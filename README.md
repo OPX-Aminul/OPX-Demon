@@ -7,7 +7,7 @@ StrykerOSS bundles a curated set of network, wireless and web security tools int
 - **Package**: `com.zalexdev.stryker`
 - **Version**: 4.5R
 - **Min SDK**: 24 (Android 7.0) · **Target SDK**: 28
-- **License**: see `LICENSE` and in-app *About → Open-source licenses*
+- **License**: [GNU GPL v3.0](LICENSE) (bundled third-party components keep their own licenses — see in-app *About → Open-source licenses*)
 - **Project site**: [zalexdev.com](https://zalexdev.com)
 - **Source**: [github.com/zalexdev/strykerapp](https://github.com/zalexdev/strykerapp)
 
@@ -147,6 +147,38 @@ When adding a feature:
 - Funnel root commands through `Core.generateSuProcess()` (direct `su` or chroot dispatch).
 - Match the existing Material 3 design language — `MaterialCardView`, `MaterialButton`, dashboard accent colors, monospace terminals.
 - Keep `targetSdk = 28` unless you are ready to migrate all storage / permission code paths.
+
+---
+
+## License
+
+StrykerOSS is free software: you can redistribute it and/or modify it under the
+terms of the **GNU General Public License v3.0** as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later version.
+The full text is in [`LICENSE`](LICENSE).
+
+```
+StrykerOSS — a mobile pentest suite for Android.
+Copyright (C) 2021-2026 zalexdev
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+```
+
+Bundled third-party components (terminal emulator, SDL/Xorg, custom-tabs, wordlists,
+PoCs, etc.) are distributed under their own GPLv3-compatible licenses — see
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) and the in-app
+*About → Open-source licenses* screen for attributions.
 
 ---
 

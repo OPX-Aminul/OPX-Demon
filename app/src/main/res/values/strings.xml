@@ -987,7 +987,7 @@
     <string name="about_link_github_url" translatable="false">github.com/zalexdev/strykerapp</string>
     <string name="about_oss_licenses_label">Open-source licenses</string>
     <string name="license_subtitle">Stryker is built on these open-source projects. Tap any entry to open its source.</string>
-    <string name="about_footer">StrykerOSS — free, open-source, authorized testing only</string>
+    <string name="about_footer">StrykerOSS — free software (GNU GPL v3.0) — authorized testing only</string>
 
     <string name="shortcut_terminal_short">Terminal</string>
     <string name="shortcut_terminal_long">Open Stryker terminal</string>
