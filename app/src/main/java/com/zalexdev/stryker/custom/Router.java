@@ -1,8 +1,5 @@
 package com.zalexdev.stryker.custom;
 
-/**
- * A router is a device that connects to a network
- */
 public class Router {
     public String auth = "";
     public String ssid = "";

@@ -1,54 +1,155 @@
-## <center> Stryker app</center>
+# StrykerOSS
 
+> A free and open-source mobile pentest suite for Android. Authorized testing only.
 
-[中文介绍](./docs/zh-CN/README.md)
-###### Requirements
+StrykerOSS bundles a curated set of network, wireless and web security tools into a single rooted-Android application, exposing them through a unified, modern UI. It runs an Alpine `chroot` under `/data/local/stryker/release` so heavyweight tools (Nmap, Metasploit, Nuclei, Hydra, SearchSploit, etc.) execute natively on the device. A built-in terminal (drawer → **Terminal**, or the **Stryker Terminal** launcher icon) drops straight into that chroot — no external shell app required.
 
-1. Android 8.0+ 
-2. Root (Magisk 23.0+)
-3. 64bit CPU (preferred)
-
-###### Description
-
-Stryker is a new generation mobile pentest application. It will help you to test your networks and devices for common vulnerabilities without special skills and knowledge. And also provides you to add your expolits and new features!
-# 📢 Stryker App — End of Life
-
-> **Thank you for being part of the journey.**
+- **Package**: `com.zalexdev.stryker`
+- **Version**: 4.5R
+- **Min SDK**: 24 (Android 7.0) · **Target SDK**: 28
+- **License**: see `LICENSE` and in-app *About → Open-source licenses*
+- **Project site**: [zalexdev.com](https://zalexdev.com)
+- **Source**: [github.com/zalexdev/strykerapp](https://github.com/zalexdev/strykerapp)
 
 ---
 
-Hey everyone,
+## Capabilities
 
-Thank you for all the time we've shared and for being part of the Stryker community. Your support, feedback, bug reports, and trust over the years have meant more than words can express.
-
-**As of today, Stryker App will no longer receive updates, and the servers have been officially shut down.**
-
-It's been an incredible ride — from the first alpha back in July 2021 to 140,000+ installations and a passionate community of security enthusiasts around the world. None of this would have been possible without you.
-
----
-
-### ⚠️ What this means
-
-- 🔴 **No further updates** will be released
-- 🔴 **Servers are permanently offline**
-- 🟡 The app may still function in offline/local mode, but no support will be provided
-
----
-
-### 📬 Stay in Touch
-
-| | |
+| Module | Description |
 |---|---|
-| 🌐 **Website** | [zalexdev.com](https://zalexdev.com) |
-| ✈️ **Telegram** | [@strykerapp](https://t.me/strykerapp) |
+| **Dashboard** | Live overview of the chroot, USB adapters, mounted state and quick actions. |
+| **WiFi networks** | Scan, deauth, handshake capture, WPS attacks (Pixie Dust, common pins, custom pins) via external monitor-mode adapters. |
+| **Handshakes** | Local handshake storage with rename, share, export to OnlineHashCrack and on-device cracking via Hashcat. |
+| **MAC changer** | Inline + dedicated MAC randomizer with persistent profiles. |
+| **Router scan** | Bulk router enumeration and credential discovery (RouterScan v2, Hydra, custom auth lists). |
+| **WhisperPair (BLE)** | Fast Pair device discovery, CVE-2025-36911 vulnerability check and full exploit chain (RAW/RETROACTIVE/EXTENDED_RESPONSE), post-pair account-key write and HFP audio capture/passthrough. |
+| **Local network** | Nmap host discovery, port scans, OS fingerprinting, per-device exploit dispatch with a live terminal. |
+| **Nmap** | Direct Nmap interface with custom scripts, NSE, and exported reports. |
+| **Web scanner (Nuclei)** | Multi-target Nuclei scans with severity-grouped findings and per-finding evidence. |
+| **Arsenal** | Custom exploit / scanner database with template arguments (`{IP}`, `{PORT}`, `{MAC}`, `{GW}`, `{MASK}`). |
+| **HID Attacks** | DuckyScript-compatible USB HID injection — pure-Java parser (Hak5 v1 + v3 superset), 7 bundled keyboard layouts (US/GB/DE/FR/ES/IT/RU), live execution log and bundled sample payloads. |
+| **USB Arsenal** | USB-gadget profile manager — toggle HID keyboard/mouse, mass-storage, RNDIS/ECM/ACM functions on the fly, customise VID/PID/serial, mount `.img`/`.iso` images as removable disks. |
+| **Metasploit** | Native MSF console inside the chroot with sessions, payload generation and module browser. |
+| **GeoMac** | OSM-based map of captured BSSIDs / handshakes with WiGLE-style export (KML/CSV). |
+| **VNC desktop** | Stand-up an in-chroot XFCE/Xfce-VNC session and view it locally. |
+| **Core manager** | Mount / unmount / repair the chroot, manage installed components. |
 
 ---
 
+## Requirements
 
-### 🙏 Thank You
+- **Rooted Android device** (Magisk or KernelSU recommended).
+- **~1 GB free internal storage** for the chroot, bundled tools and signatures.
+- **External monitor-mode USB Wi-Fi adapter** for handshake capture and deauthentication (Atheros AR9271 / Realtek 88XXAU recommended).
+- **Gadget-capable kernel (optional)** for HID Attacks and USB Arsenal. Required kernel options:
+  - `CONFIG_USB_CONFIGFS=y`
+  - `CONFIG_USB_CONFIGFS_F_HID=y`
+  - `CONFIG_USB_CONFIGFS_MASS_STORAGE=y` (for mass-storage profiles)
+  - `CONFIG_USB_CONFIGFS_RNDIS=y` / `CONFIG_USB_CONFIGFS_ECM=y` (for network profiles)
+  - kernel ≥ 3.19, `/sys/class/udc/` populated
+  - NetHunter / KernelSU-Next kernels and most modern OEM kernels meet these requirements out of the box.
 
-To every user, tester, contributor, and supporter — **thank you**. You made Stryker what it was.
+---
 
-Take care ✌️
+## Build
 
-— **ZalexDev**
+Standard Android Gradle build. Java 8 sources, ndk-build for native code, R8 minification for release.
+
+```bash
+# Debug APK
+./gradlew assembleDebug
+
+# Release APK (minified + R8)
+./gradlew assembleRelease
+
+# Install on a connected device
+./gradlew installDebug
+
+# Lint
+./gradlew lint
+```
+
+Output APKs land in `app/build/outputs/apk/`.
+
+### Release signing
+
+Configure these in `~/.gradle/gradle.properties` (or pass via `-P` / environment):
+
+```properties
+STRYKER_RELEASE_STORE_FILE=/path/to/keystore.jks
+STRYKER_RELEASE_STORE_PASSWORD=...
+STRYKER_RELEASE_KEY_ALIAS=...
+STRYKER_RELEASE_KEY_PASSWORD=...
+```
+
+If the variables are not set, the release build is left unsigned so CI / contributors can still produce an APK.
+
+---
+
+## Installation (end users)
+
+1. Install the APK on a **rooted** device (`adb install StrykerOSS-4.5R.apk` or sideload).
+2. On first launch the in-app installer (`AppIntroActivity`) will:
+   - Request root (`su`).
+   - Request runtime permissions (storage, location, notifications, Bluetooth, audio).
+   - Download and unpack the Alpine `chroot` core (`core.tar.gz`).
+   - Mount the chroot at `/data/local/stryker/release`.
+   - Install optional components (Metasploit, Nuclei, Hydra, SearchSploit).
+3. Open the built-in terminal (drawer → **Terminal**) for a shell straight into the chroot.
+4. Plug in a supported USB Wi-Fi adapter for monitor-mode features.
+
+---
+
+## Project layout
+
+```
+app/
+├── src/main/java/com/zalexdev/stryker/
+│   ├── MainActivity.java            # Single-Activity host, drawer navigation
+│   ├── about/                       # About / info page
+│   ├── appintro/                    # First-launch installer & slides
+│   ├── arsenal/                     # Custom exploit/scanner database
+│   ├── coremanger/                  # Chroot manage / repair UI
+│   ├── custom/                      # POJO domain models
+│   ├── dashboard/                   # Home dashboard
+│   ├── geomac/                      # OSM map for captured BSSIDs
+│   ├── handshakes/                  # Handshake browser + cracking
+│   ├── hid/                         # HID Attacks: DuckyScript engine, keymaps, executor, UI
+│   ├── hydra/                       # Hydra integration
+│   ├── localnetwork/                # LAN scan + exploit dispatch
+│   ├── macchanger/                  # MAC randomizer
+│   ├── metasploit/                  # MSF integration
+│   ├── nmap/                        # Nmap UI
+│   ├── nuclei/                      # Web vuln scanner
+│   ├── routerscan/                  # Router enumeration
+│   ├── searchsploit/                # ExploitDB browser
+│   ├── settings/                    # User settings
+│   ├── usbarsenal/                  # USB Arsenal: gadget profiles, configfs orchestration
+│   ├── utils/                       # Core helpers, process wrappers
+│   ├── vnc/                         # In-chroot VNC desktop
+│   ├── wifi/                        # WiFi scan / attack
+│   └── wpair/                       # WhisperPair (BLE Fast Pair) module
+├── src/main/jni/                    # Native code (ndk-build)
+├── src/main/assets/                 # Chroot scripts, wordlists, busybox
+└── src/main/res/                    # Layouts, drawables, strings, themes
+```
+
+---
+
+## Contributing
+
+PRs and issues are welcome at [github.com/zalexdev/strykerapp](https://github.com/zalexdev/strykerapp).
+
+When adding a feature:
+
+- Keep modules self-contained under `com.zalexdev.stryker.<module>`.
+- Reuse `Core.java` helpers for SharedPreferences, SQLite, asset extraction and root process execution rather than re-rolling them.
+- Funnel root commands through `Core.generateSuProcess()` (direct `su` or chroot dispatch).
+- Match the existing Material 3 design language — `MaterialCardView`, `MaterialButton`, dashboard accent colors, monospace terminals.
+- Keep `targetSdk = 28` unless you are ready to migrate all storage / permission code paths.
+
+---
+
+## Disclaimer
+
+StrykerOSS is provided **for authorized security testing, education and research only**. You are responsible for complying with all applicable laws and obtaining explicit permission before testing any system or device you do not own. The authors accept no liability for misuse.

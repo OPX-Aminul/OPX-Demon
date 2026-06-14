@@ -1,17 +1,17 @@
 RT2860
 AIR3G
 AirLive
-ArcherA9
-ArcherA2
-ArcherA5
-ArcherC2
-ArcherC5
-ArcherC6U
-ArcherC20
-ArcherC50
-ArcherMR200
-ArcherVR300
-ArcherVR400
+Archer A9
+Archer A2
+Archer A5
+Archer C2
+Archer C5
+Archer C6U
+Archer C20
+Archer C50
+Archer MR200
+Archer VR300
+Archer VR400
 B-LINK
 Belkin
 WPSRouter
@@ -107,3 +107,9 @@ RT-N300
 NBG-416N
 NBG-418N
 NBG-417N
+VMG8623
+TL-WA801ND
+ADSL
+RTL-8671
+Internet Sharing
+EnGenius

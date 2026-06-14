@@ -1,32 +1,49 @@
 package com.zalexdev.stryker.custom;
+import java.util.ArrayList;
 import java.util.Comparator;
 
-/**
- * A WiFiNetwork is a WiFi network that has been detected by the app
- */
 public class WiFINetwork {
-    public String mac;
-    public String ssid;
+    public String mac = "XX:XX:XX:XX:XX:XX";
+    public String vendor = "Unknown";
+    public String ssid = "Unknown";
     public Boolean wps = false;
     public Boolean is5hhz = false;
     public Boolean isOK = false;
     public Boolean isBlocked = false;
-    public String model;
-    public String power = "40";
-    public String channel = "1";
-    public String lon;
-    public String lun;
-    public String date;
-    public String psk;
-    public String pin;
+    public Boolean isVulnerable = false;
+    public String model = "";
+    public int power = 40;
+    public int channel = 1;
+    public String lon = "";
+    public String lun = "";
+    public String date = "";
+    public String psk = "";
+    public String pin = "";
+    public String name = "";
     public boolean canceled = false;
     public boolean three = false;
-
+    public ArrayList<String> info = new ArrayList<>();
     public WiFINetwork() {
     }
 
+    public void setVendor(String vendor) {
+        this.vendor = vendor;
+    }
+
+    public String getVendor() {
+        return vendor;
+    }
+
     public String getMac() {
-        return mac;
+        return mac.trim();
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name.trim();
     }
 
     public void setMac(String mac) {
@@ -38,11 +55,11 @@ public class WiFINetwork {
     }
 
     public void setSsid(String ssid) {
-        this.ssid = ssid;
+        this.ssid = ssid.trim();
     }
 
     public Boolean getIs5hhz() {
-        return Integer.parseInt(channel) < 20;
+        return channel >= 18;
     }
 
     public void setIs5hhz(Boolean is5hhz) {
@@ -57,16 +74,21 @@ public class WiFINetwork {
         this.wps = wps;
     }
 
-    public String getChannel() {
+    public int getChannel() {
         return channel;
     }
 
-    public void setChannel(String channel) {
+    public void setChannel(int channel) {
         this.channel = channel;
     }
 
     public String getModel() {
-        return model;
+        if (model != null) {
+             return model.trim();
+        }else{
+            return null;
+        }
+
     }
 
     public void setModel(String model) {
@@ -74,10 +96,10 @@ public class WiFINetwork {
     }
 
     public int getPower() {
-        return Integer.parseInt(power);
+        return power;
     }
 
-    public void setPower(String power) {
+    public void setPower(int power) {
         this.power = power;
     }
 
@@ -157,5 +179,20 @@ public class WiFINetwork {
 
     public void setThree(boolean three) {
         this.three = three;
+    }
+
+    public void setVulnerable(Boolean vulnerable) {
+        isVulnerable = vulnerable;
+    }
+    public boolean isVulnerable() {
+        return isVulnerable;
+    }
+
+    public void setInfo(ArrayList<String> info) {
+        this.info = info;
+    }
+
+    public ArrayList<String> getInfo() {
+        return info;
     }
 }

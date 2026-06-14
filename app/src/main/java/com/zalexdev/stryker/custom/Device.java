@@ -2,70 +2,74 @@ package com.zalexdev.stryker.custom;
 
 import com.zalexdev.stryker.R;
 
+import org.json.JSONObject;
+
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Locale;
 
-/**
- * A Device object is a single device that is scanned. It contains the IP address, MAC address, vendor,
- * OS, and subname. It also contains a list of ports and services
- */
 public class Device {
     public String ip = "Network error...";
     public String mac = "Scanning...";
     public String vendor = "";
     public int image = 0;
     public String os = "Unknown";
-    public String subname;
-    public ArrayList<String> ports = new ArrayList<>();
-    public ArrayList<String> services = new ArrayList<>();
-    public ArrayList<String> versions = new ArrayList<>();
+    public String subname = "";
+    public ArrayList<Port> ports = new ArrayList<>();
+    private ArrayList<String> nmapoutput = new ArrayList<String>();
     public boolean shim = true;
     boolean iscutted = false;
+    public ArrayList<String> portsFromString = new ArrayList<>();
 
     public Device() {
     }
 
-    public void addPort(String port) {
+    public void setPorts(ArrayList<Port> ports) {
+        this.ports = ports;
+    }
+
+
+    public ArrayList<String> getNmapoutput() {
+        return nmapoutput;
+    }
+
+    public void setNmapoutput(ArrayList<String> nmapoutput) {
+        this.nmapoutput = nmapoutput;
+    }
+    public void addPort(Port port) {
         ports.add(port);
     }
     public void guessos(){
-        ArrayList<String> ports = getPorts();
-        if (ports.contains("21") || ports.contains("22") || ports.contains("23")) {
-            setOs("Linux");
-            setImage(R.drawable.linux);
-        }
-        if (ports.contains("554") || ports.contains("37777")) {
-            setOs("Secure Camera");
-            setImage(R.drawable.camera);
-        }
-        if (ports.contains("9100")) {
-            setOs("Printer");
-            setImage(R.drawable.printer);
-        }
-        if (ports.contains("5555")) {
-            setOs("Android");
-            setImage(R.drawable.iphone);
-        }if (ports.contains("2336") || ports.contains("3004") || ports.contains("3031")) {
-            setOs("IOS/MACOS");
-            setImage(R.drawable.aplle);
-        }
-        if (ports.contains("3389") || ports.contains("135") || ports.contains("136") || ports.contains("137") || ports.contains("138") || ports.contains("139") || ports.contains("5357") || ports.contains("445") || ports.contains("903")) {
-            setOs("Windows");
-            setImage(R.drawable.windows);
-        }
-        if (ports.contains("1900")){
-            setOs("Linux");
-            setImage(R.drawable.router);
+        ArrayList<Port> ports = getPorts();
+        for (Port port : ports) {
+            if (port.getPortNumber().contains("21") || port.getPortNumber().contains("22") || port.getPortNumber().contains("23")) {
+                setOs("Linux");
+                setImage(R.drawable.linux);
+            }
+            if (port.getPortNumber().contains("554") || port.getPortNumber().contains("37777")) {
+                setOs("Secure Camera");
+                setImage(R.drawable.nest_cam_indoor);
+            }
+            if (port.getPortNumber().contains("9100")) {
+                setOs("Printer");
+                setImage(R.drawable.printer);
+            }
+            if (port.getPortNumber().contains("2336") || port.getPortNumber().contains("3004") || port.getPortNumber().contains("3031")) {
+                setOs("IOS/MACOS");
+                setImage(R.drawable.apple);
+            }
+            if (port.getPortNumber().contains("3389") || port.getPortNumber().contains("135") || port.getPortNumber().contains("136") || port.getPortNumber().contains("137") || port.getPortNumber().contains("138") || port.getPortNumber().contains("139") || port.getPortNumber().contains("5357") || port.getPortNumber().contains("445") || port.getPortNumber().contains("903")) {
+                setOs("Windows");
+                setImage(R.drawable.windows);
+            }
+            if (port.getPortNumber().contains("1900")) {
+                setOs("Linux");
+                setImage(R.drawable.router);
+            }
         }
         
     }
-    public void addService(String serv) {
-        services.add(serv);
-    }
 
-    public ArrayList<String> getServices() {
-        return services;
-    }
 
     public String getIp() {
         return ip;
@@ -75,21 +79,15 @@ public class Device {
         this.ip = ip;
     }
 
-    public ArrayList<String> getPorts() {
+    public ArrayList<Port> getPorts() {
         return ports;
     }
-
-    public ArrayList<String> getVersions() {
-        return versions;
-    }
-
-    public void setVersions(ArrayList<String> versions) {
-        this.versions = versions;
-    }
+    
 
     public int getImage() {
+
         if (image == 0) {
-            image = R.drawable.devices_local;
+            image = R.drawable.devices;
         }
         if (os.contains("Windows")){
             image = R.drawable.windows;
@@ -98,7 +96,7 @@ public class Device {
             image = R.drawable.linux;
         }
         if (os.contains("Android")){
-            image = R.drawable.smartphone;
+            image = R.drawable.iphone;
         }
         if (os.contains("IOS")||os.contains("MacOS")||os.contains("Apple")){
             image = R.drawable.apple;
@@ -135,14 +133,29 @@ public class Device {
         String ven = vendor.toLowerCase(Locale.ROOT);
         if (ven.contains("apple")) {
             setOs("MacOS/IOS");
-            setImage(R.drawable.aplle);
+            setImage(R.drawable.apple);
         } else if (ven.contains("microsoft")) {
             setOs("Windows");
             setImage(R.drawable.windows);
         } else if (ven.contains("hikvision") || ven.contains("dahua")) {
             setOs("Secure Camera");
-            setImage(R.drawable.camera);
+            setImage(R.drawable.apple);
         }
+
+    }
+    public ArrayList<String> portsToString(){
+        ArrayList<String> ports = new ArrayList<>();
+        for (Port port : getPorts()){
+            ports.add(port.getPortNumber());
+        }
+        return ports;
+    }
+    public String portsArrayToString(){
+        StringBuilder ports = new StringBuilder();
+        for (Port port : getPorts()){
+            ports.append(port.getPortNumber()).append(",");
+        }
+        return ports.toString();
     }
 
     public boolean isShim() {
@@ -168,4 +181,37 @@ public class Device {
     public void setIscutted(boolean iscutted) {
         this.iscutted = iscutted;
     }
+
+    public String toJSON(){
+        JSONObject json = new JSONObject();
+        try {
+            json.put("ip", getIp());
+            json.put("mac", getMac());
+            json.put("vendor", getVendor());
+            json.put("os", getOs());
+            json.put("subname", getSubname());
+            json.put("iscutted", isIscutted());
+            json.put("shim", isShim());
+            json.put("ports", portsArrayToString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return json.toString();
+    }
+    public void restoreFromJSON(String json){
+        try {
+            JSONObject jsonObject = new JSONObject(json);
+            setIp(jsonObject.getString("ip"));
+            setMac(jsonObject.getString("mac"));
+            setVendor(jsonObject.getString("vendor"));
+            setOs(jsonObject.getString("os"));
+            setSubname(jsonObject.getString("subname"));
+            setIscutted(jsonObject.getBoolean("iscutted"));
+            setShim(jsonObject.getBoolean("shim"));
+            Collections.addAll(portsFromString, jsonObject.getString("ports").split(","));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 }

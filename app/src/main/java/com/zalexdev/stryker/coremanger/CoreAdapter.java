@@ -1,48 +1,38 @@
 package com.zalexdev.stryker.coremanger;
 
-
-import static com.zalexdev.stryker.R.string.*;
-
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
-import android.os.AsyncTask;
-import android.os.Build;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.zalexdev.stryker.R;
-import com.zalexdev.stryker.coremanger.utils.InstallPackage;
 import com.zalexdev.stryker.custom.Package;
 import com.zalexdev.stryker.utils.Core;
-import com.zalexdev.stryker.utils.CustomCommand;
 
 import java.util.ArrayList;
-import java.util.concurrent.ExecutionException;
 
-/**
- * This class is used to display the packages in the list
- */
 public class CoreAdapter extends RecyclerView.Adapter<CoreAdapter.ViewHolder> {
-    public ArrayList<Package> pkgs;
-    public Context context;
-    public Activity activity;
-    public Core core;
 
-    public CoreAdapter(Context context2, Activity mActivity, ArrayList<Package> pskss) {
-        context = context2;
-        pkgs = pskss;
-        activity = mActivity;
-        core = new Core(context2);
+    private final Activity activity;
+    private final Context context;
+    private final Core core;
+    private final ArrayList<Package> packages;
+    private final Runnable onChange;
+
+    public CoreAdapter(Context context, Activity activity, ArrayList<Package> packages, Runnable onChange) {
+        this.context = context;
+        this.packages = packages;
+        this.activity = activity;
+        this.onChange = onChange;
+        core = new Core(context);
     }
 
     @NonNull
@@ -53,73 +43,120 @@ public class CoreAdapter extends RecyclerView.Adapter<CoreAdapter.ViewHolder> {
     }
 
     @SuppressLint("SetTextI18n")
-    @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
-    public void onBindViewHolder(@NonNull ViewHolder adapter, @SuppressLint("RecyclerView") final int position) {
-        Package temp = pkgs.get(position);
-        adapter.title.setText(temp.getName());
-        adapter.version.setText(temp.getVersion());
-        adapter.install.setOnClickListener(view -> {
-            adapter.install.setVisibility(View.INVISIBLE);
-            core.toaster(core.str("installingg"));
-            new Thread(() -> {
-                try {
-                    Boolean ok = new InstallPackage(temp.getName(),core).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR).get();
-                    if (ok){
-                        toaster(core.str("installed")+" "+temp.getName());
-                    }else{
-                        toaster(core.str("inst_error")+" "+temp.getName());
-                        activity.runOnUiThread(() -> adapter.install.setVisibility(View.VISIBLE));
-                    }
+    public void onBindViewHolder(@NonNull ViewHolder h, @SuppressLint("RecyclerView") int position) {
+        Package temp = packages.get(position);
+        h.title.setText(temp.getName());
+        h.version.setText(temp.getVersion());
+        h.progress.setVisibility(View.GONE);
+        h.action.setVisibility(View.VISIBLE);
 
-                } catch (ExecutionException | InterruptedException e) {
-                    e.printStackTrace();
+        if (temp.isPythonPackage()) {
+            h.sourceChip.setText(R.string.core_mgr_chip_python);
+            h.sourceChip.setTextColor(android.graphics.Color.parseColor("#FB8C00"));
+        } else {
+            h.sourceChip.setText(R.string.core_mgr_chip_apk);
+            h.sourceChip.setTextColor(android.graphics.Color.parseColor("#1E88E5"));
+        }
+
+        if (temp.isInstalled()) {
+            h.installedChip.setVisibility(View.VISIBLE);
+            h.action.setImageResource(R.drawable.delete);
+            h.action.setColorFilter(android.graphics.Color.parseColor("#D32F2F"));
+            h.action.setOnClickListener(v -> uninstall(h, temp));
+        } else {
+            h.installedChip.setVisibility(View.GONE);
+            h.action.setImageResource(R.drawable.download);
+            h.action.setColorFilter(android.graphics.Color.parseColor("#AB47BC"));
+            h.action.setOnClickListener(v -> install(h, temp));
+        }
+    }
+
+    private void install(ViewHolder h, Package temp) {
+        h.action.setVisibility(View.GONE);
+        h.progress.setVisibility(View.VISIBLE);
+        core.toaster(activity, context.getString(R.string.core_mgr_installing, temp.getName()));
+        new Thread(() -> {
+            boolean ok;
+            if (temp.isPythonPackage()) {
+                ok = Core.contains(core.customChrootCommand("pip install --break-system-packages " + temp.getName()), "Successfully installed");
+            } else {
+                ok = Core.contains(core.customChrootCommand("apk add " + temp.getName()), "OK:");
+            }
+            final boolean okFinal = ok;
+            activity.runOnUiThread(() -> {
+                h.progress.setVisibility(View.GONE);
+                h.action.setVisibility(View.VISIBLE);
+                if (okFinal) {
+                    core.toaster(context.getString(R.string.core_mgr_install_ok, temp.getName()));
+                    temp.setInstalled(true);
+                    notifyItemChanged(h.getAdapterPosition());
+                    if (onChange != null) onChange.run();
+                } else {
+                    core.toaster(context.getString(R.string.core_mgr_install_failed, temp.getName()));
                 }
-            }).start();
-        });
+            });
+        }).start();
+    }
+
+    private void uninstall(ViewHolder h, Package temp) {
+        h.action.setVisibility(View.GONE);
+        h.progress.setVisibility(View.VISIBLE);
+        core.toaster(activity, context.getString(R.string.core_mgr_uninstalling, temp.getName()));
+        new Thread(() -> {
+            boolean ok;
+            if (temp.isPythonPackage()) {
+                ok = Core.contains(core.customChrootCommand("pip uninstall " + temp.getName() + " -y"), "Successfully uninstalled");
+            } else {
+                ok = Core.contains(core.customChrootCommand("apk del " + temp.getName()), "OK:");
+            }
+            final boolean okFinal = ok;
+            activity.runOnUiThread(() -> {
+                h.progress.setVisibility(View.GONE);
+                h.action.setVisibility(View.VISIBLE);
+                if (okFinal) {
+                    core.toaster(context.getString(R.string.core_mgr_uninstall_ok, temp.getName()));
+                    temp.setInstalled(false);
+                    notifyItemChanged(h.getAdapterPosition());
+                    if (onChange != null) onChange.run();
+                } else {
+                    core.toaster(context.getString(R.string.core_mgr_uninstall_failed, temp.getName()));
+                }
+            });
+        }).start();
     }
 
     @Override
     public int getItemCount() {
-
-        return pkgs.size();
-    }
-
-    public void toaster(String msg) {
-        activity.runOnUiThread(() -> {
-            Toast toast = Toast.makeText(context,
-                    msg, Toast.LENGTH_SHORT);
-            toast.show();
-        });
-
-    }
-
-    public void appendtext(String text, TextView output) {
-        activity.runOnUiThread(() -> output.append(text));
+        return packages.size();
     }
 
     @Override
     public long getItemId(int position) {
-        return position;
+        return packages.get(position).getName().hashCode();
     }
 
     @Override
     public int getItemViewType(int position) {
-        return position;
+        return 0;
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
         public TextView title;
         public TextView version;
-        public ImageView install;
+        public TextView sourceChip;
+        public TextView installedChip;
+        public ImageView action;
+        public CircularProgressIndicator progress;
 
         public ViewHolder(View v) {
             super(v);
             version = v.findViewById(R.id.version);
             title = v.findViewById(R.id.title);
-            install = v.findViewById(R.id.run_sploit);
+            sourceChip = v.findViewById(R.id.pkg_source_chip);
+            installedChip = v.findViewById(R.id.pkg_installed_chip);
+            action = v.findViewById(R.id.run_sploit);
+            progress = v.findViewById(R.id.pkg_progress);
         }
-
     }
-
 }

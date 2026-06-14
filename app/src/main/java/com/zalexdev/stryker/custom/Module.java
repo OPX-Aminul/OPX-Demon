@@ -1,10 +1,5 @@
 package com.zalexdev.stryker.custom;
 
-import org.jsoup.nodes.Document;
-
-/**
- * A list of attributes of a module
- */
 public class Module {
     public String name;
     public String author;

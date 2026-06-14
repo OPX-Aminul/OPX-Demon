@@ -1,10 +1,7 @@
 #!/system/bin/sh
 
-## R1 by @ZALEXDEV
-###
-FROM_ZALEXDEV_TO_WORLD=$(readlink -f $0)
-. ${FROM_ZALEXDEV_TO_WORLD%/*}/bootroot_env
-###
+SELF_PATH=$(readlink -f $0)
+. ${SELF_PATH%/*}/bootroot_env
 
 
 ######### CHECK IF WORKING CHROOT DIR EXISTS #########
@@ -20,7 +17,7 @@ f_chk_chroot() {
 ######### CHECK IF FS IS ALL MOUNTED ALREADY #########
 f_isAllReady(){
     local FS
-    FS=(proc sys dev dev/pts system sdcard)
+    FS=(proc sys dev dev/pts system sdcard/Stryker)
     for i in "${FS[@]}"; do
         if [ "$(grep $MNT/$i /proc/mounts)" ]; then
             echo "[+] $i was mounted already."
@@ -36,13 +33,18 @@ f_isAllReady(){
 }
 
 ######### MOUNT SDCARD #########
-
+# SAFETY: bind ONLY our own /sdcard/Stryker folder into the chroot, never the
+# whole shared storage. Binding the entire /sdcard meant a stray "rm -rf" of the
+# chroot tree (our own uninstall, killroot, or a third-party cleaner run while
+# still mounted) could recurse through the bind and wipe the user's ENTIRE
+# internal storage. Scoping the bind to /sdcard/Stryker bounds that blast radius
+# to our own folder. The chroot still sees the data at /sdcard/Stryker exactly
+# as before, so nothing else changes.
 f_mount_sdcard() {
-    if [ -d "$MNT/sdcard" ]; then
-        $BUSYBOX mountpoint -q "$MNT/sdcard" && return 0
-        rm -rf $MNT/sdcard
+    if $BUSYBOX mountpoint -q "$MNT/sdcard/Stryker"; then
+        return 0
     fi
-    mkdir -p $MNT/sdcard
+    mkdir -p "$MNT/sdcard/Stryker"
     for sdcard in \
         "$EXTERNAL_STORAGE" \
         /storage/emulated/0 \
@@ -50,9 +52,11 @@ f_mount_sdcard() {
         /storage/sdcard0 \
         /sdcard
     do
-        [ -d "$sdcard" ] &&
-            $BUSYBOX mount -o bind "$sdcard" "$MNT/sdcard" && echo "[+] mounted /sdcard" &&
-                return 0
+        if [ -d "$sdcard" ]; then
+            mkdir -p "$sdcard/Stryker"
+            $BUSYBOX mount -o bind "$sdcard/Stryker" "$MNT/sdcard/Stryker" &&
+                echo "[+] mounted /sdcard/Stryker" && return 0
+        fi
     done
     return 1
 }
@@ -138,9 +142,23 @@ f_mount_fs() {
 
     ######### SET NETWORK AND HOSTNAME ########
     $BUSYBOX sysctl -w net.ipv4.ip_forward=1
-    echo "127.0.0.1		 localhost stryker"                                       > $MNT/etc/hosts
-    echo "::1				 localhost ip6-localhost ip6-loopback" >> $MNT/etc/hosts
-    echo "stryker"                                                                            > $MNT/proc/sys/kernel/hostname
+    echo "127.0.0.1    localhost stryker"              > $MNT/etc/hosts
+    echo "::1    localhost ip6-localhost ip6-loopback" >> $MNT/etc/hosts
+    echo 'nameserver 8.8.8.8'                          > /data/local/stryker/release/etc/resolv.conf
+    echo 'nameserver 8.8.4.4'                          >> /data/local/stryker/release/etc/resolv.conf
+
+    ######### SET STRYKER SHELL PROMPT #########
+    # Deploy the cool interactive prompt + aliases into the chroot (idempotent),
+    # sourced from /etc/profile so the terminal's `ash -l` login shells use it
+    # instead of the bland default "localhost" prompt. Done on every mount so new
+    # AND existing installs pick it up.
+    if [ -f /data/data/$APP_PGK_NAME/files/stryker_profile.sh ]; then
+        cp -f /data/data/$APP_PGK_NAME/files/stryker_profile.sh $MNT/etc/stryker_profile.sh
+        chmod 644 $MNT/etc/stryker_profile.sh
+        if ! grep -q stryker_profile.sh $MNT/etc/profile 2> /dev/null; then
+            echo '. /etc/stryker_profile.sh' >> $MNT/etc/profile
+        fi
+    fi
 
     ######### Setup done #########
     echo "[+] The Chroot has been started."

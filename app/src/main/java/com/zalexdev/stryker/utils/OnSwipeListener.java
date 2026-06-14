@@ -1,5 +1,6 @@
 package com.zalexdev.stryker.utils;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
@@ -13,6 +14,7 @@ public class OnSwipeListener implements View.OnTouchListener {
         gestureDetector = new GestureDetector(context, new GestureListener());
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouch(View v, MotionEvent event) {
         return gestureDetector.onTouchEvent(event);
@@ -22,11 +24,6 @@ public class OnSwipeListener implements View.OnTouchListener {
 
         private static final int SWIPE_VELOCITY_THRESHOLD = 100;
         private static final int SWIPE_THRESHOLD = 100;
-
-        @Override
-        public boolean onDown(MotionEvent e) {
-            return true;
-        }
 
         @Override
         public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
@@ -42,6 +39,7 @@ public class OnSwipeListener implements View.OnTouchListener {
                 }
             } else if (Math.abs(diffY) > SWIPE_THRESHOLD && Math.abs(velocityY) > SWIPE_VELOCITY_THRESHOLD) {
                 if (diffY > 0) {
+
                     onSwipeBottom();
                 } else {
                     onSwipeTop();

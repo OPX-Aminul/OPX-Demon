@@ -1,7 +1,5 @@
 package com.zalexdev.stryker.handshakes.utils;
 
-import static android.content.ContentValues.TAG;
-
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Notification;
@@ -12,7 +10,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Build;
-import android.util.Log;
 import android.widget.TextView;
 
 import androidx.annotation.RequiresApi;
@@ -21,20 +18,19 @@ import androidx.core.app.NotificationCompat;
 import com.zalexdev.stryker.MainActivity;
 import com.zalexdev.stryker.R;
 import com.zalexdev.stryker.custom.WiFINetwork;
+import com.zalexdev.stryker.logger.Logger;
 import com.zalexdev.stryker.utils.Core;
+import com.zalexdev.stryker.utils.Utils;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.util.ArrayList;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * This class is used to run the aircrack-ng and brute handshake
- */
 public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
     public String exec = Core.EXECUTE;
     public String path;
@@ -46,6 +42,7 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
     public Context context;
     public int id;
     public Process process;
+    public Logger logger;
 
     public BruteHandshake(String p, String w, Core c, Activity a, Context con, TextView pr, TextView t, int i) {
         core = c;
@@ -56,6 +53,7 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
         time = t;
         context = con;
         id = i;
+        logger = new Logger();
     }
 
     @Override
@@ -69,22 +67,27 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
     protected WiFINetwork doInBackground(Void... command) {
         String line;
         WiFINetwork result = new WiFINetwork();
+        logger.writeLine("Starting brute handshake",1);
         try {
             process = Runtime.getRuntime().exec("su");
             OutputStream stdin = process.getOutputStream();
             InputStream stderr = process.getErrorStream();
             InputStream stdout = process.getInputStream();
-            stdin.write((exec + "'aircrack-ng -w " + wordlist + " " + path + " '" + '\n').getBytes());
+            stdin.write((exec + "'aircrack-ng -w/sdcard/Stryker/wordlists/" + wordlist + " /sdcard/Stryker/captured/" + path + " '" + '\n').getBytes());
             stdin.flush();
             stdin.close();
-            ArrayList<String> out2 = new ArrayList<>();
-            ArrayList<String> outerror = new ArrayList<>();
+
             BufferedReader br = new BufferedReader(new InputStreamReader(stdout));
             while ((line = br.readLine()) != null) {
-                out2.add(line);
+
+                logger.writeLine(line,2);
                 onProgressUpdate(line);
-                if (line.contains("\u001B[11B\u001B[8;28H\u001B[2KKEY FOUND! [ ")) {
-                    result.setPsk(line.replace("\u001B[11B\u001B[8;28H\u001B[2KKEY FOUND! [ ", "").replace(" ]", "").replaceAll("\\s+", ""));
+                if (line.contains("KEY FOUND! [ ")) {
+                    Pattern pattern = Pattern.compile("\\[ (.*?)\\]");
+                    Matcher matcher = pattern.matcher(line);
+                    if (matcher.find()) {
+                        result.setPsk(matcher.group(1));
+                    }
                     result.setOK(true);
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         CreateNotification("Success", "Password found: " + result.getPsk(), 100, 100);
@@ -94,15 +97,14 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
             br.close();
             br = new BufferedReader(new InputStreamReader(stderr));
             while ((line = br.readLine()) != null) {
-                outerror.add(line);
+
+                logger.writeLine(line,3);
             }
-            core.writetolog(out2, false);
-            core.writetolog(outerror, true);
             br.close();
             process.waitFor();
             process.destroy();
+
         } catch (IOException | InterruptedException e) {
-            Log.d("Debug: ", "An IOException was caught: " + e.getMessage());
         }
         if (!result.getOK()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -147,8 +149,8 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
             int pr = 0;
             int all = 0;
             if (matcher.find()) {
-                pr = Integer.parseInt(matcher.group(0).split("/")[0]);
-                all = Integer.parseInt(matcher.group(0).split("/")[1]);
+                pr = Integer.parseInt(Objects.requireNonNull(matcher.group(0)).split("/")[0]);
+                all = Integer.parseInt(Objects.requireNonNull(matcher.group(0)).split("/")[1]);
                 progress.setText("Progress: " + matcher.group(0) + " k/s");
             }
             if (rem.length() != 0) {
@@ -164,7 +166,7 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
     @RequiresApi(api = Build.VERSION_CODES.O)
     public void CreateNotification(String key, String left, int prog, int max) {
         Intent intent = new Intent(context, MainActivity.class);
-        PendingIntent contentIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent contentIntent = PendingIntent.getActivity(context, 0, intent, Utils.setPendingIntentFlag());
         String CHANNEL_ID = "BruteForce";
         NotificationChannel notificationChannel = new NotificationChannel(CHANNEL_ID, "BruteForce", NotificationManager.IMPORTANCE_LOW);
 
@@ -173,7 +175,7 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
         b.setAutoCancel(true)
                 .setDefaults(Notification.DEFAULT_ALL)
                 .setWhen(System.currentTimeMillis())
-                .setSmallIcon(R.drawable.iconnotif)
+                .setSmallIcon(R.drawable.bolt)
                 .setTicker("Brute")
                 .setContentTitle(left)
                 .setContentText(key)

@@ -1,13 +1,10 @@
 package com.zalexdev.stryker.nmap.utils;
 
-import static android.content.ContentValues.TAG;
-
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.os.AsyncTask;
 import android.util.Log;
-import android.widget.TextView;
 
 import com.zalexdev.stryker.utils.Core;
 
@@ -16,113 +13,91 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Timer;
-import java.util.TimerTask;
 
-/**
- * This class is used to scan a target
- */
 public class ScanTarget extends AsyncTask<Void, String, Boolean> {
-    public String exec = Core.EXECUTE;
-    public String ip;
-    public Activity activity;
-    public TextView output;
-    public Core core;
-    public ArrayList<Boolean> settings;
 
-    public ScanTarget(String i, ArrayList<Boolean> s, Context context, Activity a, TextView o) {
-        ip = i;
-        core = new Core(context);
-        activity = a;
-        output = o;
-        settings = s;
+    public interface Callback {
+        void onLine(String line);
+        void onFinished(boolean ok);
     }
 
-    @Override
-    protected void onPreExecute() {
-        super.onPreExecute();
+    private final String command;
+    private final Activity activity;
+    private final Callback callback;
+    private final Core core;
+
+    private Process process;
+    private volatile boolean killed;
+
+    public ScanTarget(String command, Context context, Activity activity, Callback callback) {
+        this.command = command;
+        this.activity = activity;
+        this.callback = callback;
+        this.core = new Core(context);
+    }
+
+    public void kill() {
+        killed = true;
+        if (process != null) {
+            try {
+                process.destroy();
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     @SuppressLint("WrongThread")
     @Override
-    protected Boolean doInBackground(Void... command) {
-        String line;
-        Boolean ok = false;
+    protected Boolean doInBackground(Void... voids) {
+        boolean ok = false;
         try {
-            Process process = Runtime.getRuntime().exec("su");
+            process = Runtime.getRuntime().exec("su");
             OutputStream stdin = process.getOutputStream();
             InputStream stderr = process.getErrorStream();
             InputStream stdout = process.getInputStream();
-            StringBuilder cmd = new StringBuilder();
-            cmd.append("nmap ").append(ip).append(" ");
-            if (settings.get(0)) {
-                cmd.append(" -O ");
-            }
-            if (settings.get(1)) {
-                cmd.append(" -sV ");
-            }
-            if (settings.get(2)) {
-                cmd.append(" -F --top 100 ");
-            }
-            if (settings.get(3)) {
-                cmd.append(" -Pn ");
-            }
-            Timer checkprg = new Timer();
-            checkprg.scheduleAtFixedRate(new TimerTask() {
-                @Override
-                public void run() {
-                    try {
-                        stdin.write(("" + '\n').getBytes());
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }, 200, 1000);
-            stdin.write((exec + "'" + cmd.toString() + "'&&echo SCANFINISHED" + '\n').getBytes());
+            String wrapped = Core.EXECUTE + "'" + command.replace("'", "'\\''") + "' && echo SCAN_DONE_OK || echo SCAN_DONE_ERR";
+            stdin.write((wrapped + '\n').getBytes());
+            stdin.write(("exit" + '\n').getBytes());
             stdin.flush();
             stdin.close();
-            ArrayList<String> nmapoutput = new ArrayList<>();
-            ArrayList<String> outerror = new ArrayList<>();
+
             BufferedReader br = new BufferedReader(new InputStreamReader(stdout));
-            while ((line = br.readLine()) != null) {
-                nmapoutput.add(line);
-                String finalLine = line;
-                if (line.contains("SCANFINISHED")) {
-                    ok = true;
-                    break;
-                }
-                activity.runOnUiThread(() -> output.append(finalLine + "\n"));
+            String line;
+            while (!killed && (line = br.readLine()) != null) {
+                if (line.contains("SCAN_DONE_OK")) { ok = true; break; }
+                if (line.contains("SCAN_DONE_ERR")) { ok = false; break; }
+                publishProgress(line);
             }
             br.close();
-            br = new BufferedReader(new InputStreamReader(stderr));
-            while ((line = br.readLine()) != null) {
-                outerror.add(line);
-                String finalLine1 = line;
-                activity.runOnUiThread(() -> output.append("[E] " + finalLine1 + "\n"));
+
+            BufferedReader er = new BufferedReader(new InputStreamReader(stderr));
+            while (!killed && (line = er.readLine()) != null) {
+                publishProgress("[stderr] " + line);
             }
-            core.writetolog(nmapoutput, false);
-            core.writetolog(outerror, true);
-            br.close();
+            er.close();
+
             process.waitFor();
             process.destroy();
         } catch (IOException | InterruptedException e) {
-            Log.d("Debug: ", "An IOException was caught: " + e.getMessage());
+            Log.d("NmapScan", "exception: " + e.getMessage());
         }
-        return ok;
-    }
-
-    @Override
-    protected void onPostExecute(Boolean result) {
-        super.onPostExecute(result);
-
+        return ok && !killed;
     }
 
     @Override
     protected void onProgressUpdate(String... values) {
-        super.onProgressUpdate(values);
-
+        if (callback != null && values != null && values.length > 0) {
+            callback.onLine(values[0]);
+        }
     }
 
+    @Override
+    protected void onPostExecute(Boolean result) {
+        if (callback != null) callback.onFinished(Boolean.TRUE.equals(result));
+    }
 
+    @Override
+    protected void onCancelled(Boolean result) {
+        if (callback != null) callback.onFinished(false);
+    }
 }
