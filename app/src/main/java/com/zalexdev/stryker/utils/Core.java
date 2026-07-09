@@ -572,14 +572,24 @@ public class Core {
     }
     public Boolean mountCore(){
         customMegaCommand("/data/data/com.zalexdev.stryker/files/bootroot");
-        return checkFolder("/data/local/stryker/release/sdcard/Stryker");
+        return isMounted();
     }
     public Boolean unmountCore(){
         customMegaCommand("/data/data/com.zalexdev.stryker/files/killroot");
         return !checkFolder("/data/local/stryker/release/sdcard/Stryker");
     }
     public Boolean isMounted(){
-        return checkFolder("/data/local/stryker/release/sdcard/Stryker");
+        return isChrootMounted("/data/local/stryker/release");
+    }
+    private boolean isChrootMounted(String root){
+        boolean proc = false, sys = false, dev = false, sdcard = false;
+        for (String s : customCommand("cat /proc/mounts", true)) {
+            if (s.contains(" " + root + "/proc ")) proc = true;
+            if (s.contains(" " + root + "/sys ")) sys = true;
+            if (s.contains(" " + root + "/dev ")) dev = true;
+            if (s.contains(" " + root + "/sdcard/Stryker ")) sdcard = true;
+        }
+        return proc && sys && dev && sdcard;
     }
     public boolean isOldMounted(){
         return checkFolder("/data/local/stryker/beta/sdcard/Stryker");

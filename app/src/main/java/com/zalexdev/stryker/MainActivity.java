@@ -134,7 +134,7 @@ public class MainActivity extends AppCompatActivity {
                         install.putExtra("update", false);
                         startActivity(install);
                     } else {
-                        if (core.checkFolder("/data/local/stryker/release/sdcard/Stryker")) {
+                        if (core.isMounted()) {
                             fragmentManager.beginTransaction().replace(R.id.flContent, new Dashboard()).commit();
                             schedulePromo();
                             checkForUsb();
@@ -201,8 +201,7 @@ public class MainActivity extends AppCompatActivity {
         if (arch != null) arch.setText(core != null && core.is64Bit() ? "arm64" : "arm32");
         TextView chrootStatus = navView.findViewById(R.id.drawer_chroot_status);
         new Thread(() -> {
-            boolean mounted = core != null
-                    && core.checkFolder("/data/local/stryker/release/sdcard/Stryker");
+            boolean mounted = core != null && core.isMounted();
             runOnUiThread(() -> {
                 if (chrootStatus != null) {
                     chrootStatus.setText(mounted ? "Chroot mounted" : "Chroot detached");
