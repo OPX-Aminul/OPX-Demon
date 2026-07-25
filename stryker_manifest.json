@@ -1,16 +1,41 @@
 {
   "manifest_version": 1,
   "core": {
-    "version": "chroot-main",
+    "version": "chroot-debian-trixie",
+    "note": "Debian trixie arm64, same rootfs the rootless VM boots. arm64-v8a only.",
     "chroot64": {
-      "url": "https://github.com/zalexdev/strykerapp/releases/download/chroot-main/chroot64.tar.gz",
-      "sha256": "2ad21f1445102913c52099bcb86ab380f9520c9e4d7771e6a951f634451068ac",
-      "size": 58918734
+      "url": "https://github.com/zalexdev/strykerapp/releases/download/chroot-main/chroot64-debian.tar.gz",
+      "sha256": "bb27ba9f063dc8000eef947db36df1c0b96f1ec56edb36519a24b7f0ec9b030c",
+      "size": 237502035
+    }
+  },
+  "rootless": {
+    "version": "rootless-main",
+    "note": "Local dev ships these inside the APK under assets/rootless/. This block is the OTA fallback; arm64-v8a only.",
+    "qemu": {
+      "url": "https://github.com/zalexdev/strykerapp/releases/download/rootless-main/qemu-system-aarch64",
+      "sha256": "2a87f531371b3f8d45141d48632e0dbe2c3d968fbcb385ba105d671479fb8c99",
+      "size": 43800304
     },
-    "chroot32": {
-      "url": "https://github.com/zalexdev/strykerapp/releases/download/chroot-main/chroot32.tar.gz",
-      "sha256": "faa4b256819818360945d8fecc8f05f0f158a76e6a61feb8eff66308c32b3341",
-      "size": 140633600
+    "kernel": {
+      "url": "https://github.com/zalexdev/strykerapp/releases/download/rootless-main/Image",
+      "sha256": "cbe59a02e7ea979a150661032440c94e2c4db0b735af2416e11ae5cac15a58e4",
+      "size": 37605312
+    },
+    "initrd": {
+      "url": "https://github.com/zalexdev/strykerapp/releases/download/rootless-main/initrd.img",
+      "sha256": "655f3ef013e7818e9ee874cf3b44a4c0bdc8a586c986cf237cb74c41862dfd02",
+      "size": 38301815
+    },
+    "libslirp": {
+      "url": "https://github.com/zalexdev/strykerapp/releases/download/rootless-main/libslirp.so",
+      "sha256": "226372426fda32c9fccd8e831d0901a86bfff3c3e6f7a60336d6dde149f756c4",
+      "size": 1145496
+    },
+    "rootfs": {
+      "url": "https://github.com/zalexdev/strykerapp/releases/download/rootless-main/rootfs.imgz",
+      "sha256": "f80c2b1e2433c3036aa745da2a5935cf5dd61b65b17bbeabae87b49bd68a12ef",
+      "size": 427974567
     }
   },
   "app": {
