@@ -4,9 +4,9 @@
     "version": "chroot-debian-trixie",
     "note": "Debian trixie arm64, same rootfs the rootless VM boots. arm64-v8a only.",
     "chroot64": {
-      "url": "https://github.com/zalexdev/strykerapp/releases/download/chroot-main/chroot64-debian.tar.gz",
-      "sha256": "bb27ba9f063dc8000eef947db36df1c0b96f1ec56edb36519a24b7f0ec9b030c",
-      "size": 237502035
+      "url": "https://github.com/zalexdev/strykerapp/releases/download/chroot-main/chroot64.tar.gz",
+      "sha256": "2ad21f1445102913c52099bcb86ab380f9520c9e4d7771e6a951f634451068ac",
+      "size": 58918734
     }
   },
   "rootless": {
