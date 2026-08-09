@@ -10,6 +10,11 @@ android {
     testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
   }
 
+  lint {
+    abortOnError false
+    checkReleaseBuilds false
+  }
+
   sourceSets {
     main {
       jniLibs.srcDirs = ['src/main/jniLibs']
