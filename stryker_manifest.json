@@ -54,8 +54,8 @@
     }
   },
   "app": {
-    "versionCode": 600,
-    "versionName": "6.0",
+    "versionCode": 450,
+    "versionName": "4.5",
     "url": "https://github.com/zalexdev/strykerapp/releases/download/v6.0/StrykerOSS-6.0.apk",
     "sha256": "",
     "size": 0,
