@@ -91,9 +91,6 @@ public class AboutFragment extends Fragment {
                 R.string.feat_searchsploit_title, R.string.feat_searchsploit_desc, R.drawable.search,
                 Color.parseColor("#FB8C00"), Color.parseColor("#E65100")));
         features.add(new FeatureCardStack.Feature(
-                R.string.feat_router_title, R.string.feat_router_desc, R.drawable.router,
-                Color.parseColor("#43A047"), Color.parseColor("#1B5E20")));
-        features.add(new FeatureCardStack.Feature(
                 R.string.feat_hid_title, R.string.feat_hid_desc, R.drawable.keyboard,
                 Color.parseColor("#5E35B1"), Color.parseColor("#311B92")));
 

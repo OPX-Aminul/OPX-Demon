@@ -19,8 +19,11 @@ import androidx.core.app.NotificationCompat;
 
 import com.zalexdev.stryker.MainActivity;
 import com.zalexdev.stryker.R;
+import android.text.TextUtils;
+
 import com.zalexdev.stryker.custom.NucleiItem;
 import com.zalexdev.stryker.custom.Site;
+import com.zalexdev.stryker.engine.GuestExec;
 import com.zalexdev.stryker.utils.Core;
 
 import org.json.JSONException;
@@ -61,7 +64,16 @@ public class NucleiScanService extends Service {
     private PowerManager.WakeLock wakeLock;
     private ExecutorService executor;
 
+    private static final String TEMPLATES_MARKER = "__STRYKER_NUCLEI_TEMPLATES__";
+
+    private static final Set<Integer> ACTIVE = ConcurrentHashMap.newKeySet();
+
+    public static boolean isScanActive(int siteId) {
+        return ACTIVE.contains(siteId);
+    }
+
     private final Map<Integer, Process> running = new ConcurrentHashMap<>();
+    private final Map<Integer, GuestExec.Session> guestSessions = new ConcurrentHashMap<>();
     private final Set<Integer> queued = ConcurrentHashMap.newKeySet();
     private final Map<Integer, String> severities = new ConcurrentHashMap<>();
     private final Map<Integer, PrintWriter> logWriters = new ConcurrentHashMap<>();
@@ -116,6 +128,7 @@ public class NucleiScanService extends Service {
         if (!wakeLock.isHeld()) wakeLock.acquire(6L * 60 * 60 * 1000);
 
         queued.add(siteId);
+        ACTIVE.add(siteId);
         executor.submit(() -> runScan(siteId));
         return START_NOT_STICKY;
     }
@@ -138,7 +151,52 @@ public class NucleiScanService extends Service {
         broadcast(siteId);
 
         Process process = null;
+        GuestExec.Session guestSession = null;
         try {
+            if (core.isRootless()) {
+                String script = TextUtils.join("\n",
+                        buildNucleiScript(site.getUrl(), severities.get(siteId)));
+                guestSession = core.rootless().openStream(script);
+                guestSessions.put(siteId, guestSession);
+                site.pid = "guest";
+                persist(site, siteId);
+
+                int exit = -1;
+                String line;
+                while ((line = guestSession.reader.readLine()) != null) {
+                    if (line.startsWith(GuestExec.Session.SENTINEL)) {
+                        try {
+                            exit = Integer.parseInt(
+                                    line.substring(GuestExec.Session.SENTINEL.length()).trim());
+                        } catch (NumberFormatException ignored) {}
+                        break;
+                    }
+                    if (line.contains(TEMPLATES_MARKER)) {
+                        onTemplatesDownloading(siteId);
+                    } else if (line.contains("\"percent\"")) {
+                        teeLog(siteId, "ERR", line);
+                        parseStatsLine(line, siteId);
+                    } else {
+                        teeLog(siteId, "OUT", line);
+                        parseStdoutLine(line, siteId);
+                    }
+                }
+
+                Site final_ = loadSite(siteId);
+                if (final_ == null) return;
+                if (exit == 0 || final_.getNucleis().size() > 0) {
+                    final_.status = "Finished";
+                    final_.progress = "100";
+                    persist(final_, siteId);
+                    postResultNotification(final_, siteId, true);
+                } else {
+                    final_.status = "Failed";
+                    final_.progress = "100";
+                    persist(final_, siteId);
+                    postResultNotification(final_, siteId, false);
+                }
+                broadcast(siteId);
+            } else {
             process = Runtime.getRuntime().exec("su");
             running.put(siteId, process);
             site.pid = String.valueOf(getPidOfProcess(process));
@@ -148,7 +206,7 @@ public class NucleiScanService extends Service {
             InputStream stderr = process.getErrorStream();
             InputStream stdout = process.getInputStream();
 
-            stdin.write((Core.EXECUTE + "'ash'\n").getBytes());
+            stdin.write((Core.EXECUTE + "'" + Core.SHELL + "'\n").getBytes());
             for (String line : buildNucleiScript(site.getUrl(), severities.get(siteId))) {
                 stdin.write((line + "\n").getBytes());
             }
@@ -162,6 +220,10 @@ public class NucleiScanService extends Service {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(stdout))) {
                 String line;
                 while ((line = br.readLine()) != null) {
+                    if (line.contains(TEMPLATES_MARKER)) {
+                        onTemplatesDownloading(siteId);
+                        continue;
+                    }
                     teeLog(siteId, "OUT", line);
                     parseStdoutLine(line, siteId);
                 }
@@ -184,6 +246,7 @@ public class NucleiScanService extends Service {
                 postResultNotification(final_, siteId, false);
             }
             broadcast(siteId);
+            }
         } catch (IOException | InterruptedException e) {
             Log.e("NucleiScanService", "Scan crashed", e);
             Site failed = loadSite(siteId);
@@ -198,11 +261,22 @@ public class NucleiScanService extends Service {
             if (process != null) {
                 try { process.destroy(); } catch (Throwable ignored) {}
             }
+            GuestExec.Session gs = guestSessions.remove(siteId);
+            if (gs != null) gs.close();
             closeLog(siteId);
             running.remove(siteId);
             severities.remove(siteId);
+            ACTIVE.remove(siteId);
             stopIfIdle();
         }
+    }
+
+    private void onTemplatesDownloading(int siteId) {
+        teeLog(siteId, "INFO", "template library missing — downloading it first, this takes minutes");
+        Site site = loadSite(siteId);
+        if (site == null) return;
+        updateForegroundNotification(site);
+        broadcast(siteId);
     }
 
     private void openLog(int siteId, String target) {
@@ -245,9 +319,14 @@ public class NucleiScanService extends Service {
         lines.add("export HOME=/root");
         lines.add("export TMPDIR=/tmp");
         lines.add("mkdir -p /tmp /root/.config/nuclei");
+        lines.add("if [ ! -f " + com.zalexdev.stryker.install.InstallService.NUCLEI_TEMPLATES_MARKER + " ]; then "
+                + "echo " + TEMPLATES_MARKER + "; "
+                + "if /usr/bin/nuclei -duc -ut >/tmp/nuclei-ut.log 2>&1; then touch "
+                + com.zalexdev.stryker.install.InstallService.NUCLEI_TEMPLATES_MARKER + "; fi; "
+                + "tail -5 /tmp/nuclei-ut.log; rm -f /tmp/nuclei-ut.log; fi");
         StringBuilder cmd = new StringBuilder("/usr/bin/nuclei ");
         cmd.append("-u ").append(shellEscape(target)).append(' ');
-        cmd.append("-jsonl -stats -silent -no-color -timeout 8 -retries 1");
+        cmd.append("-jsonl -stats -silent -no-color -duc -timeout 8 -retries 1");
         if (severityList != null && !severityList.isEmpty()) {
             cmd.append(" -severity ").append(shellEscape(severityList));
         }
@@ -310,6 +389,8 @@ public class NucleiScanService extends Service {
         if (p != null) {
             try { p.destroy(); } catch (Throwable ignored) {}
         }
+        GuestExec.Session gs = guestSessions.remove(siteId);
+        if (gs != null) gs.close();
         Site site = loadSite(siteId);
         if (site != null && !"Finished".equals(site.status)) {
             site.status = "Failed";
@@ -457,6 +538,10 @@ public class NucleiScanService extends Service {
             }
         }
         running.clear();
+        for (GuestExec.Session gs : new java.util.ArrayList<>(guestSessions.values())) {
+            try { gs.close(); } catch (Throwable ignored) {}
+        }
+        guestSessions.clear();
         queued.clear();
         for (Integer id : new java.util.ArrayList<>(logWriters.keySet())) closeLog(id);
         if (executor != null) executor.shutdownNow();

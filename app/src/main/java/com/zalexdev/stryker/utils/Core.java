@@ -50,15 +50,17 @@ import androidx.viewpager.widget.ViewPager;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.google.android.material.switchmaterial.SwitchMaterial;
-import com.race604.drawable.wave.WaveDrawable;
 import com.zalexdev.stryker.BuildConfig;
 import com.zalexdev.stryker.R;
 import com.zalexdev.stryker.custom.Credentials;
 import com.zalexdev.stryker.custom.Device;
 import com.zalexdev.stryker.custom.Exploit;
 import com.zalexdev.stryker.custom.Module;
-import com.zalexdev.stryker.custom.Router;
 import com.zalexdev.stryker.custom.Site;
+import com.zalexdev.stryker.engine.Apt;
+import com.zalexdev.stryker.engine.EngineType;
+import com.zalexdev.stryker.engine.GuestCore;
+import com.zalexdev.stryker.engine.RootlessEngine;
 import com.zalexdev.stryker.logger.LogTool;
 import com.zalexdev.stryker.logger.Logger;
 
@@ -81,6 +83,7 @@ import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -90,6 +93,14 @@ public class Core {
 
     public final static String EXECUTE = "/data/data/com.zalexdev.stryker/files/chroot_exec ";
     public final static String BUSYBOX = "/data/data/com.zalexdev.stryker/files/busybox ";
+    public final static String SHELL = "bash";
+    public final static String CHROOT_ROOT = "/data/local/stryker/release";
+
+    /** Marker written after a successful chroot install. The name IS the rootfs generation:
+     *  "4.0" is the old Alpine tree, "6.0" the Debian one. */
+    public final static String CHROOT_MARKER_VERSION = "6.0";
+    public final static String CHROOT_MARKER = CHROOT_ROOT + "/" + CHROOT_MARKER_VERSION;
+    private final static String[] LEGACY_CHROOT_MARKERS = {"4.0"};
     public final static String HIDDEN_MAC = "XX:XX:XX:XX:XX:XX";
     public final String versionName = BuildConfig.VERSION_NAME;
     public final int versionInt = BuildConfig.VERSION_CODE;
@@ -100,7 +111,7 @@ public class Core {
     public MonitorManager monitorManager;
     public Logger logger;
     public SQLiteDatabase db;
-    public SQLiteDatabase dbСodename;
+    public SQLiteDatabase dbCodename;
     public SQLiteDatabase dbAdapters;
     public Core(Context context) {
 
@@ -245,6 +256,10 @@ public class Core {
         preferences.edit().remove(key).apply();
     }
 
+    public boolean contains(String key) {
+        return preferences != null && preferences.contains(key);
+    }
+
     public void clear() {
         preferences.edit().clear().apply();
     }
@@ -281,54 +296,6 @@ public class Core {
 
 
 
-    public void saveResult(ArrayList<Router> rs) {
-        if (rs == null || rs.isEmpty()) return;
-
-        StringBuilder body = new StringBuilder();
-        for (Router r : rs) {
-            if (!r.getSuccess()) continue;
-            body.append('"').append(safeCsv(r.getIp())).append("\";\"80\";\"100\";\"Done\";\"")
-                    .append(safeCsv(r.getAuth())).append("\";\"")
-                    .append(safeCsv(r.getTitle())).append("\";\" \";\" \";\"")
-                    .append(safeCsv(r.getBssid())).append("\";\"")
-                    .append(safeCsv(r.getSsid())).append("\";\" \";\"")
-                    .append(safeCsv(r.getPsk())).append("\";\"")
-                    .append(safeCsv(r.getWps()))
-                    .append("\";\" \";\" \";\" \";\" \";\" \";\" \";\" \";\" \";\" \";\" \";\r\n");
-        }
-        if (body.length() == 0) return;
-
-        final String target = "/sdcard/Stryker/routerscan.csv";
-        if (!checkFile(target)) {
-            body.insert(0, "\"IP Address\";\"Port\";\"Time (ms)\";\"Status\";\"Authorization\";"
-                    + "\"Server name / Realm name / Device type\";\"Radio Off\";\"Hidden\";"
-                    + "\"BSSID\";\"ESSID\";\"Security\";\"Key\";\"WPS PIN\";\"LAN IP Address\";"
-                    + "\"LAN Subnet Mask\";\"WAN IP Address\";\"WAN Subnet Mask\";\"WAN Gateway\";"
-                    + "\"Domain Name Servers\";\"Latitude\";\"Longitude\";\"Comments\"\r\n");
-        }
-
-        File staged = new File(context.getFilesDir(), "routerscan_append.csv");
-        try (FileOutputStream fos = new FileOutputStream(staged, false);
-             OutputStreamWriter osw = new OutputStreamWriter(fos)) {
-            osw.write(body.toString());
-            osw.flush();
-        } catch (IOException e) {
-            Log.e("Core.saveResult", "Could not stage CSV: " + e.getMessage());
-            return;
-        }
-
-        customCommand("mkdir -p '/sdcard/Stryker'");
-        customCommand("touch '" + target + "'");
-        customCommand("cat '" + staged.getAbsolutePath() + "' >> '" + target + "'");
-        customCommand("chmod 0666 '" + target + "'");
-        staged.delete();
-    }
-
-    private static String safeCsv(String s) {
-        if (s == null) return " ";
-        return s.replace("\"", "''");
-    }
-
     public void vibrate(int mil) {
         if (SDK_INT >= 26) {
             ((Vibrator) context.getSystemService(VIBRATOR_SERVICE)).vibrate(VibrationEffect.createOneShot(mil, VibrationEffect.DEFAULT_AMPLITUDE));
@@ -338,6 +305,17 @@ public class Core {
     }
 
     public ArrayList<String> getListFiles(String parentDir) {
+        if (isRootless()) {
+            ArrayList<String> names = new ArrayList<>();
+            String host = parentDir;
+            if (parentDir != null && parentDir.startsWith("/sdcard/Stryker")) {
+                host = getShareRoot() + parentDir.substring("/sdcard/Stryker".length());
+            }
+            File dir = new File(host == null ? "" : host);
+            File[] fs = dir.listFiles();
+            if (fs != null) for (File f : fs) names.add(f.getName());
+            return names;
+        }
         return customCommand("ls "+parentDir);
     }
 
@@ -374,9 +352,9 @@ public class Core {
         return t;
     }
     public void updateExploits(){
-        deleteFile("/data/local/stryker/release/exploits");
-        copyFile("/storage/emulated/0/Stryker/exploits"," /data/local/stryker/release/exploits");
-        chmodFolder("/data/local/stryker/release/exploits");
+        customChrootCommand("rm -rf /exploits; mkdir -p /exploits; "
+                + "cp -f /sdcard/Stryker/exploits/* /exploits/ 2>/dev/null; "
+                + "chmod -R 0755 /exploits", true);
     }
 
     public void deleteExploit(int id){
@@ -446,8 +424,12 @@ public class Core {
         return list;
     }
 
-    public boolean is64Bit() {
-        return (Build.SUPPORTED_64_BIT_ABIS != null && Build.SUPPORTED_64_BIT_ABIS.length > 0);
+    public static boolean isArm64() {
+        if (Build.SUPPORTED_ABIS == null) return false;
+        for (String abi : Build.SUPPORTED_ABIS) {
+            if ("arm64-v8a".equals(abi)) return true;
+        }
+        return false;
     }
     public void scale(View v, Float x){
         v.animate().scaleY(x);
@@ -465,26 +447,78 @@ public class Core {
     public String getStorage() {
         return getExternalStorageDirectory().getAbsolutePath() + "/";
     }
-    public boolean checkModel(String model){
-        BufferedReader reader;
-        boolean result = false;
+
+    public String getShareRoot() {
+        if (isRootless()) {
+            File d = rootless().resolveShareDir();
+            if (d != null) return d.getAbsolutePath();
+        }
+        return getStorage() + "Stryker";
+    }
+    public final static String PIXIE_HEURISTIC_ASSET = "routes.txt";
+    public final static String PIXIE_VERIFIED_ASSET = "pixie_verified.txt";
+
+    private static volatile ArrayList<String> pixieHeuristic;
+    private static volatile HashSet<String> pixieVerified;
+
+    private static String normalizeModel(String model) {
+        if (model == null) return "";
+        return model.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+    }
+
+    private ArrayList<String> readAssetLines(String asset) {
+        ArrayList<String> lines = new ArrayList<>();
+        BufferedReader reader = null;
         try {
-            reader = new BufferedReader(new InputStreamReader(context.getAssets().open("routes.txt")));
-            String mLine;
-            while ((mLine = reader.readLine()) != null) {
-                if(model.toLowerCase(Locale.ROOT).contains(mLine.toLowerCase(Locale.ROOT))){
-                    result = true;
-                }
-            }
-            for (String m : getRouters()){
-                if (model.toLowerCase(Locale.ROOT).contains(m.toLowerCase(Locale.ROOT))){
-                    result = true;
-                }
+            reader = new BufferedReader(new InputStreamReader(context.getAssets().open(asset)));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String v = normalizeModel(line);
+                if (!v.isEmpty()) lines.add(v);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.writeLine("Cannot read " + asset + ": " + e.getMessage(), 3);
+        } finally {
+            if (reader != null) try { reader.close(); } catch (IOException ignored) {}
         }
-        return result;
+        return lines;
+    }
+
+    private ArrayList<String> heuristicModels() {
+        ArrayList<String> cached = pixieHeuristic;
+        if (cached == null) {
+            cached = readAssetLines(PIXIE_HEURISTIC_ASSET);
+            pixieHeuristic = cached;
+        }
+        return cached;
+    }
+
+    private HashSet<String> verifiedModels() {
+        HashSet<String> cached = pixieVerified;
+        if (cached == null) {
+            cached = new HashSet<>(readAssetLines(PIXIE_VERIFIED_ASSET));
+            pixieVerified = cached;
+        }
+        return cached;
+    }
+
+    public boolean isPixieVerified(String model) {
+        String needle = normalizeModel(model);
+        return !needle.isEmpty() && verifiedModels().contains(needle);
+    }
+
+    public boolean checkModel(String model){
+        String needle = normalizeModel(model);
+        if (needle.isEmpty()) return false;
+        if (verifiedModels().contains(needle)) return true;
+        for (String m : heuristicModels()) {
+            if (needle.contains(m)) return true;
+        }
+        for (String m : getRouters()) {
+            String v = normalizeModel(m);
+            if (!v.isEmpty() && needle.contains(v)) return true;
+        }
+        return false;
     }
 
     public void installApplication(Context context, String filePath) {
@@ -526,12 +560,29 @@ public class Core {
         putListString("installed_modules",mods);
     }
 
+    public String chrootPath(String guestPath){
+        if (guestPath == null || guestPath.isEmpty()) return CHROOT_ROOT;
+        return CHROOT_ROOT + (guestPath.startsWith("/") ? guestPath : "/" + guestPath);
+    }
+
     public boolean isToolInstalled(String tool){
         switch (tool) {
-            case "metasploit": return getBoolean("msf") || checkFile("/data/local/stryker/release/metasploit-framework/msfconsole");
-            case "nuclei": return getBoolean("nuclei") || checkFile("/data/local/stryker/release/usr/bin/nuclei");
-            case "hydra": return getBoolean("hydra") || checkFile("/data/local/stryker/release/usr/bin/hydra");
-            case "searchsploit": return checkFile("/data/local/stryker/release/exploitdb/searchsploit");
+            case "metasploit": return getBoolean("msf")
+                    || guestFileExists("/opt/metasploit-framework/msfconsole",
+                                       "/usr/local/bin/msfconsole")
+                    || hasBinary("msfconsole");
+            case "nuclei": return getBoolean("nuclei")
+                    || guestFileExists("/usr/bin/nuclei", "/usr/local/bin/nuclei")
+                    || hasBinary("nuclei");
+            case "hydra": return getBoolean("hydra")
+                    || guestFileExists("/usr/bin/hydra", "/usr/local/bin/hydra")
+                    || hasBinary("hydra");
+            case "cameradar": return getBoolean("cameradar")
+                    || guestFileExists("/usr/bin/cameradar", "/usr/local/bin/cameradar")
+                    || hasBinary("cameradar");
+            case "searchsploit": return guestFileExists("/opt/exploitdb/searchsploit",
+                                       "/usr/local/bin/searchsploit")
+                    || hasBinary("searchsploit");
             default: return false;
         }
     }
@@ -540,23 +591,28 @@ public class Core {
         logger.writeLine("Uninstalling tool: "+tool,1);
         switch (tool) {
             case "metasploit":
-                deleteFile("/data/local/stryker/release/metasploit-framework");
-                deleteFile("/data/local/stryker/release/msfpc");
-                deleteFile("/data/local/stryker/release/usr/bin/msfvenom");
+                guestRemove("/opt/metasploit-framework /opt/msfpc /usr/local/bin/msfconsole "
+                        + "/usr/local/bin/msfvenom /usr/local/bin/msfdb /usr/local/bin/msfd "
+                        + "/usr/local/bin/msfrpc /usr/local/bin/msfpc");
+                customChrootCommand("snap remove metasploit-framework >/dev/null 2>&1 || true", true);
                 putBoolean("msf", false);
                 break;
             case "nuclei":
-                deleteFile("/data/local/stryker/release/usr/bin/nuclei");
-                deleteFile("/data/local/stryker/release/root/go/bin/nuclei");
+                guestRemove("/usr/bin/nuclei /usr/local/bin/nuclei /root/go/bin/nuclei");
                 putBoolean("nuclei", false);
                 break;
             case "hydra":
-                customChrootCommand("apk del hydra", true);
-                deleteFile("/data/local/stryker/release/usr/bin/hydra");
+                customChrootCommand(TextUtils.join("; ", Apt.env()) + "; " + Apt.remove("hydra"), true);
+                guestRemove("/usr/local/bin/hydra");
                 putBoolean("hydra", false);
                 break;
+            case "cameradar":
+                guestRemove("/usr/bin/cameradar /usr/local/bin/cameradar /usr/bin/radar "
+                        + "/usr/local/bin/radar");
+                putBoolean("cameradar", false);
+                break;
             case "searchsploit":
-                deleteFile("/data/local/stryker/release/exploitdb");
+                guestRemove("/opt/exploitdb /usr/local/bin/searchsploit");
                 break;
             default:
                 return false;
@@ -565,6 +621,49 @@ public class Core {
         remove("install_status_" + tool);
         return !isToolInstalled(tool);
     }
+
+    public void guestRemove(String spaceSeparatedPaths){
+        if (spaceSeparatedPaths == null || spaceSeparatedPaths.trim().isEmpty()) return;
+        if (isRootless()) {
+            customChrootCommand("rm -rf " + spaceSeparatedPaths, true);
+            return;
+        }
+        StringBuilder cmd = new StringBuilder("rm -rf");
+        for (String p : spaceSeparatedPaths.trim().split("\\s+")) {
+            if (!p.isEmpty()) cmd.append(' ').append(Apt.shellQuote(chrootPath(p)));
+        }
+        customCommand(cmd.toString(), true);
+    }
+
+    public boolean guestFileExists(String... guestPaths){
+        if (guestPaths == null || guestPaths.length == 0) return false;
+        StringBuilder test = new StringBuilder();
+        for (String p : guestPaths) {
+            if (p == null || p.isEmpty()) continue;
+            if (test.length() > 0) test.append(" || ");
+            test.append("[ -e ").append(Apt.shellQuote(isRootless() ? p : chrootPath(p))).append(" ]");
+        }
+        if (test.length() == 0) return false;
+        String cmd = "{ " + test + "; } && echo " + Apt.INSTALLED_MARK
+                + " || echo " + Apt.MISSING_MARK;
+        return marked(isRootless() ? customChrootCommand(cmd, true) : customCommand(cmd, true));
+    }
+
+    public boolean hasBinary(String bin){
+        return marked(customChrootCommand(Apt.hasBinary(bin), true));
+    }
+
+    public boolean hasPackage(String pkg){
+        return marked(customChrootCommand(Apt.isInstalled(pkg), true));
+    }
+
+    private static boolean marked(ArrayList<String> out){
+        if (out == null) return false;
+        for (String l : out) {
+            if (l != null && l.trim().equals(Apt.INSTALLED_MARK)) return true;
+        }
+        return false;
+    }
     public boolean unzip(String zipFile, String targetDirectory)  {
         customCommand(BUSYBOX+"unzip -o "+zipFile+" -d "+targetDirectory);
         return checkFolder(targetDirectory);
@@ -572,8 +671,47 @@ public class Core {
     }
     public Boolean mountCore(){
         customMegaCommand("/data/data/com.zalexdev.stryker/files/bootroot");
-        return isMounted();
+        boolean mounted = isMounted();
+        if (mounted) {
+            try { GuestCore.ensure(this); } catch (Throwable ignored) {}
+        }
+        return mounted;
     }
+    /** True when a chroot from before the Debian move is installed. */
+    public boolean hasLegacyChroot(){
+        if (isRootless()) return false;
+        if (checkFile(CHROOT_MARKER)) return false;
+        for (String m : LEGACY_CHROOT_MARKERS) {
+            if (checkFile(CHROOT_ROOT + "/" + m)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Unmount and delete the installed rootfs. Refuses to delete while anything is still mounted:
+     * the chroot bind-mounts /sdcard inside itself, so an rm -rf over a live mount would wipe the
+     * user's real storage.
+     */
+    public boolean purgeChroot(){
+        logger.writeLine("Removing the previous chroot", 1);
+        unmountCore();
+        for (int i = 0; i < 10 && isMounted(); i++) {
+            try { Thread.sleep(500); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        if (isMounted()) {
+            logger.writeLine("Could not unmount the old chroot — refusing to delete it", 3);
+            return false;
+        }
+        customCommand("rm -rf " + CHROOT_ROOT);
+        boolean gone = !checkFolder(CHROOT_ROOT + "/bin") && !checkFolder(CHROOT_ROOT + "/usr");
+        logger.writeLine(gone ? "Previous chroot removed" : "Previous chroot could not be removed",
+                gone ? 2 : 3);
+        return gone;
+    }
+
     public Boolean unmountCore(){
         customMegaCommand("/data/data/com.zalexdev.stryker/files/killroot");
         return !checkFolder("/data/local/stryker/release/sdcard/Stryker");
@@ -676,12 +814,18 @@ public class Core {
 
     public boolean checkFile(String path){
         logger.writeLine("Checking file "+path,1);
+        if (isRootless()) {
+            return new File(path).isFile();
+        }
         return customCommand("[ -f " + path + " ] && echo true || echo false").contains("true");
     }
 
     public boolean checkFolder(String path){
         boolean ok = false;
         logger.writeLine("Checking folder "+path,1);
+        if (isRootless()) {
+            return new File(path).isDirectory();
+        }
         for (String s : customCommand("[ -d " + path + " ] && echo true || echo false")) {
             if (s.contains("true")) {
                 ok = true;
@@ -709,90 +853,131 @@ public class Core {
     }
 
 
-    public String executeCommand(String command){
-        StringBuilder result = new StringBuilder();
-        Process process = generateSuProcess();
-        String tool = LogTool.classify(command);
-        logger.writeLine("Executing command: " + command,1, tool);
+    private static final String RC_MARK = "__STRYKER_RC__";
+    private static final long IDLE_LIMIT_MS = 10 * 60 * 1000L;
+
+    private ArrayList<String> pumpProcess(Process process, String script, boolean log, String tool,
+                                          boolean answerNoOnPrompt) {
+        return pumpProcess(process, script, log, tool, answerNoOnPrompt, IDLE_LIMIT_MS);
+    }
+
+    private ArrayList<String> pumpProcess(Process process, String script, boolean log, String tool,
+                                          boolean answerNoOnPrompt, long idleLimitMs) {
+        ArrayList<String> result = new ArrayList<>();
+        if (process == null) return result;
+        final ArrayList<String> errors = new ArrayList<>();
+        Thread errReader = new Thread(() -> {
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(process.getErrorStream()))) {
+                String l;
+                while ((l = br.readLine()) != null) {
+                    synchronized (errors) { errors.add(l); }
+                    if (log) logger.writeLine(l, 3, tool);
+                }
+            } catch (IOException ignored) {
+            }
+        }, "stryker-su-stderr");
+        errReader.setDaemon(true);
+        errReader.start();
+        final long[] lastActivity = {android.os.SystemClock.elapsedRealtime()};
+        final boolean[] finished = {false};
+        final boolean[] timedOut = {false};
+        Thread watchdog = new Thread(() -> {
+            while (!finished[0]) {
+                try { Thread.sleep(5000); } catch (InterruptedException e) { return; }
+                if (finished[0]) return;
+                if (android.os.SystemClock.elapsedRealtime() - lastActivity[0] > idleLimitMs) {
+                    timedOut[0] = true;
+                    process.destroy();
+                    return;
+                }
+            }
+        }, "stryker-su-watchdog");
+        watchdog.setDaemon(true);
+        if (idleLimitMs > 0) watchdog.start();
+        boolean sawMark = false;
         try {
             OutputStream stdin = process.getOutputStream();
-            InputStream stdout = process.getInputStream();
-            stdin.write((command + '\n').getBytes());
-            stdin.write(("exit\nexit\n").getBytes());
+            stdin.write(script.getBytes());
             stdin.flush();
-            stdin.close();
-            BufferedReader br = new BufferedReader(new InputStreamReader(stdout));
+            if (!answerNoOnPrompt) stdin.close();
+            BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line;
+            boolean pendingBlank = false;
             while ((line = br.readLine()) != null) {
-                logger.writeLine(line,2, tool);
-                result.append(line).append("\n");
+                if (line.startsWith(RC_MARK)) {
+                    sawMark = true;
+                    break;
+                }
+                lastActivity[0] = android.os.SystemClock.elapsedRealtime();
+                if (line.isEmpty()) {
+                    pendingBlank = true;
+                    continue;
+                }
+                if (pendingBlank) {
+                    pendingBlank = false;
+                    result.add("");
+                    if (log) logger.writeLine("", 2, tool);
+                }
+                result.add(line);
+                if (log) logger.writeLine(line, 2, tool);
+                if (answerNoOnPrompt && line.contains("no interfaces assigned")) {
+                    if (log) logger.writeLine("No interfaces assigned. Answering no", 3, tool);
+                    stdin.write("n\n".getBytes());
+                    stdin.flush();
+                }
             }
-            br.close();
-            if (result.length() > 0)
-                result = new StringBuilder(result.substring(0, result.length() - 1));
-        } catch (IOException e) {
+            if (answerNoOnPrompt) {
+                try { stdin.close(); } catch (IOException ignored) {}
+            }
+            if (!sawMark) process.waitFor();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (IOException ignored) {
+        } finally {
+            finished[0] = true;
+            watchdog.interrupt();
+            try { errReader.join(sawMark ? 300 : 2000); } catch (InterruptedException ignored) {}
+            process.destroy();
         }
-        process.destroy();
+        if (timedOut[0]) {
+            String msg = "command produced no output for " + (IDLE_LIMIT_MS / 60000)
+                    + " min and was killed";
+            result.add("[E] " + msg);
+            logger.writeLine(msg, 3, tool);
+        }
+        synchronized (errors) { result.addAll(errors); }
+        return result;
+    }
+
+    private static String terminated(String command) {
+        return command + "\nprintf '\\n" + RC_MARK + "%s\\n' \"$?\"\n";
+    }
+
+    public String executeCommand(String command){
+        String tool = LogTool.classify(command);
+        logger.writeLine("Executing command: " + command,1, tool);
+        ArrayList<String> lines = pumpProcess(generateSuProcess(),
+                terminated(command) + "exit\nexit\n", true, tool, false);
+        StringBuilder result = new StringBuilder();
+        for (String l : lines) result.append(l).append('\n');
+        if (result.length() > 0) result.setLength(result.length() - 1);
         return result.toString();
     }
     public ArrayList<String> customCommand(String command){
-        ArrayList<String> result = new ArrayList<>();
-        Process process = generateSuProcess();
         String tool = LogTool.classify(command);
         logger.writeLine("Executing command: " + command,1, tool);
-        try {
-            OutputStream stdin = process.getOutputStream();
-            InputStream stderr = process.getErrorStream();
-            InputStream stdout = process.getInputStream();
-            stdin.write((command + '\n').getBytes());
-            stdin.write(("exit\nexit\n").getBytes());
-            stdin.flush();
-            stdin.close();
-            BufferedReader br = new BufferedReader(new InputStreamReader(stdout));
-            String line;
-            while ((line = br.readLine()) != null) {
-                logger.writeLine(line,2, tool);
-                result.add(line);
-            }
-            br.close();
-            BufferedReader br2 = new BufferedReader(new InputStreamReader(stderr));
-            String lineError;
-            while ((lineError = br2.readLine()) != null) {
-                logger.writeLine(lineError,3, tool);
-                result.add(lineError);
-            }
-            br2.close();
-        } catch (IOException e) {
-
-        }
-        process.destroy();
-        return result;
+        return pumpProcess(generateSuProcess(), terminated(command) + "exit\nexit\n", true, tool, false);
     }
     public ArrayList<String> customCommand(String command,boolean nolog){
-        ArrayList<String> result = new ArrayList<>();
-        Process process = generateSuProcess();
-        try {
-            OutputStream stdin = process.getOutputStream();
-            InputStream stderr = process.getErrorStream();
-            InputStream stdout = process.getInputStream();
-            stdin.write((command + '\n').getBytes());
-            stdin.write(("exit\n").getBytes());
-            stdin.flush();
-            stdin.close();
-            BufferedReader br = new BufferedReader(new InputStreamReader(stdout));
-            String line;
-            while ((line = br.readLine()) != null) {result.add(line);}
-            br.close();
-            BufferedReader br2 = new BufferedReader(new InputStreamReader(stderr));
-            String lineerror;
-            while ((lineerror = br2.readLine()) != null) {result.add(lineerror);}
-            br2.close();
+        return pumpProcess(generateSuProcess(), terminated(command) + "exit\n", false, null, false);
+    }
 
-        } catch (IOException e) {
-
-        }
-        process.destroy();
-        return result;
+    public ArrayList<String> customCommand(String command, long idleLimitMs){
+        String tool = LogTool.classify(command);
+        logger.writeLine("Executing command: " + command, 1, tool);
+        return pumpProcess(generateSuProcess(), terminated(command) + "exit\nexit\n",
+                true, tool, false, idleLimitMs);
     }
     public void threadCommand(String cmd){new Thread(() -> customCommand(cmd)).start();}
 
@@ -800,136 +985,132 @@ public class Core {
 
 
     public ArrayList<String> customMegaCommand(String command){
-        ArrayList<String> result = new ArrayList<>();
-        Process process = null;
+        Process process;
         try {
             process = Runtime.getRuntime().exec("su -mm");
         } catch (IOException e) {
             e.printStackTrace();
+            return new ArrayList<>();
         }
         String tool = LogTool.classify(command);
         logger.writeLine("Executing command: " + command,1, tool);
-        try {
-            OutputStream stdin = Objects.requireNonNull(process).getOutputStream();
-            InputStream stderr = process.getErrorStream();
-            InputStream stdout = process.getInputStream();
-            stdin.write((command + '\n').getBytes());
-            stdin.write(("").getBytes());
-            stdin.flush();
-            stdin.close();
-            BufferedReader br = new BufferedReader(new InputStreamReader(stdout));
-
-            String line;
-            while ((line = br.readLine()) != null) {
-                logger.writeLine(line,2, tool);
-                result.add(line);
-            }
-            br.close();
-            BufferedReader br2 = new BufferedReader(new InputStreamReader(stderr));
-            String lineerror;
-            while ((lineerror = br2.readLine()) != null) {
-                logger.writeLine(lineerror,3, tool);
-                result.add(lineerror);
-            }
-            br2.close();
-        } catch (IOException e) {
-
-        }process.destroy();
-        return result;
+        return pumpProcess(process, terminated(command), true, tool, false);
     }
+    public boolean isRootless() {
+        return EngineType.isRootless(this);
+    }
+
+    public RootlessEngine rootless() {
+        return RootlessEngine.get(context);
+    }
+
     public ArrayList<String> customChrootCommand(String command)  {
-        ArrayList<String> result = new ArrayList<>();
-        Process process = generateSuProcess();
-        String tool = LogTool.classify(command);
-        try {
-            logger.writeLine("Executing chroot command: " + command,1, tool);
-            OutputStream stdin = process.getOutputStream();
-            InputStream stderr = process.getErrorStream();
-            InputStream stdout = process.getInputStream();
-            stdin.write((EXECUTE+ "'ash'"+ '\n').getBytes());
-            stdin.write((command+ '\n').getBytes());
-            stdin.write(("exit\n").getBytes());
-            stdin.flush();
-            stdin.close();
-            BufferedReader br = new BufferedReader(new InputStreamReader(stdout));
-            String line;
-            while ((line = br.readLine()) != null) {
-                result.add(line);
-                if (line.contains("no interfaces assigned")) {
-                    logger.writeLine("No interfaces assigned. Answering no",3, tool);
-                    stdin.write(("n\n").getBytes());
-                    stdin.flush();
-                }
-                logger.writeLine(line,2, tool);
-            }
-            br.close();
-            BufferedReader br2 = new BufferedReader(new InputStreamReader(stderr));
-            String lineerror;
-            while ((lineerror = br2.readLine()) != null) {
-                logger.writeLine(lineerror,3, tool);
-                result.add(lineerror);
-            }
-            br2.close();
-            process.waitFor();
-            process.destroy();
-        } catch (InterruptedException | IOException e) {
-            e.printStackTrace();
+        if (isRootless()) {
+            String tool = LogTool.classify(command);
+            logger.writeLine("Executing rootless command: " + command, 1, tool);
+            ArrayList<String> out = rootless().exec(command);
+            for (String l : out) logger.writeLine(l, 2, tool);
+            return out;
         }
-        return result;
+        String tool = LogTool.classify(command);
+        logger.writeLine("Executing chroot command: " + command,1, tool);
+        return pumpProcess(generateSuProcess(),
+                EXECUTE + "'" + SHELL + "'\n" + terminated(command) + "exit\n", true, tool, true);
     }
 
     public ArrayList<String> customChrootCommand(String command, boolean nolog)  {
-        ArrayList<String> result = new ArrayList<>();
-        Process process = generateSuProcess();
-        try {
-            OutputStream stdin = process.getOutputStream();
-            InputStream stderr = process.getErrorStream();
-            InputStream stdout = process.getInputStream();
-            stdin.write((EXECUTE+ "'ash'"+ '\n').getBytes());
-            stdin.write((command+ '\n').getBytes());
-            stdin.write(("exit\n").getBytes());
-            stdin.flush();
-            stdin.close();
-            BufferedReader br = new BufferedReader(new InputStreamReader(stdout));
-            String line;
-            while ((line = br.readLine()) != null) {result.add(line);}
-            br.close();
-            BufferedReader br2 = new BufferedReader (new InputStreamReader(stderr));
-            String lineerror;
-            while ((lineerror = br2.readLine()) != null) {result.add(lineerror);}
-            br2.close();
-            process.waitFor();
-        } catch (InterruptedException | IOException e) {
-            e.printStackTrace();
-
-        }process.destroy();
-        return result;
-    }
-
-    public static String busyboxAssetName() {
-        for (String abi : Build.SUPPORTED_ABIS) {
-            if ("arm64-v8a".equals(abi)) return "busybox64";
+        if (isRootless()) {
+            return rootless().exec(command);
         }
-        return "busybox32";
+        return pumpProcess(generateSuProcess(),
+                EXECUTE + "'" + SHELL + "'\n" + terminated(command) + "exit\n", false, null, false);
     }
 
-    public static void extractBusybox(Context ctx) {
-        String asset = busyboxAssetName();
-        File out = new File(ctx.getFilesDir(), "busybox");
-        try (InputStream in = ctx.getAssets().open(asset);
-             OutputStream os = new FileOutputStream(out)) {
+    @Deprecated
+    public boolean guestHasBinary(String bin) {
+        return hasBinary(bin);
+    }
+
+    public static final String BUSYBOX_ASSET = "busybox64";
+
+    public static File busyboxFile(Context ctx) {
+        return new File(ctx.getFilesDir(), "busybox");
+    }
+
+    public static boolean extractBusybox(Context ctx) {
+        return extractBusybox(ctx, false);
+    }
+
+    public static boolean extractBusybox(Context ctx, boolean force) {
+        File out = busyboxFile(ctx);
+        if (!force && out.length() > 0 && out.canExecute()) return true;
+        File tmp = new File(out.getParentFile(), "busybox.part");
+        try (InputStream in = ctx.getAssets().open(BUSYBOX_ASSET);
+             OutputStream os = new FileOutputStream(tmp)) {
             byte[] buf = new byte[8192];
             int r;
             while ((r = in.read(buf)) != -1) os.write(buf, 0, r);
             os.flush();
         } catch (IOException e) {
-            Log.e("Core", "Failed to extract busybox variant " + asset, e);
-            return;
+            Log.e("Core", "Failed to extract " + BUSYBOX_ASSET, e);
+            //noinspection ResultOfMethodCallIgnored
+            tmp.delete();
+            return out.length() > 0 && out.canExecute();
+        }
+        if (tmp.length() <= 0) {
+            //noinspection ResultOfMethodCallIgnored
+            tmp.delete();
+            return false;
+        }
+        try { tmp.setExecutable(true, false); } catch (Exception ignored) {}
+        //noinspection ResultOfMethodCallIgnored
+        out.delete();
+        if (!tmp.renameTo(out)) {
+            //noinspection ResultOfMethodCallIgnored
+            tmp.delete();
+            return false;
         }
         try { out.setExecutable(true, false); } catch (Exception ignored) {}
+        return true;
+    }
+
+    public boolean busyboxUsable() {
+        for (String l : customCommand(BUSYBOX + "true >/dev/null 2>&1; echo BBEXIT=$?", true)) {
+            if (l != null && l.contains("BBEXIT=0")) return true;
+        }
+        return false;
+    }
+
+    public String tarCommand() {
+        if (busyboxUsable()) return BUSYBOX + "tar";
+        extractBusybox(context, true);
+        if (busyboxUsable()) return BUSYBOX + "tar";
+        for (String l : customCommand("command -v tar 2>/dev/null", true)) {
+            if (l != null && l.trim().startsWith("/")) return l.trim();
+        }
+        return null;
     }
 
     public void moveFile(@NonNull String source, @NonNull String destination){
+        if (isRootless()) {
+            try {
+                File src = new File(source);
+                File dst = new File(destination);
+                if (dst.getParentFile() != null) dst.getParentFile().mkdirs();
+                if (!src.renameTo(dst)) {
+                    try (InputStream in = new java.io.FileInputStream(src);
+                         OutputStream out = new FileOutputStream(dst)) {
+                        byte[] buf = new byte[8192]; int r;
+                        while ((r = in.read(buf)) != -1) out.write(buf, 0, r);
+                    }
+                    //noinspection ResultOfMethodCallIgnored
+                    src.delete();
+                }
+            } catch (Exception e) {
+                logger.writeLine("Rootless move failed: " + e.getMessage(), 3);
+            }
+            return;
+        }
         customCommand("mv " + source + " " + destination);
     }
     public void copyFile(@NonNull String source, @NonNull String destination){
@@ -937,13 +1118,34 @@ public class Core {
 
     }
     public void deleteFile(@NonNull String file){
+        if (isRootless()) {
+            deleteRecursively(new File(file));
+            return;
+        }
         customCommand("rm -rf " + file);
     }
+
+    private static void deleteRecursively(File target) {
+        if (target == null || !target.exists()) return;
+        File[] children = target.listFiles();
+        if (children != null) {
+            for (File c : children) deleteRecursively(c);
+        }
+        //noinspection ResultOfMethodCallIgnored
+        target.delete();
+    }
+
     public void createFolder(@NonNull String folder){
+        if (isRootless()) {
+            //noinspection ResultOfMethodCallIgnored
+            new File(folder).mkdirs();
+            return;
+        }
         customCommand("mkdir " + folder);
 
     }
     public void chmodFolder(@NonNull String folder){
+        if (isRootless()) return;
         customCommand("chmod 777 -R " + folder);
 
     }
@@ -977,10 +1179,10 @@ public class Core {
     public String getDeviceByCodeNameFromDB(String codename){
         String model = "";
         try {
-            if (dbСodename == null || !dbСodename.isOpen()){
-                dbСodename = SQLiteDatabase.openDatabase("/data/data/com.zalexdev.stryker/files/codenames.db", null, SQLiteDatabase.OPEN_READONLY);
+            if (dbCodename == null || !dbCodename.isOpen()){
+                dbCodename = SQLiteDatabase.openDatabase("/data/data/com.zalexdev.stryker/files/codenames.db", null, SQLiteDatabase.OPEN_READONLY);
             }
-            Cursor cursor = dbСodename.rawQuery("SELECT manufacture,model FROM codename WHERE codename = '"+codename+"';", null);
+            Cursor cursor = dbCodename.rawQuery("SELECT manufacture,model FROM codename WHERE codename = '"+codename+"';", null);
 
             if (cursor.moveToFirst()) {
                 model = cursor.getString(0)+" "+cursor.getString(1).replace(cursor.getString(0),"");
@@ -1070,6 +1272,7 @@ public class Core {
     }
 
     public void wpsDisableWifiIfEnabled(){
+        if (isRootless()) return;
         if (isPixieIfaceDown()) customCommand("svc wifi disable");
     }
 
@@ -1086,6 +1289,48 @@ public class Core {
                     new String[]{WRITE_EXTERNAL_STORAGE},
                     123
             );
+        }
+    }
+
+    public boolean hasLocationPermission() {
+        try {
+            return context.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public void requestLocationPermission(Activity activity) {
+        if (activity == null || hasLocationPermission()) return;
+        try {
+            ActivityCompat.requestPermissions(
+                    activity,
+                    new String[]{
+                            android.Manifest.permission.ACCESS_FINE_LOCATION,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION
+                    },
+                    124
+            );
+        } catch (Exception ignored) {
+        }
+    }
+
+    public void requestAllFilesAccess(Activity activity) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                if (!android.os.Environment.isExternalStorageManager()) {
+                    Intent i = new Intent(
+                            android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                            Uri.parse("package:" + context.getPackageName()));
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    activity.startActivity(i);
+                }
+            } else {
+                checkPermission(activity);
+            }
+        } catch (Exception e) {
+            try { checkPermission(activity); } catch (Exception ignored) {}
         }
     }
     public void openlink(String url) {
@@ -1156,19 +1401,8 @@ public class Core {
 
     public ArrayList<String> getInterfacesList(){
         ArrayList<String> result = new ArrayList<>();
-        ArrayList<String> temp = customChrootCommand("iw dev | grep 'Interface\\|type' | sed -r 's/type//g' | sed -r 's/Interface//g' | sed 'N;s/\\n/,/'",true);
-
-        for (String t : temp){
-            String[] l = t.trim().replaceAll("\\s+", " ").split(",");
-            result.add(l[0]);
-        }
-        if (result.contains("managed") || result.contains("monitor") || result.contains("NAN") || result.contains("P2P")){
-            result = new ArrayList<>();
-            for (String t : temp){
-                String[] l = t.trim().replaceAll("\\s+", " ").split(",");
-                if (l.length > 1){result.add(l[1]);}
-
-            }
+        for (String[] p : monitorManager.listInterfaces()){
+            result.add(p[0]);
         }
 
         ArrayList<String> latest = new ArrayList<>();
@@ -1181,11 +1415,34 @@ public class Core {
         return result;
     }
 
+    public ArrayList<String> rootlessPrepWifi(String iface) {
+        String cmd =
+            "rfkill unblock all 2>/dev/null || for f in /sys/class/rfkill/*/state; do echo 1 > \"$f\" 2>/dev/null; done; "
+          + "pkill wpa_supplicant 2>/dev/null; "
+          + "for i in $(iw dev 2>/dev/null | awk '/Interface/{print $2}'); do case \"$i\" in *mon) [ \"$i\" = \"" + iface + "\" ] || iw dev \"$i\" del 2>/dev/null;; esac; done; "
+          + "ip link set " + iface + " down 2>/dev/null; "
+          + "iw dev " + iface + " set type managed 2>/dev/null; "
+          + "ip link set " + iface + " up 2>&1";
+        return customChrootCommand(cmd);
+    }
+
     public String getHSInterface(){
         return monitorManager.getHSInterface();
     }
     public String getWPSInterface(){
         return getString("wlan_wps");
+    }
+
+    public void setWifiInterface(String iface){
+        if (iface == null || iface.isEmpty()) return;
+        String previous = getString("wlan_wifi");
+        putString("wlan_wifi", iface);
+        for (String key : new String[]{"wlan_scan", "wlan_deauth", "wlan_wps"}){
+            String current = getString(key);
+            if (current == null || current.isEmpty() || current.equals(previous)){
+                putString(key, iface);
+            }
+        }
     }
     public boolean isMonitorModeEnabled(String wlan){
         return monitorManager.isMonitorModeEnabled(wlan);
@@ -1228,22 +1485,5 @@ public class Core {
         credsList.remove(position);
         putListString("creds",credsList);
     }
-
-    public void setSmoothLevel(WaveDrawable mWaveDrawable, int level){
-        int now = mWaveDrawable.getLevel();
-        if (now < level){
-            for (int i = now; i < level; i++){
-
-                mWaveDrawable.setLevel(i);
-            }
-        }else{
-            for (int i = now; i > level; i--){
-                mWaveDrawable.setLevel(i);
-            }
-        }
-    }
-
-
-
 
 }

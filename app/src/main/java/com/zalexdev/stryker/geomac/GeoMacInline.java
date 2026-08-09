@@ -135,12 +135,8 @@ public class GeoMacInline extends AppCompatActivity {
     }
 
     private String lookup(String mac) {
-        ArrayList<String> out = core.customChrootCommand("./modules/GeoMac/geomac " + mac);
-        for (String line : out) {
-            Matcher m = COORDS.matcher(line);
-            if (m.find()) return m.group();
-        }
-        return "";
+        double[] c = GeoLookup.coordsFor(core, mac);
+        return c == null ? "" : c[0] + "," + c[1];
     }
 
     private void copy(String text) {

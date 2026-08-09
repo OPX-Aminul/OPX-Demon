@@ -142,7 +142,7 @@ public class Metasploit extends Fragment {
         });
 
         new Thread(() -> {
-            boolean msfcheck = core.checkFile("/data/local/stryker/release/metasploit-framework/msfconsole");
+            boolean msfcheck = core.isToolInstalled("metasploit");
             if (!isAdded() || activity == null) return;
             if (!msfcheck) {
                 core.putBoolean("msf", false);

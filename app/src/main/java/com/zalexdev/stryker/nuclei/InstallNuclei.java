@@ -66,7 +66,6 @@ public class InstallNuclei extends Fragment {
     private LogAdapter logAdapter;
 
     private final EnumMap<NucleiInstallStage, StageRow> stageRows = new EnumMap<>(NucleiInstallStage.class);
-    private NucleiInstallStage currentApkStage = null;
 
     private boolean receiverRegistered = false;
     private final BroadcastReceiver installReceiver = new BroadcastReceiver() {
@@ -128,7 +127,7 @@ public class InstallNuclei extends Fragment {
             renderFromService(status);
         } else {
             new Thread(() -> {
-                boolean already = core.checkFile("/data/local/stryker/release/usr/bin/nuclei");
+                boolean already = core.hasBinary("nuclei");
                 runOnUi(() -> {
                     if (already) {
                         core.putBoolean("nuclei", true);
@@ -248,28 +247,29 @@ public class InstallNuclei extends Fragment {
     }
 
     private void applyMarker(String marker) {
-        if (marker.startsWith("Prepare clean Go environment")) {
-            currentApkStage = NucleiInstallStage.PREPARE;
+        if (marker.startsWith("Installing download tools")) {
             markStage(NucleiInstallStage.PREPARE, RowState.ACTIVE);
-        } else if (marker.startsWith("Refresh apk index")) {
+        } else if (marker.startsWith("Detecting architecture")) {
             markStage(NucleiInstallStage.PREPARE, RowState.DONE);
-            currentApkStage = NucleiInstallStage.REFRESH;
             markStage(NucleiInstallStage.REFRESH, RowState.ACTIVE);
-        } else if (marker.startsWith("Install Go toolchain")) {
+        } else if (marker.startsWith("Resolving latest nuclei release")) {
             markStage(NucleiInstallStage.REFRESH, RowState.DONE);
-            currentApkStage = NucleiInstallStage.INSTALL_GO;
-            markStage(NucleiInstallStage.INSTALL_GO, RowState.ACTIVE);
-        } else if (marker.startsWith("go install nuclei@latest")) {
-            markStage(NucleiInstallStage.INSTALL_GO, RowState.DONE);
-            currentApkStage = NucleiInstallStage.GO_BUILD;
-            markStage(NucleiInstallStage.GO_BUILD, RowState.ACTIVE);
-        } else if (marker.startsWith("Deploy nuclei")) {
-            markStage(NucleiInstallStage.GO_BUILD, RowState.DONE);
-            currentApkStage = NucleiInstallStage.DEPLOY;
+            markStage(NucleiInstallStage.RESOLVE, RowState.ACTIVE);
+        } else if (marker.startsWith("Downloading ")) {
+            markStage(NucleiInstallStage.RESOLVE, RowState.DONE);
+            markStage(NucleiInstallStage.DOWNLOAD, RowState.ACTIVE);
+        } else if (marker.startsWith("Unpacking binary")) {
+            markStage(NucleiInstallStage.DOWNLOAD, RowState.DONE);
             markStage(NucleiInstallStage.DEPLOY, RowState.ACTIVE);
+        } else if (marker.startsWith("Fetching template library")) {
+            markStage(NucleiInstallStage.DEPLOY, RowState.DONE);
+            markStage(NucleiInstallStage.TEMPLATES, RowState.ACTIVE);
+        } else if (marker.startsWith("Template library ready")) {
+            markStage(NucleiInstallStage.TEMPLATES, RowState.DONE);
+        } else if (marker.startsWith("Template download failed")) {
+            markStage(NucleiInstallStage.TEMPLATES, RowState.FAILED);
         } else if (marker.startsWith("Verify nuclei")) {
             markStage(NucleiInstallStage.DEPLOY, RowState.DONE);
-            currentApkStage = NucleiInstallStage.VERIFY;
             markStage(NucleiInstallStage.VERIFY, RowState.ACTIVE);
         }
         updateSubtitle(marker);

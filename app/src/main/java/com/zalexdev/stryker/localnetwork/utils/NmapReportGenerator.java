@@ -11,7 +11,9 @@ import android.content.Intent;
 import androidx.core.app.NotificationCompat;
 
 import com.zalexdev.stryker.R;
+import com.zalexdev.stryker.engine.GuestExec;
 import com.zalexdev.stryker.logger.Logger;
+import com.zalexdev.stryker.utils.Core;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -71,6 +73,11 @@ public class NmapReportGenerator extends IntentService {
 
     public void startNmap(NotificationCompat.Builder builder) {
         isRunning = true;
+        Core core = new Core(this);
+        if (core.isRootless()) {
+            startNmapRootless(builder, core);
+            return;
+        }
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         ArrayList<String> output = new ArrayList<>();
         try {
@@ -115,6 +122,36 @@ public class NmapReportGenerator extends IntentService {
 
         }
 
+    }
+
+    public void startNmapRootless(NotificationCompat.Builder builder, Core core) {
+        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        ArrayList<String> output = new ArrayList<>();
+        GuestExec.Session s = null;
+        try {
+            s = core.rootless().openStream("nmap " + ip + " -A --script=vuln --stats-every 1s -Pn");
+            String line;
+            while ((line = s.reader.readLine()) != null) {
+                if (line.startsWith(GuestExec.Session.SENTINEL)) {
+                    break;
+                }
+                builder.setStyle(new NotificationCompat.BigTextStyle()
+                        .bigText(line));
+                notificationManager.notify(notificationId, builder.build());
+                if (!line.contains("done") && !line.contains("elapsed")) {output.add(line);}
+                Matcher per = Pattern.compile("[0-9]*\\.[0-9]+%").matcher(line);
+                if (per.find()){
+                    builder.setProgress(100,(int) Double.parseDouble(per.group().replace("%","")) , false);
+                }
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (s != null) s.close();
+        }
+        isRunning = false;
+        new Logger().generateNmapReport(ip, output);
+        notificationManager.cancel(notificationId);
+        sendSuccessNotification();
     }
 
     @Override

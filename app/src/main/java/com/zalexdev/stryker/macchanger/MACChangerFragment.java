@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.Html;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.text.method.LinkMovementMethod;
 import android.view.LayoutInflater;
@@ -32,6 +33,7 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.textview.MaterialTextView;
 import com.zalexdev.stryker.R;
+import com.zalexdev.stryker.engine.Apt;
 import com.zalexdev.stryker.utils.AdvancedProcess;
 import com.zalexdev.stryker.utils.Core;
 import com.zalexdev.stryker.utils.SimpleProcess;
@@ -169,7 +171,7 @@ public class MACChangerFragment extends Fragment {
         restoreState();
 
         loadInterfaces();
-        core.threadChrootCommand("apk add macchanger");
+        core.threadChrootCommand(TextUtils.join("; ", Apt.env()) + "; " + Apt.install("macchanger"));
     }
 
     @Override

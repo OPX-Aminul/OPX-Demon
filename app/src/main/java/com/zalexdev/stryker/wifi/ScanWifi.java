@@ -41,6 +41,15 @@ public class ScanWifi extends AsyncTask<Void, String, ArrayList<WiFINetwork>> {
     protected ArrayList<WiFINetwork> doInBackground(Void... command) {
         String line;
         ArrayList<WiFINetwork> result = new ArrayList<>();
+        if (core.isRootless()) {
+            ArrayList<String> out = core.customChrootCommand("iw dev " + wlan + " scan 2>&1");
+            result = parsewifi(out);
+            if (result.isEmpty()) {
+                result = parseWifiLenient(out);
+            }
+            onPostExecute(result);
+            return result;
+        }
         try {
             Process process = core.generateSuProcess();
             OutputStream stdin = process.getOutputStream();
@@ -172,8 +181,7 @@ public class ScanWifi extends AsyncTask<Void, String, ArrayList<WiFINetwork>> {
                     String model = temp.replace("Model:", "");
                     networks.get(networks.size() - 1).setModel(model);
                     networks.get(networks.size() - 1).setVulnerable(core.checkModel(model));
-
-
+                    networks.get(networks.size() - 1).setVulnVerified(core.isPixieVerified(model));
                 } else if (temp.contains("0x01")) {
                     networks.get(networks.size() - 1).setBlocked(true);
                 }else if (temp.contains("Device name:")){
@@ -189,6 +197,59 @@ public class ScanWifi extends AsyncTask<Void, String, ArrayList<WiFINetwork>> {
         if (tempInfo.size() > 0 && networks.size() > 0) {
             networks.get(networks.size() - 1).setInfo(tempInfo);
             tempInfo = new ArrayList<>();
+        }
+        return networks;
+    }
+
+    public ArrayList<WiFINetwork> parseWifiLenient(ArrayList<String> output) {
+        ArrayList<WiFINetwork> networks = new ArrayList<>();
+        WiFINetwork cur = null;
+        ArrayList<String> info = new ArrayList<>();
+        for (String raw : output) {
+            if (raw == null) continue;
+            String t = raw.trim().replace("*", "").trim();
+            if (t.startsWith("BSS ") && t.contains(":")) {
+                if (cur != null && cur.getMac() != null && !cur.getMac().isEmpty()) {
+                    cur.setInfo(info);
+                    networks.add(cur);
+                }
+                cur = new WiFINetwork();
+                info = new ArrayList<>();
+                Matcher m = Pattern.compile("((\\w{2}:){5}\\w{2})").matcher(t);
+                if (m.find()) {
+                    cur.setMac(m.group());
+                    String vendor = core.getVendorByMacFromDB(m.group());
+                    cur.setVendor(vendor.isEmpty() ? "Unknown" : vendor);
+                }
+                cur.setSsid("Hidden network");
+            } else if (cur != null) {
+                info.add(raw);
+                if (t.startsWith("SSID:")) {
+                    String name = t.substring(5).trim();
+                    if (!name.isEmpty() && !name.contains("\\x")) cur.setSsid(name);
+                } else if (t.startsWith("signal:")) {
+                    Matcher m = Pattern.compile("\\d+").matcher(t.replace("signal:", "").replace("dBm", ""));
+                    if (m.find()) { try { cur.setPower(Integer.parseInt(m.group())); } catch (Exception ignored) {} }
+                } else if (t.contains("WPS:") && t.contains("Version")) {
+                    cur.setWps(true);
+                } else if (t.contains("primary channel:")) {
+                    cur.setIs5hhz(true);
+                    Matcher m = Pattern.compile("\\d+").matcher(t.replace("primary channel:", ""));
+                    if (m.find()) { try { cur.setChannel(Integer.parseInt(m.group())); } catch (Exception ignored) {} }
+                } else if (t.contains("DS Parameter set: channel")) {
+                    Matcher m = Pattern.compile("\\d+").matcher(t.replace("DS Parameter set: channel", ""));
+                    if (m.find()) { try { cur.setChannel(Integer.parseInt(m.group())); } catch (Exception ignored) {} }
+                } else if (t.startsWith("Model:")) {
+                    String model = t.replace("Model:", "").trim();
+                    cur.setModel(model);
+                    cur.setVulnerable(core.checkModel(model));
+                    cur.setVulnVerified(core.isPixieVerified(model));
+                }
+            }
+        }
+        if (cur != null && cur.getMac() != null && !cur.getMac().isEmpty()) {
+            cur.setInfo(info);
+            networks.add(cur);
         }
         return networks;
     }

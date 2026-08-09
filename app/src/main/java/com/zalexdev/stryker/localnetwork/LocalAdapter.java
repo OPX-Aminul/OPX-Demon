@@ -45,9 +45,7 @@ import com.google.android.material.textview.MaterialTextView;
 import com.zalexdev.stryker.R;
 import com.zalexdev.stryker.custom.Device;
 import com.zalexdev.stryker.custom.Exploit;
-import com.zalexdev.stryker.custom.Router;
 import com.zalexdev.stryker.exploithub.utils.BasicExploitLaunch;
-import com.zalexdev.stryker.localnetwork.exploits.RouterScan;
 import com.zalexdev.stryker.localnetwork.utils.NmapReportGenerator;
 import com.zalexdev.stryker.metasploit.InstallMetasploit;
 import com.zalexdev.stryker.utils.AdvancedProcess;
@@ -101,7 +99,13 @@ public class LocalAdapter extends RecyclerView.Adapter<LocalAdapter.ViewHolder> 
         String mac = device.getMac();
 
         adapter.local_ip.setText(ip);
-        adapter.local_manufacture.setText(core.getVendorByMacFromDB(device.getMac()));
+        String vendorText = core.getVendorByMacFromDB(device.getMac());
+        if (vendorText == null || vendorText.trim().isEmpty()) {
+            vendorText = com.zalexdev.stryker.localnetwork.utils.MacLine.stripMac(device.getVendor());
+        }
+        vendorText = vendorText.trim();
+        if (vendorText.isEmpty()) vendorText = context.getString(R.string.local_vendor_unknown);
+        adapter.local_manufacture.setText(vendorText);
 
         if (device.getSubname() != null && !device.getSubname().isEmpty()
                 && !device.getSubname().equals(device.getIp())) {
@@ -115,7 +119,7 @@ public class LocalAdapter extends RecyclerView.Adapter<LocalAdapter.ViewHolder> 
         }
 
         if (!core.getBoolean("hide")) {
-            adapter.local_mac.setText(mac);
+            adapter.local_mac.setText(mac == null || mac.trim().isEmpty() ? "—" : mac);
         } else {
             adapter.local_mac.setText(Core.HIDDEN_MAC);
         }
@@ -197,6 +201,39 @@ public class LocalAdapter extends RecyclerView.Adapter<LocalAdapter.ViewHolder> 
     }
 
     public void netcutdialog(Device d, int pos) {
+        if (core.isRootless()) {
+            new Thread(() -> {
+                boolean l2 = guestHasLanAccess(d.getIp());
+                activity.runOnUiThread(() -> {
+                    if (l2) {
+                        netcutDialogInner(d, pos);
+                    } else {
+                        new MaterialAlertDialogBuilder(context)
+                                .setTitle(R.string.local_netcut_no_l2_title)
+                                .setMessage(R.string.local_netcut_no_l2_body)
+                                .setPositiveButton(android.R.string.ok, (di, i) -> di.dismiss())
+                                .show();
+                    }
+                });
+            }, "netcut-l2-check").start();
+            return;
+        }
+        netcutDialogInner(d, pos);
+    }
+
+    private boolean guestHasLanAccess(String target) {
+        try {
+            for (String l : core.customChrootCommand("ip route get " + target + " 2>/dev/null", true)) {
+                if (l == null) continue;
+                if (l.contains("via 10.0.2.2")) return false;
+                if (l.contains(" dev ")) return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    private void netcutDialogInner(Device d, int pos) {
         if (pos != 0) {
             String[] types = new String[]{
                     context.getString(R.string.cut_dev),
@@ -397,15 +434,37 @@ public class LocalAdapter extends RecyclerView.Adapter<LocalAdapter.ViewHolder> 
     }
 
     private void launchHydra(Device device) {
-        if (core.checkFile("/data/local/stryker/release/usr/bin/hydra")) {
-            core.putBoolean("hydra", true);
-            com.zalexdev.stryker.hydra.HydraDialog.show(context, activity, core, device);
-            return;
-        }
-        FragmentManager manager = ((AppCompatActivity) context).getSupportFragmentManager();
-        manager.beginTransaction()
-                .replace(R.id.flContent, new com.zalexdev.stryker.hydra.HydraInstall())
-                .commit();
+        new Thread(() -> {
+            boolean installed = core.isToolInstalled("hydra");
+            activity.runOnUiThread(() -> {
+                if (installed) {
+                    core.putBoolean("hydra", true);
+                    com.zalexdev.stryker.hydra.HydraDialog.show(context, activity, core, device);
+                    return;
+                }
+                FragmentManager manager = ((AppCompatActivity) context).getSupportFragmentManager();
+                manager.beginTransaction()
+                        .replace(R.id.flContent, new com.zalexdev.stryker.hydra.HydraInstall())
+                        .commit();
+            });
+        }, "hydra-check").start();
+    }
+
+    private void launchCameradar(String ip) {
+        new Thread(() -> {
+            boolean installed = core.isToolInstalled("cameradar");
+            activity.runOnUiThread(() -> {
+                if (installed) {
+                    core.putBoolean("cameradar", true);
+                    radarDialog(ip);
+                    return;
+                }
+                FragmentManager manager = ((AppCompatActivity) context).getSupportFragmentManager();
+                manager.beginTransaction()
+                        .replace(R.id.flContent, new com.zalexdev.stryker.cameradar.CameradarInstall())
+                        .commit();
+            });
+        }, "cameradar-check").start();
     }
 
     private void generatePayload() {
@@ -475,57 +534,6 @@ public class LocalAdapter extends RecyclerView.Adapter<LocalAdapter.ViewHolder> 
         dialog.show();
     }
 
-    private void testexploit(String type, String port, String ip) throws ExecutionException, InterruptedException {
-        final Dialog dialog = new Dialog(context);
-        dialog.setContentView(R.layout.exploit_progress);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            window.setLayout(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        }
-        LinearProgressIndicator prog = dialog.findViewById(R.id.exploit_prog);
-        LottieAnimationView image = dialog.findViewById(R.id.exploit_img);
-        TextView title = dialog.findViewById(R.id.exploit_title);
-        TextView progress = dialog.findViewById(R.id.exploit_progress_text);
-        TextView cancel = dialog.findViewById(R.id.exploit_cancel);
-        cancel.setOnClickListener(view -> dialog.dismiss());
-        dialog.setCanceledOnTouchOutside(false);
-        if (!core.is64Bit()) {
-            bitdialog();
-            return;
-        }
-        if (!type.equals("Admin")) return;
-
-        image.setAnimation(R.raw.router);
-        title.setText(R.string.rs);
-        progress.setText(R.string.start_core);
-        prog.setVisibility(View.INVISIBLE);
-        prog.setIndeterminate(false);
-        prog.setVisibility(View.VISIBLE);
-        setProg(prog, 20);
-        dialog.show();
-        new Thread(() -> {
-            try {
-                Router router = new RouterScan(activity, context, progress, prog, ip, port)
-                        .executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR).get();
-                setProg(prog, 100);
-                setText(cancel, context.getString(android.R.string.ok));
-                if (!router.getSuccess()) {
-                    setText(progress, context.getString(R.string.failed_info));
-                    setProgColor(prog, image, 1);
-                } else {
-                    setText(progress, context.getString(R.string.webauth) + router.getAuth()
-                            + context.getString(R.string.ssid) + "\n" + router.getSsid()
-                            + context.getString(R.string.psk) + router.getPsk()
-                            + context.getString(R.string.wps) + router.getWps());
-                    setProgColor(prog, image, 2);
-                }
-            } catch (ExecutionException | InterruptedException e) {
-                e.printStackTrace();
-            }
-        }).start();
-    }
-
     public void radarDialog(String ip) {
         AdvancedProcess cameradar;
         final Dialog dialog = new Dialog(context);
@@ -551,7 +559,9 @@ public class LocalAdapter extends RecyclerView.Adapter<LocalAdapter.ViewHolder> 
         dialog.show();
         final String[] username = {""};
         final String[] password = {""};
-        cameradar = new AdvancedProcess(activity, context, "radar -c  /CORE/Cameradar/credentials.json -r /CORE/Cameradar/routes -t " + ip, true) {
+        String radarCmd = "cameradar --custom-credentials /CORE/Cameradar/credentials.json"
+                + " --custom-routes /CORE/Cameradar/routes --ui plain --targets " + ip;
+        cameradar = new AdvancedProcess(activity, context, radarCmd, true) {
             @Override
             public void onFinished(ArrayList<String> outputList) {
                 kill();
@@ -570,10 +580,13 @@ public class LocalAdapter extends RecyclerView.Adapter<LocalAdapter.ViewHolder> 
             public void onNewLine(String line) {
                 progress.setText(line);
                 if (line.contains("Username:")) {
-                    username[0] = line.replace("Username:", "");
+                    username[0] = line.replace("Username:", "").trim();
                 }
                 if (line.contains("Password:")) {
-                    password[0] = line.replace("Password:", "");
+                    password[0] = line.replace("Password:", "").trim();
+                }
+                if (!username[0].isEmpty() || !password[0].isEmpty()) {
+                    success = true;
                 }
                 onEvent(line);
             }
@@ -589,37 +602,6 @@ public class LocalAdapter extends RecyclerView.Adapter<LocalAdapter.ViewHolder> 
         cancel.setOnClickListener(view -> {
             dialog.dismiss();
             finalCameradar.kill();
-        });
-    }
-
-    public void bitdialog() {
-        new MaterialAlertDialogBuilder(context)
-                .setTitle("Your device is 32bit!")
-                .setMessage(context.getString(R.string.bit))
-                .setPositiveButton(android.R.string.ok, (dialogInterface, i) -> dialogInterface.dismiss())
-                .show();
-    }
-
-    public void getPort(String type, ArrayList<String> ports, String ip) {
-        port = "";
-        if (ports.isEmpty()) return;
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
-        builder.setTitle(R.string.coose_port);
-        String[] port_list = ports.toArray(new String[0]);
-        builder.setSingleChoiceItems(port_list, 0, (di, which) -> {
-            port = port_list[which];
-            di.dismiss();
-        });
-        AlertDialog d = builder.create();
-        d.show();
-        d.setOnDismissListener(dialogInterface -> {
-            try {
-                if (!port.isEmpty()) {
-                    testexploit(type, port, ip);
-                }
-            } catch (ExecutionException | InterruptedException e) {
-                e.printStackTrace();
-            }
         });
     }
 
@@ -653,7 +635,6 @@ public class LocalAdapter extends RecyclerView.Adapter<LocalAdapter.ViewHolder> 
         TextView portcount = dialog.findViewById(R.id.port_count);
         ImageView image = dialog.findViewById(R.id.device_image);
 
-        View admin = dialog.findViewById(R.id.check_admin_panel);
         View vulns = dialog.findViewById(R.id.check_vulns);
         View netcut = dialog.findViewById(R.id.netcut);
         View metasploit = dialog.findViewById(R.id.launch_msf);
@@ -742,8 +723,10 @@ public class LocalAdapter extends RecyclerView.Adapter<LocalAdapter.ViewHolder> 
         });
         nmap.setOnClickListener(view ->
                 activity.startService(new Intent(activity, NmapReportGenerator.class).putExtra("ip", device.getIp())));
-        camera.setOnClickListener(view -> radarDialog(device.getIp()));
-        admin.setOnClickListener(view -> getPort("Admin", device.portsToString(), device.getIp()));
+        camera.setOnClickListener(view -> {
+            dialog.dismiss();
+            launchCameradar(device.getIp());
+        });
         netcut.setOnClickListener(view -> netcutdialog(device, position));
         image.setOnClickListener(view -> showPorts2(device));
         genpayload.setOnClickListener(v -> generatePayload());

@@ -34,11 +34,6 @@ public class MetasploitUtils {
     public boolean isInitializedConsole = false;
     public boolean isInitializedShell = false;
 
-    public Process consoleProc;
-    public Process shellProc;
-
-    public final String launchCmd = Core.EXECUTE + " ./metasploit-framework/msfconsole\n";
-
     private final ArrayList<StateListener> stateListeners = new ArrayList<>();
 
     public interface StateListener {
@@ -82,7 +77,6 @@ public class MetasploitUtils {
         notificator();
         logger.writeLine("MetasploitUtils initialized", 2);
         new Thread(this::initConsole, "msf-console-init").start();
-        new Thread(this::initShell, "msf-shell-init").start();
     }
 
     public void addStateListener(StateListener listener) {

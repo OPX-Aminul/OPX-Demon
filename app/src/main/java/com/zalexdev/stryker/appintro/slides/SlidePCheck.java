@@ -23,9 +23,7 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
-import com.race604.drawable.wave.WaveDrawable;
 import com.zalexdev.stryker.R;
-import com.zalexdev.stryker.appintro.AppIntroActivity;
 import com.zalexdev.stryker.utils.Core;
 
 import java.util.Locale;
@@ -40,6 +38,8 @@ public class SlidePCheck extends Fragment {
     private static final String PREF_MANUFACT = "pcheck_manufacture";
     private static final String PREF_SPACE = "pcheck_space";
     private static final String PREF_FREE_GB = "pcheck_free_gb";
+
+    private static final long REQUIRED_FREE_GB = 4;
 
     private Activity activity;
     private Context context;
@@ -72,6 +72,11 @@ public class SlidePCheck extends Fragment {
         core = new Core(context);
         mPager = activity.findViewById(R.id.view_pager);
 
+        if (core.isRootless()) {
+            view.post(() -> core.moveNext(mPager));
+            return view;
+        }
+
         cardView = view.findViewById(R.id.check_card);
         capabilitiesLabel = view.findViewById(R.id.capabilities_label);
         disclaimer = view.findViewById(R.id.disclaimer);
@@ -92,7 +97,6 @@ public class SlidePCheck extends Fragment {
         button.setOnClickListener(view12 -> {
             if (checked) {
                 core.moveNext(mPager);
-                ((AppIntroActivity) activity).getWaveDrawable().setLevel(6500);
                 return;
             }
             runCheck();
@@ -110,12 +114,12 @@ public class SlidePCheck extends Fragment {
         boolean monFinal = core.getBoolean(PREF_MON);
         boolean usbOk = core.getBoolean(PREF_USB);
         boolean manufactOk = core.getBoolean(PREF_MANUFACT);
-        boolean spaceOk = core.getBoolean(PREF_SPACE);
         long freeGb = 0;
         try {
             freeGb = Long.parseLong(core.getString(PREF_FREE_GB));
         } catch (NumberFormatException ignored) {
         }
+        boolean spaceOk = core.getBoolean(PREF_SPACE) && freeGb >= REQUIRED_FREE_GB;
 
         progressIndicator.setVisibility(View.GONE);
         cardView.setVisibility(View.VISIBLE);
@@ -128,12 +132,12 @@ public class SlidePCheck extends Fragment {
         button.setEnabled(true);
         button.setText(context.getResources().getString(R.string.next));
         button.setIconResource(R.drawable.bolt);
-        ((AppIntroActivity) activity).getWaveDrawable().setLevel(5500);
     }
 
     @SuppressLint("SetTextI18n")
     private void renderRows(boolean rootOk, boolean monFinal, boolean usbOk,
                             boolean manufactOk, boolean spaceOk, long freeGb) {
+        boolean archOk = Core.isArm64();
         applyRow(rootOk, rootSub, rootBadge,
                 "Superuser shell available",
                 "su not detected — install Magisk or another root manager");
@@ -143,12 +147,24 @@ public class SlidePCheck extends Fragment {
         applyRow(usbOk, usbOtg, usbBadge,
                 "USB host mode supported",
                 "External adapters won't be usable on this device");
-        applyRow(manufactOk, manufacture, manufactureBadge,
-                Build.MANUFACTURER + " — no known quirks",
-                "Samsung stock ROM detected — wifi/local scan may misbehave");
+        applyRow(manufactOk && archOk, manufacture, manufactureBadge,
+                Build.MANUFACTURER + " · arm64-v8a — no known quirks",
+                archOk
+                        ? "Samsung stock ROM detected — wifi/local scan may misbehave"
+                        : Build.MANUFACTURER + " · " + primaryAbi()
+                                + " — Stryker is arm64-v8a only and will not run here");
         applyRow(spaceOk, spaceSub, spaceBadge,
                 freeGb + " GB free on /data",
-                "Only " + freeGb + " GB free — chroot install needs ~2 GB");
+                "Only " + freeGb + " GB free — Debian chroot install needs ~" + REQUIRED_FREE_GB + " GB");
+        if (!archOk) {
+            disclaimer.setText("This device reports " + primaryAbi()
+                    + ". Stryker ships arm64-v8a binaries only — the chroot toolset cannot be installed here.");
+        }
+    }
+
+    private static String primaryAbi() {
+        if (Build.SUPPORTED_ABIS == null || Build.SUPPORTED_ABIS.length == 0) return "an unknown CPU";
+        return Build.SUPPORTED_ABIS[0];
     }
 
     @SuppressLint("SetTextI18n")
@@ -173,7 +189,7 @@ public class SlidePCheck extends Fragment {
             boolean manufactOk = !Build.MANUFACTURER.toLowerCase(Locale.ROOT).contains("samsung");
 
             long freeGb = freeStorageGb();
-            boolean spaceOk = freeGb >= 2;
+            boolean spaceOk = freeGb >= REQUIRED_FREE_GB;
 
             core.putBoolean(PREF_ROOT, rootOk);
             core.putBoolean(PREF_MON, monFinal);
@@ -198,7 +214,6 @@ public class SlidePCheck extends Fragment {
                 button.setEnabled(true);
                 button.setText(context.getResources().getString(R.string.next));
                 button.setIconResource(R.drawable.bolt);
-                ((AppIntroActivity) activity).getWaveDrawable().setLevel(5500);
             });
         }).start();
     }

@@ -29,6 +29,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -37,11 +39,17 @@ import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.zalexdev.stryker.R;
+import com.zalexdev.stryker.appintro.install.LogAdapter;
+import com.zalexdev.stryker.appintro.install.LogClassifier;
+import com.zalexdev.stryker.appintro.install.LogLevel;
+import com.zalexdev.stryker.appintro.install.LogLine;
+import com.zalexdev.stryker.vnc.install.VncInstallStage;
 import com.zalexdev.stryker.utils.AdvancedProcess;
 import com.zalexdev.stryker.utils.Core;
 import com.zalexdev.stryker.utils.SimpleProcess;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -87,6 +95,14 @@ public class VNCFragment extends Fragment {
     private SimpleProcess changePasswdProcess;
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
 
+    private com.google.android.material.textview.MaterialTextView stagesHeader, logHeader;
+    private com.google.android.material.card.MaterialCardView stagesCard;
+    private LinearLayout stagesContainer;
+    private RecyclerView logRecycler;
+    private LogAdapter logAdapter;
+    private final EnumMap<VncInstallStage, StageRow> stageRows = new EnumMap<>(VncInstallStage.class);
+
+    private static final String VNC_DIR = "/CORE/VNC";
     private static final String PREF_RESOLUTION = "vnc_last_resolution";
     private static final String PREF_PORT = "vnc_last_port";
 
@@ -133,6 +149,16 @@ public class VNCFragment extends Fragment {
         port = view.findViewById(R.id.port);
         passwdLayout = view.findViewById(R.id.passwd_layout);
 
+        stagesHeader = view.findViewById(R.id.vnc_stages_header);
+        stagesCard = view.findViewById(R.id.vnc_stages_card);
+        stagesContainer = view.findViewById(R.id.vnc_stages_container);
+        logHeader = view.findViewById(R.id.vnc_log_header);
+        logRecycler = view.findViewById(R.id.vnc_log_recycler);
+        logRecycler.setLayoutManager(new LinearLayoutManager(context));
+        logAdapter = new LogAdapter(context);
+        logRecycler.setAdapter(logAdapter);
+        buildStageRows(LayoutInflater.from(context));
+
         install = view.findViewById(R.id.install_vnc);
         toggle = view.findViewById(R.id.toggle_vnc);
         uninstall = view.findViewById(R.id.uninstall_vnc);
@@ -147,10 +173,7 @@ public class VNCFragment extends Fragment {
         wireUninstall();
         wireChangePassword();
 
-        new Thread(() -> {
-            if (!core.checkFolder("/data/local/stryker/release/CORE/VNC"))
-                core.customChrootCommand("mkdir /CORE/VNC", true);
-        }).start();
+        new Thread(() -> core.customChrootCommand("mkdir -p " + VNC_DIR, true)).start();
 
         checkVNCInstalled();
 
@@ -238,22 +261,229 @@ public class VNCFragment extends Fragment {
     private void wireInstall() {
         install.setOnClickListener(v -> new MaterialAlertDialogBuilder(context)
                 .setTitle("VNC installer")
-                .setMessage("This will install XFCE + x11vnc into the chroot. ~600 MB download.")
+                .setMessage(core.isRootless()
+                        ? "This will install XFCE + x11vnc inside the VM. ~600 MB download."
+                        : "This will install XFCE + x11vnc into the chroot. ~600 MB download.")
                 .setPositiveButton(android.R.string.ok, (di, i) -> new Thread(() -> {
-                    core.customCommand("cp /data/data/com.zalexdev.stryker/files/install_xfce.sh /data/local/stryker/release/CORE/VNC/install.sh");
-                    core.customCommand("cp /data/data/com.zalexdev.stryker/files/uninstall_xfce.sh /data/local/stryker/release/CORE/VNC/uninstall.sh");
-                    core.customCommand("dos2unix /data/local/stryker/release/CORE/VNC/install.sh");
-                    core.customCommand("dos2unix /data/local/stryker/release/CORE/VNC/uninstall.sh");
-                    core.customCommand("chmod 755 /data/local/stryker/release/CORE/VNC/install.sh");
-                    core.customCommand("chmod 755 /data/local/stryker/release/CORE/VNC/uninstall.sh");
+                    if (!stageVncScripts()) {
+                        if (isSafe()) activity.runOnUiThread(() -> showDialog("Install failed",
+                                "Could not stage the VNC helper scripts into the tool environment."));
+                        return;
+                    }
                     activity.runOnUiThread(this::enterRunningInstallUi);
                     runInstallProcess();
                 }).start())
                 .show());
     }
 
+    private boolean stageVncScripts() {
+        return core.isRootless() ? stageForGuest() : stageForChroot();
+    }
+
+    /** The VM only sees the 9p share, so the scripts have to travel through it. */
+    private boolean stageForGuest() {
+        java.io.File staging = new java.io.File(core.getShareRoot(), ".stryker-vnc");
+        //noinspection ResultOfMethodCallIgnored
+        staging.mkdirs();
+        if (!stageAsset("install_xfce.sh", new java.io.File(staging, "install.sh"))) return false;
+        if (!stageAsset("uninstall_xfce.sh", new java.io.File(staging, "uninstall.sh"))) return false;
+        core.customChrootCommand("mkdir -p " + VNC_DIR + "; "
+                + "cp -f /sdcard/Stryker/.stryker-vnc/install.sh " + VNC_DIR + "/install.sh; "
+                + "cp -f /sdcard/Stryker/.stryker-vnc/uninstall.sh " + VNC_DIR + "/uninstall.sh; "
+                + "sed -i 's/\r$//' " + VNC_DIR + "/install.sh " + VNC_DIR + "/uninstall.sh; "
+                + "chmod 0755 " + VNC_DIR + "/install.sh " + VNC_DIR + "/uninstall.sh", true);
+        return core.guestFileExists(VNC_DIR + "/install.sh");
+    }
+
+    /**
+     * Chroot: never route this through shared storage. From Android 11 the app has no write access
+     * to /sdcard unless the user grants all-files access, and refusing it used to fail the whole
+     * install. The app's own files dir is always writable, and root copies from there.
+     */
+    private boolean stageForChroot() {
+        java.io.File staging = new java.io.File(context.getFilesDir(), ".stryker-vnc");
+        //noinspection ResultOfMethodCallIgnored
+        staging.mkdirs();
+        if (!stageAsset("install_xfce.sh", new java.io.File(staging, "install.sh"))) return false;
+        if (!stageAsset("uninstall_xfce.sh", new java.io.File(staging, "uninstall.sh"))) return false;
+        String src = staging.getAbsolutePath();
+        String dst = Core.CHROOT_ROOT + VNC_DIR;
+        core.customCommand("mkdir -p " + dst + "; "
+                + "cp -f " + src + "/install.sh " + dst + "/install.sh; "
+                + "cp -f " + src + "/uninstall.sh " + dst + "/uninstall.sh; "
+                + "sed -i 's/\r$//' " + dst + "/install.sh " + dst + "/uninstall.sh; "
+                + "chmod 0755 " + dst + "/install.sh " + dst + "/uninstall.sh", true);
+        return core.guestFileExists(VNC_DIR + "/install.sh");
+    }
+
+    private boolean stageAsset(String assetName, java.io.File dest) {
+        try (java.io.InputStream in = context.getAssets().open(assetName);
+             java.io.OutputStream out = new java.io.FileOutputStream(dest)) {
+            byte[] buf = new byte[8192];
+            int r;
+            while ((r = in.read(buf)) != -1) out.write(buf, 0, r);
+            out.flush();
+            return true;
+        } catch (Exception e) {
+            core.logger.writeLine("VNC staging failed for " + assetName + ": " + e.getMessage(), 3);
+            return false;
+        }
+    }
+
+    private enum RowState { PENDING, ACTIVE, DONE, FAILED }
+
+    private static final class StageRow {
+        final TextView title;
+        final ImageView icon;
+        final ProgressBar spinner;
+        final android.widget.FrameLayout indicator;
+
+        StageRow(TextView title, ImageView icon, ProgressBar spinner,
+                 android.widget.FrameLayout indicator) {
+            this.title = title;
+            this.icon = icon;
+            this.spinner = spinner;
+            this.indicator = indicator;
+        }
+    }
+
+    private void buildStageRows(LayoutInflater inflater) {
+        stagesContainer.removeAllViews();
+        stageRows.clear();
+        for (VncInstallStage stage : VncInstallStage.values()) {
+            View row = inflater.inflate(R.layout.install_stage_row, stagesContainer, false);
+            TextView title = row.findViewById(R.id.stage_title);
+            ImageView icon = row.findViewById(R.id.stage_icon);
+            ProgressBar spinner = row.findViewById(R.id.stage_spinner);
+            android.widget.FrameLayout indicator = row.findViewById(R.id.stage_indicator);
+            title.setText(stage.titleRes);
+            StageRow handles = new StageRow(title, icon, spinner, indicator);
+            applyRowState(handles, RowState.PENDING);
+            stageRows.put(stage, handles);
+            stagesContainer.addView(row);
+        }
+    }
+
+    private void resetStages() {
+        for (StageRow row : stageRows.values()) applyRowState(row, RowState.PENDING);
+    }
+
+    private void markStage(VncInstallStage stage, RowState newState) {
+        if (!isSafe()) return;
+        activity.runOnUiThread(() -> {
+            StageRow row = stageRows.get(stage);
+            if (row != null) applyRowState(row, newState);
+        });
+    }
+
+    private void applyRowState(StageRow row, RowState state) {
+        int color;
+        switch (state) {
+            case ACTIVE:
+                color = ContextCompat.getColor(context, R.color.stryker_accent);
+                row.spinner.setVisibility(View.VISIBLE);
+                row.icon.setVisibility(View.GONE);
+                row.title.setTypeface(null, android.graphics.Typeface.BOLD);
+                break;
+            case DONE:
+                color = ContextCompat.getColor(context, R.color.green);
+                row.spinner.setVisibility(View.GONE);
+                row.icon.setVisibility(View.VISIBLE);
+                row.icon.setImageResource(R.drawable.done);
+                row.icon.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+                row.title.setTypeface(null, android.graphics.Typeface.NORMAL);
+                break;
+            case FAILED:
+                color = ContextCompat.getColor(context, R.color.red);
+                row.spinner.setVisibility(View.GONE);
+                row.icon.setVisibility(View.VISIBLE);
+                row.icon.setImageResource(R.drawable.error);
+                row.icon.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+                row.title.setTypeface(null, android.graphics.Typeface.BOLD);
+                break;
+            case PENDING:
+            default:
+                color = ContextCompat.getColor(context, R.color.grey);
+                row.spinner.setVisibility(View.GONE);
+                row.icon.setVisibility(View.GONE);
+                row.title.setTypeface(null, android.graphics.Typeface.NORMAL);
+                break;
+        }
+        row.title.setTextColor(color);
+        if (row.indicator.getBackground() != null) {
+            row.indicator.getBackground().mutate().setColorFilter(color, PorterDuff.Mode.SRC_IN);
+            row.indicator.getBackground().setAlpha(60);
+        }
+    }
+
+    private void markCurrentStageFailed() {
+        for (VncInstallStage stage : VncInstallStage.values()) {
+            StageRow row = stageRows.get(stage);
+            if (row != null && row.spinner.getVisibility() == View.VISIBLE) {
+                markStage(stage, RowState.FAILED);
+                return;
+            }
+        }
+    }
+
+    private void appendLog(LogLevel level, String text) {
+        if (!isSafe()) return;
+        activity.runOnUiThread(() -> {
+            if (!isSafe()) return;
+            logAdapter.append(new LogLine(level, text));
+            logRecycler.scrollToPosition(logAdapter.size() - 1);
+        });
+    }
+
+    private void showInstallSurfaces() {
+        stagesHeader.setVisibility(View.VISIBLE);
+        stagesCard.setVisibility(View.VISIBLE);
+        logHeader.setVisibility(View.VISIBLE);
+        logRecycler.setVisibility(View.VISIBLE);
+    }
+
+    /** The stage list and installer output only make sense while installing or after a failure. */
+    private void hideInstallSurfaces() {
+        stagesHeader.setVisibility(View.GONE);
+        stagesCard.setVisibility(View.GONE);
+        logHeader.setVisibility(View.GONE);
+        logRecycler.setVisibility(View.GONE);
+    }
+
+    private void handleInstallLine(String line) {
+        if (line == null) return;
+        if (line.contains("×")) {
+            String marker = line.replace("×", "").trim();
+            if (marker.startsWith("Refreshing package index")) {
+                markStage(VncInstallStage.REFRESH, RowState.ACTIVE);
+            } else if (marker.startsWith("Installing XFCE")) {
+                markStage(VncInstallStage.REFRESH, RowState.DONE);
+                markStage(VncInstallStage.PACKAGES, RowState.ACTIVE);
+            } else if (marker.startsWith("Preparing the VNC password")) {
+                markStage(VncInstallStage.PACKAGES, RowState.DONE);
+                markStage(VncInstallStage.PASSWORD, RowState.ACTIVE);
+            } else if (marker.startsWith("Writing helper scripts")) {
+                markStage(VncInstallStage.PASSWORD, RowState.DONE);
+                markStage(VncInstallStage.SCRIPTS, RowState.ACTIVE);
+            } else if (marker.startsWith("Verifying the installation")) {
+                markStage(VncInstallStage.SCRIPTS, RowState.DONE);
+                markStage(VncInstallStage.VERIFY, RowState.ACTIVE);
+            } else if (marker.startsWith("Done")) {
+                markStage(VncInstallStage.VERIFY, RowState.DONE);
+            }
+            if (isSafe()) activity.runOnUiThread(() -> textProgress.setText(marker));
+            appendLog(LogLevel.STEP, marker);
+            return;
+        }
+        String content = LogClassifier.strip(line);
+        if (!content.isEmpty()) appendLog(LogClassifier.classify(content), content);
+    }
+
     private void enterRunningInstallUi() {
         if (!isSafe()) return;
+        resetStages();
+        logAdapter.clear();
+        showInstallSurfaces();
         install.setEnabled(false);
         textProgress.setText("Starting installation…");
         textProgress.setVisibility(View.VISIBLE);
@@ -276,46 +506,47 @@ public class VNCFragment extends Fragment {
                 progress.setVisibility(View.GONE);
                 progress.setIndeterminate(false);
                 install.setEnabled(true);
-                core.deleteFile("/data/local/stryker/release/usr/share/backgrounds/xfce/*.png");
-                core.copyFile("/data/data/com.zalexdev.stryker/files/bg1.png", "/data/local/stryker/release/usr/share/backgrounds/xfce/xfce-verticals.png");
-                core.copyFile("/data/data/com.zalexdev.stryker/files/bg3.png", "/data/local/stryker/release/usr/share/backgrounds/xfce/bg3.png");
             }
 
             @Override
             public void onNewLine(String line) {
                 if (!isSafe()) return;
-                textProgress.setText(line);
-                if (line.contains("fetch")) {
-                    textProgress.setText("Fetching packages…");
-                }
+                handleInstallLine(line);
+                applyAptProgress(line);
 
-                if (line.contains("(") && line.contains(")") && line.contains("/")) {
-                    String paren = line.substring(line.indexOf("(") + 1, line.indexOf(")"));
-                    String[] parts = paren.split("/");
-                    if (parts.length != 2) return;
-                    int progressInt;
-                    int progressMax;
-                    try {
-                        progressInt = Integer.parseInt(parts[0].trim());
-                        progressMax = Integer.parseInt(parts[1].trim());
-                    } catch (NumberFormatException e) {
-                        return;
-                    }
-                    if (!determinate) {
-                        determinate = true;
-                        progress.setIndeterminate(false);
-                        progress.setMax(progressMax);
-                    }
-                    progress.setProgressCompat(progressInt, true);
-                }
-
-                if (line.contains("Failed to update packages") || line.contains("Failed to write")) {
+                if (line.startsWith("E: ")
+                        || line.contains("Failed to update packages")
+                        || line.contains("Failed to write")) {
+                    markCurrentStageFailed();
                     showDialog("Install failed", line);
                 } else if (line.contains("No previous VNC")) {
                     core.toaster("Default password set to \"stryker\"");
                 } else if (line.contains("Use the helper scripts")) {
                     showDialog("Install complete", "VNC server installed.");
                 }
+            }
+
+            private void applyAptProgress(String line) {
+                int open = line.indexOf('(');
+                int close = line.indexOf(')', open + 1);
+                if (open < 0 || close < 0) return;
+                String[] parts = line.substring(open + 1, close).split("/");
+                if (parts.length != 2) return;
+                int progressInt;
+                int progressMax;
+                try {
+                    progressInt = Integer.parseInt(parts[0].trim());
+                    progressMax = Integer.parseInt(parts[1].trim());
+                } catch (NumberFormatException e) {
+                    return;
+                }
+                if (progressMax <= 0 || progressInt > progressMax) return;
+                if (!determinate) {
+                    determinate = true;
+                    progress.setIndeterminate(false);
+                    progress.setMax(progressMax);
+                }
+                progress.setProgressCompat(progressInt, true);
             }
 
             @Override
@@ -416,6 +647,7 @@ public class VNCFragment extends Fragment {
     }
 
     private void vncInstalled() {
+        hideInstallSurfaces();
         install.setVisibility(View.GONE);
         resolutionLayout.setVisibility(View.VISIBLE);
         portLayout.setVisibility(View.VISIBLE);
@@ -430,6 +662,8 @@ public class VNCFragment extends Fragment {
     }
 
     private void vncNotInstalled() {
+        // Keep them up after a failed run so the error stays readable.
+        if (logAdapter.size() == 0) hideInstallSurfaces();
         install.setVisibility(View.VISIBLE);
         resolutionLayout.setVisibility(View.GONE);
         portLayout.setVisibility(View.GONE);
@@ -464,7 +698,13 @@ public class VNCFragment extends Fragment {
     }
 
     private boolean isVNCStarted() {
-        return !core.customChrootCommand("pidof Xvfb").isEmpty();
+        java.util.ArrayList<String> out = core.customChrootCommand("pidof Xvfb", true);
+        for (String l : out) {
+            if (l == null) continue;
+            String t = l.trim();
+            if (!t.isEmpty() && t.matches("[0-9 ]+")) return true;
+        }
+        return false;
     }
 
     private void vncStarted() {

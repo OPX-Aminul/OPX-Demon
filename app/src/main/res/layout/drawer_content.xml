@@ -59,7 +59,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="-2dp"
                     android:fontFamily="monospace"
-                    android:text="v4.5R"
+                    android:text="v6.0"
                     android:textColor="@color/grey"
                     android:textSize="11sp" />
             </LinearLayout>
@@ -94,6 +94,7 @@
                 android:paddingBottom="8dp">
 
                 <View
+                    android:id="@+id/drawer_status_dot"
                     android:layout_width="8dp"
                     android:layout_height="8dp"
                     android:background="@drawable/sev_dot_bg"
@@ -148,6 +149,10 @@
             android:id="@+id/terminal_item"
             layout="@layout/drawer_row" />
 
+        <include
+            android:id="@+id/logs_item"
+            layout="@layout/drawer_row" />
+
         <com.google.android.material.textview.MaterialTextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -169,15 +174,7 @@
             android:id="@+id/hs_item"
             layout="@layout/drawer_row" />
 
-        <include
-            android:id="@+id/macchanger_item"
-            layout="@layout/drawer_row" />
-
-        <include
-            android:id="@+id/router_scan_item"
-            layout="@layout/drawer_row" />
-
-        <include
+<include
             android:id="@+id/wpair_item"
             layout="@layout/drawer_row" />
 
@@ -224,10 +221,6 @@
             layout="@layout/drawer_row" />
 
         <include
-            android:id="@+id/hid_item"
-            layout="@layout/drawer_row" />
-
-        <include
             android:id="@+id/metasploit_item"
             layout="@layout/drawer_row" />
 
@@ -253,15 +246,48 @@
             layout="@layout/drawer_row" />
 
         <include
-            android:id="@+id/usb_arsenal_item"
-            layout="@layout/drawer_row" />
-
-        <include
             android:id="@+id/manager_item"
             layout="@layout/drawer_row" />
 
         <include
             android:id="@+id/about_item"
+            layout="@layout/drawer_row" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/root_section_header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginBottom="6dp"
+            android:letterSpacing="0.08"
+            android:text="ROOT"
+            android:textAllCaps="true"
+            android:textColor="@color/red"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/root_section_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="6dp"
+            android:text="Need the phone's own radio/USB gadget — unavailable on the rootless VM"
+            android:textColor="@color/grey"
+            android:textSize="10sp"
+            android:visibility="gone" />
+
+        <include
+            android:id="@+id/hid_item"
+            layout="@layout/drawer_row" />
+
+        <include
+            android:id="@+id/usb_arsenal_item"
+            layout="@layout/drawer_row" />
+
+        <include
+            android:id="@+id/macchanger_item"
             layout="@layout/drawer_row" />
 
         <View

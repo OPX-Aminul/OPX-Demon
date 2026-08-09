@@ -3,6 +3,7 @@ package com.zalexdev.stryker.utils;
 import android.app.Activity;
 import android.content.Context;
 
+import com.zalexdev.stryker.engine.GuestExec;
 import com.zalexdev.stryker.logger.LogTool;
 import com.zalexdev.stryker.logger.Logger;
 
@@ -16,9 +17,9 @@ public abstract class SimpleProcess {
 
     private final Activity activity;
     private static Process process;
-    private final InputStream output;
-    private final InputStream error;
-    private final OutputStream input;
+    private InputStream output;
+    private InputStream error;
+    private OutputStream input;
     private final String cmd;
     private final String tool;
     private final boolean chroot;
@@ -27,22 +28,32 @@ public abstract class SimpleProcess {
     private boolean noLog = false;
     public Core core;
 
+    private final boolean rootless;
+    private GuestExec.Session guestSession;
+
     public SimpleProcess(Activity activity, String command, boolean chroot) {
         this.activity = activity;
         core = new Core((Context) activity);
-        process = core.generateSuProcess();
         this.cmd = command;
         this.tool = LogTool.classify(command);
         this.chroot = chroot;
-        output = process.getInputStream();
-        error = process.getErrorStream();
-        input = process.getOutputStream();
+        this.rootless = chroot && core.isRootless();
+        if (!rootless) {
+            process = core.generateSuProcess();
+            output = process.getInputStream();
+            error = process.getErrorStream();
+            input = process.getOutputStream();
+        }
         logger = new Logger();
         startBackground();
     }
 
     private void startBackground() {
         onStarted();
+        if (rootless) {
+            startRootless();
+            return;
+        }
         new Thread(() -> {
             sendCommand(cmd);
             logger.writeLine("Command: " + cmd, 1, tool);
@@ -80,12 +91,34 @@ public abstract class SimpleProcess {
         }).start();
     }
 
+    private void startRootless() {
+        new Thread(() -> {
+            logger.writeLine("Rootless command: " + cmd, 1, tool);
+            try {
+                guestSession = core.rootless().openStream(cmd);
+                String line;
+                while ((line = guestSession.reader.readLine()) != null) {
+                    if (line.startsWith(GuestExec.Session.SENTINEL)) break;
+                    line = line.trim();
+                    if (!noLog) logger.writeLine(line, 2, tool);
+                    outputList.add(line);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                if (guestSession != null) guestSession.close();
+            }
+            activity.runOnUiThread(() -> onFinished(outputList));
+        }).start();
+    }
+
     public abstract void onFinished(ArrayList<String> outputList);
 
     protected void onStarted() {
     }
 
     public SimpleProcess sendCommand(String command) {
+        if (rootless) return this;
         try {
             if (chroot) {
                 input.write((Core.EXECUTE + " '" + command + "'\nexit\n").getBytes());
@@ -101,7 +134,11 @@ public abstract class SimpleProcess {
 
     public void kill() {
         try {
-            process.destroy();
+            if (rootless) {
+                if (guestSession != null) guestSession.close();
+            } else {
+                process.destroy();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }

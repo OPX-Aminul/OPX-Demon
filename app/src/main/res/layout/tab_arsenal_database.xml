@@ -148,7 +148,7 @@
                                     android:ellipsize="middle"
                                     android:fontFamily="monospace"
                                     android:singleLine="true"
-                                    android:text="/data/local/stryker/release/exploitdb"
+                                    android:text="/opt/exploitdb"
                                     android:textColor="@color/grey"
                                     android:textSize="11sp" />
                             </LinearLayout>

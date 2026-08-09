@@ -74,10 +74,8 @@ object SetupHelper {
 
   fun determineArchName(): String {
     for (androidArch in Build.SUPPORTED_ABIS) {
-      when (androidArch) {
-        "arm64-v8a" -> return "aarch64"
-        "armeabi-v7a" -> return "arm"
-        "x86_64" -> return "x86_64"
+      if (androidArch == "arm64-v8a") {
+        return "aarch64"
       }
     }
     throw RuntimeException(

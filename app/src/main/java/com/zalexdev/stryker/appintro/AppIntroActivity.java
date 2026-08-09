@@ -1,8 +1,8 @@
 package com.zalexdev.stryker.appintro;
 
 import android.content.res.Configuration;
-import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
@@ -11,96 +11,152 @@ import androidx.fragment.app.FragmentActivity;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 import androidx.viewpager2.widget.ViewPager2;
 
-import com.airbnb.lottie.LottieAnimationView;
-import com.race604.drawable.wave.WaveDrawable;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
+import com.google.android.material.textview.MaterialTextView;
 import com.zalexdev.stryker.R;
 import com.zalexdev.stryker.appintro.slides.Slide1;
 import com.zalexdev.stryker.appintro.slides.Slide2;
 import com.zalexdev.stryker.appintro.slides.Slide3;
 import com.zalexdev.stryker.appintro.slides.Slide6Final;
+import com.zalexdev.stryker.appintro.slides.SlideEngineSelect;
 import com.zalexdev.stryker.appintro.slides.SlidePCheck;
+import com.zalexdev.stryker.appintro.slides.SlideQemuInstall;
+import com.zalexdev.stryker.engine.EngineType;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class AppIntroActivity extends FragmentActivity {
 
-    private static final int NUM_PAGES = 5;
-    private LottieAnimationView animationView;
-    private WaveDrawable mWaveDrawable;
+    public static final String EXTRA_MIGRATE = "migrate_legacy_chroot";
+
+    public enum Page { CONSENT, ENGINE, PERMS, PCHECK, INSTALL_CHROOT, INSTALL_QEMU, FINAL }
+
+    public boolean isMigration() {
+        return getIntent() != null && getIntent().getBooleanExtra(EXTRA_MIGRATE, false);
+    }
+
+    private final List<Page> pages = new ArrayList<>(Arrays.asList(
+            Page.CONSENT, Page.ENGINE, Page.PERMS, Page.PCHECK, Page.INSTALL_CHROOT, Page.FINAL));
+
+    private ViewPager2 mPager;
+    private ScreenPagerAdapter pagerAdapter;
+    private LinearProgressIndicator progress;
+    private MaterialTextView stepLabel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_app_intro);
-        animationView = findViewById(R.id.lottie_view);
-        ViewPager2 mPager = findViewById(R.id.view_pager);
+
+        mPager = findViewById(R.id.view_pager);
+        progress = findViewById(R.id.intro_progress);
+        stepLabel = findViewById(R.id.intro_step);
+
         mPager.setUserInputEnabled(false);
-        ScreenPagerAdapter pagerAdapter = new ScreenPagerAdapter(this);
+        mPager.setPageTransformer(new SlideFadeTransformer());
+        pagerAdapter = new ScreenPagerAdapter(this, pages);
         mPager.setAdapter(pagerAdapter);
+        mPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override public void onPageSelected(int position) { bindProgress(position); }
+        });
+
         ImageView logo = findViewById(R.id.logo);
+        boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
+        logo.setImageResource(dark ? R.drawable.ic_white : R.drawable.ic_blue);
+        logo.setAlpha(0f);
+        logo.setScaleX(0.85f);
+        logo.setScaleY(0.85f);
+        logo.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                .setDuration(getResources().getInteger(R.integer.motion_long))
+                .start();
 
-        boolean isDarkThemeOn = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-        if (isDarkThemeOn) {
-            logo.setImageResource(R.drawable.ic_white);
+        bindProgress(0);
+    }
+
+    public void applyEngineFlow(EngineType type) {
+        while (pages.size() > 2) pages.remove(pages.size() - 1);
+        pages.add(Page.PERMS);
+        if (type == EngineType.ROOTLESS) {
+            pages.add(Page.INSTALL_QEMU);
         } else {
-            logo.setImageResource(R.drawable.ic_blue);
+            pages.add(Page.PCHECK);
+            pages.add(Page.INSTALL_CHROOT);
         }
+        pages.add(Page.FINAL);
+        pagerAdapter.notifyDataSetChanged();
+        bindProgress(mPager.getCurrentItem());
+    }
 
-        mWaveDrawable = new WaveDrawable(logo.getDrawable());
-        logo.setImageDrawable(mWaveDrawable);
-        mWaveDrawable.setLevel(10000);
-        mWaveDrawable.setWaveSpeed(15);
+    public void jumpToLast() {
+        mPager.setCurrentItem(pages.size() - 1);
+    }
+
+    private void bindProgress(int position) {
+        int total = pages.size();
+        int step = Math.min(Math.max(position + 1, 1), total);
+        if (progress != null) {
+            progress.setMax(total);
+            progress.setProgressCompat(step, true);
+        }
+        if (stepLabel != null) {
+            stepLabel.setText(getString(R.string.intro_step_of, step, total));
+        }
     }
 
     @Override
     public void onBackPressed() {
-
-    }
-
-    public WaveDrawable getWaveDrawable() {
-        return mWaveDrawable;
-    }
-
-    public void setAnimationView(boolean type) {
-        int frame = animationView.getFrame();
-        if (!type) {
-            animationView.setAnimation(R.raw.hello);
-        } else {
-            animationView.setAnimation(R.raw.hello_red);
-        }
-        animationView.playAnimation();
-        animationView.setFrame(frame + 1);
-    }
-
-    public void setSpeed(float speed) {
-        animationView.setSpeed(speed);
     }
 
     private static class ScreenPagerAdapter extends FragmentStateAdapter {
+        private final List<Page> pages;
 
-        public ScreenPagerAdapter(@NonNull FragmentActivity fragmentActivity) {
-            super(fragmentActivity);
+        ScreenPagerAdapter(@NonNull FragmentActivity a, List<Page> pages) {
+            super(a);
+            this.pages = pages;
         }
 
         @NonNull
         @Override
         public Fragment createFragment(int position) {
-            if (position == 0) {
-                return new Slide1();
-            } else if (position == 1) {
-                return new Slide2();
-            } else if (position == 2) {
-                return new SlidePCheck();
-            } else if (position == 3) {
-                return new Slide3();
-            } else if (position == 4) {
-                return new Slide6Final();
-            } else {
-                return new Slide6Final();
+            switch (pages.get(position)) {
+                case CONSENT: return new Slide1();
+                case ENGINE: return new SlideEngineSelect();
+                case PERMS: return new Slide2();
+                case PCHECK: return new SlidePCheck();
+                case INSTALL_CHROOT: return new Slide3();
+                case INSTALL_QEMU: return new SlideQemuInstall();
+                case FINAL:
+                default: return new Slide6Final();
             }
         }
 
         @Override
-        public int getItemCount() {
-            return NUM_PAGES;
+        public int getItemCount() { return pages.size(); }
+
+        @Override
+        public long getItemId(int position) { return pages.get(position).ordinal(); }
+
+        @Override
+        public boolean containsItem(long itemId) {
+            for (Page p : pages) if (p.ordinal() == itemId) return true;
+            return false;
+        }
+    }
+
+    private static class SlideFadeTransformer implements ViewPager2.PageTransformer {
+        @Override
+        public void transformPage(@NonNull View page, float position) {
+            float abs = Math.abs(position);
+            if (abs >= 1f) {
+                page.setAlpha(0f);
+                page.setTranslationX(0f);
+                return;
+            }
+            page.setAlpha(1f - abs);
+            page.setTranslationX(-position * page.getWidth() * 0.12f);
         }
     }
 }

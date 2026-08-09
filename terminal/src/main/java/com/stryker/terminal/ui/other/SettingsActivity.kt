@@ -9,10 +9,10 @@ import androidx.fragment.app.FragmentTransaction
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.stryker.terminal.R
+import java.io.File
 import com.stryker.terminal.component.config.NeoTermPath
 import com.stryker.terminal.ui.settings.SettingsHomeFragment
 import com.stryker.terminal.utils.extractAssetsDir
-import com.topjohnwu.superuser.Shell
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -72,14 +72,12 @@ class SettingsActivity : AppCompatActivity() {
     Thread {
       val usr = NeoTermPath.USR_PATH
       val bin = NeoTermPath.BIN_PATH
-      Runtime.getRuntime().exec("mkdir -p $usr/").waitFor()
-      Shell.cmd("/system/bin/rm -rf $bin").exec()
-      Thread.sleep(1200)
+      File(usr).mkdirs()
+      File(bin).deleteRecursively()
       extractAssetsDir("bin", "$bin/")
-      Thread.sleep(800)
-      Shell.cmd("/system/bin/chmod +x $bin/bash").exec()
-      Shell.cmd("/system/bin/chmod +x $bin/stryker-ch").exec()
-      Shell.cmd("/system/bin/chmod +x $bin/android-su").exec()
+      for (name in listOf("bash", "stryker-ch", "android-su")) {
+        try { File(bin, name).setExecutable(true, false) } catch (_: Exception) {}
+      }
       runOnUiThread {
         if (!isFinishing && !isDestroyed) {
           MaterialAlertDialogBuilder(this)

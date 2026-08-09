@@ -19,22 +19,33 @@ public final class GeoLookup {
 
     public static double[] coordsFor(Core core, String bssid) {
         if (core == null || bssid == null || bssid.isEmpty()) return null;
-        ArrayList<String> out = core.customChrootCommand(
-                "./modules/GeoMac/geomac " + bssid, true);
-        for (String line : out) {
-            Matcher m = COORDS.matcher(line);
-            if (m.find()) {
-                try {
-                    return new double[]{
-                            Double.parseDouble(m.group(1)),
-                            Double.parseDouble(m.group(2))
-                    };
-                } catch (NumberFormatException ignored) {
-                    return null;
-                }
-            }
-        }
+
+        double[] apple = AppleWloc.locate(bssid);
+        if (apple != null) return apple;
+
+        double[] mylnikov = coordsViaHttp(bssid);
+        if (mylnikov != null) return mylnikov;
+
         return null;
+    }
+
+    private static double[] coordsViaHttp(String bssid) {
+        try {
+            String url = "https://api.mylnikov.org/geolocation/wifi?v=1.1&data=open&bssid="
+                    + java.net.URLEncoder.encode(bssid, "UTF-8");
+            okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+            okhttp3.Request req = new okhttp3.Request.Builder().url(url).build();
+            try (okhttp3.Response resp = client.newCall(req).execute()) {
+                if (!resp.isSuccessful() || resp.body() == null) return null;
+                org.json.JSONObject j = new org.json.JSONObject(resp.body().string());
+                if (j.optInt("result") != 200) return null;
+                org.json.JSONObject d = j.optJSONObject("data");
+                if (d == null) return null;
+                return new double[]{ d.getDouble("lat"), d.getDouble("lon") };
+            }
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public static boolean lookupAndStore(Context ctx, Core core, String bssid, String ssid,

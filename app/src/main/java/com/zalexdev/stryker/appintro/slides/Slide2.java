@@ -22,7 +22,6 @@ import androidx.fragment.app.Fragment;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.google.android.material.button.MaterialButton;
-import com.race604.drawable.wave.WaveDrawable;
 import com.zalexdev.stryker.R;
 import com.zalexdev.stryker.appintro.AppIntroActivity;
 import com.zalexdev.stryker.utils.Core;
@@ -90,27 +89,38 @@ public class Slide2 extends Fragment {
         setPip(storageSpinner, storageStatus, true, false);
         setPip(batterySpinner, batteryStatus, true, false);
 
+        if (core.isRootless()) {
+            core.requestAllFilesAccess(activity);
+        }
+
         new Thread(() -> {
             core.checkPermission(activity);
-            boolean rooted = core.checkRoot();
+            boolean rootless = core.isRootless();
+            boolean rooted = !rootless && core.checkRoot();
             rootChecked = true;
             rootGranted = rooted;
 
-            if (rooted) {
-                core.customCommand("pm grant com.zalexdev.stryker android.permission.WRITE_EXTERNAL_STORAGE", true);
-                core.customCommand("pm grant com.zalexdev.stryker android.permission.READ_EXTERNAL_STORAGE", true);
-                core.customCommand("dumpsys deviceidle whitelist +com.zalexdev.stryker", true);
+            if (rooted || rootless) {
+                if (rooted) {
+                    core.customCommand("pm grant com.zalexdev.stryker android.permission.WRITE_EXTERNAL_STORAGE", true);
+                    core.customCommand("pm grant com.zalexdev.stryker android.permission.READ_EXTERNAL_STORAGE", true);
+                    core.customCommand("dumpsys deviceidle whitelist +com.zalexdev.stryker", true);
+                }
 
-                AppIntroActivity introActivity = (AppIntroActivity) activity;
-                uiSafe(() -> introActivity.setAnimationView(false));
-
-                ArrayList<String> interfaces = core.getInterfacesList();
                 core.putString("vnc_passwd", "stryker");
-                if (interfaces.contains("swlan0")) {
-                    core.putString("wlan_scan", "swlan0");
-                    core.putString("wlan_wifi", "swlan0");
-                    core.putString("wlan_deauth", "swlan0");
-                    core.putString("wlan_wps", "swlan0");
+                if (rooted) {
+                    ArrayList<String> interfaces = core.getInterfacesList();
+                    if (interfaces.contains("swlan0")) {
+                        core.putString("wlan_scan", "swlan0");
+                        core.putString("wlan_wifi", "swlan0");
+                        core.putString("wlan_deauth", "swlan0");
+                        core.putString("wlan_wps", "swlan0");
+                    } else {
+                        core.putString("wlan_scan", "wlan0");
+                        core.putString("wlan_deauth", "wlan0");
+                        core.putString("wlan_wifi", "wlan0");
+                        core.putString("wlan_wps", "wlan0");
+                    }
                 } else {
                     core.putString("wlan_scan", "wlan0");
                     core.putString("wlan_deauth", "wlan0");
@@ -128,25 +138,25 @@ public class Slide2 extends Fragment {
                 core.putBoolean("dash", true);
                 core.putInt("night", 2);
                 core.putInt("threads", 100);
-                core.chmodFolder("/data/data/com.zalexdev.stryker/files");
+                if (rooted) {
+                    core.chmodFolder("/data/data/com.zalexdev.stryker/files");
+                }
 
                 uiSafe(() -> {
                     refreshStatuses();
-                    boolean alreadyInstalled = core.checkFolder("/data/local/stryker/release/sdcard/Stryker")
-                            && core.checkFile("/data/local/stryker/release/4.0");
-                    if (alreadyInstalled) {
-                        mPager.setCurrentItem(4);
-                        ((AppIntroActivity) activity).getWaveDrawable().setLevel(7500);
-                    } else {
-                        ((AppIntroActivity) activity).getWaveDrawable().setLevel(4800);
-                        core.moveNext(mPager);
+                    if (rooted) {
+                        boolean alreadyInstalled = core.checkFolder("/data/local/stryker/release/sdcard/Stryker")
+                                && core.checkFile(Core.CHROOT_MARKER);
+                        if (alreadyInstalled) {
+                            ((AppIntroActivity) activity).jumpToLast();
+                            return;
+                        }
                     }
+                    core.moveNext(mPager);
                 });
             } else {
                 uiSafe(() -> {
                     refreshStatuses();
-                    AppIntroActivity introActivity = (AppIntroActivity) activity;
-                    introActivity.setAnimationView(true);
                     title.setText(context.getResources().getString(R.string.permissions_is_not_granted));
                     button.setText(context.getResources().getString(R.string.permissions_check_again));
                     button.setIconResource(R.drawable.done);
@@ -159,8 +169,9 @@ public class Slide2 extends Fragment {
         boolean storageOk = storageGranted();
         boolean batteryOk = batteryWhitelisted();
 
-        applyStatus(rootSpinner, rootStatus, rootSub, rootChecked && rootGranted,
-                "Granted — superuser ready",
+        boolean rootless = core.isRootless();
+        applyStatus(rootSpinner, rootStatus, rootSub, rootless || (rootChecked && rootGranted),
+                rootless ? "Not required — rootless VM engine" : "Granted — superuser ready",
                 "Required to mount the chroot and run privileged tools");
         applyStatus(storageSpinner, storageStatus, storageSub, storageOk,
                 "Granted — can read/write storage",
@@ -224,7 +235,8 @@ public class Slide2 extends Fragment {
         }
         if (files == null) return;
         for (String filename : files) {
-            if (filename.equals("busybox32") || filename.equals("busybox64")) continue;
+            if (filename.equals(Core.BUSYBOX_ASSET)) continue;
+            if (filename.equals("rootless")) continue;
             InputStream in = null;
             OutputStream out = null;
             try {
@@ -234,18 +246,17 @@ public class Slide2 extends Fragment {
                 copyFile(in, out);
                 out.flush();
                 Log.d("Slide2", "Copied asset: " + filename + " size: " + outFile.length());
-            } catch (IOException e) {
-                if (filename.equals("nuclei")) {
-                    Log.e("Slide2", "Failed to copy important asset: " + filename, e);
-                }
+            } catch (IOException ignored) {
             } finally {
                 if (in != null) try { in.close(); } catch (IOException ignored) {}
                 if (out != null) try { out.close(); } catch (IOException ignored) {}
             }
         }
         Core.extractBusybox(activity);
-        core.customCommand("dos2unix /data/data/com.zalexdev.stryker/files/*.sh", true);
-        core.customCommand("dos2unix /data/data/com.zalexdev.stryker/files/*root*", true);
+        if (!core.isRootless()) {
+            core.customCommand("dos2unix /data/data/com.zalexdev.stryker/files/*.sh", true);
+            core.customCommand("dos2unix /data/data/com.zalexdev.stryker/files/*root*", true);
+        }
     }
 
     private void copyFile(InputStream in, OutputStream out) throws IOException {

@@ -170,7 +170,7 @@ public class Wifi extends Fragment {
         FabOption fabOption2 = view.findViewById(R.id.fab_hs);
         FabOption fabOption3 = view.findViewById(R.id.fab_deauth);
         fabOption2.setOnClickListener(view1 -> runHS());
-        if (core.getBoolean("wifi")) {
+        if (core.getBoolean("wifi") && !core.isRootless()) {
             core.threadCommand("svc wifi enable");
         }
         fabOption.setOnClickListener(v -> {
@@ -205,6 +205,54 @@ public class Wifi extends Fragment {
 
         scanThread = new Thread(() -> {
             try {
+                if (core.isRootless()) {
+                    com.zalexdev.stryker.logger.Logger log = new com.zalexdev.stryker.logger.Logger();
+                    log.writeLine("Rootless WiFi: passing USB adapter into the VM…", 1, "wifi");
+                    boolean attached = core.rootless().ensureUsbWifiAttached();
+                    log.writeLine(attached ? "USB adapter attached — driver OK"
+                            : "USB adapter not usable", attached ? 2 : 3, "wifi");
+                    if (!attached) {
+                        boolean noDriver = core.rootless().usb() != null
+                                && core.rootless().usb().hasAttached();
+                        safeUi(noDriver ? this::showNoDriverState : this::showNoAdapterState);
+                        return;
+                    }
+                    boolean up = false;
+                    String target = core.getString("wlan_wifi");
+                    ArrayList<String> ifs = new ArrayList<>();
+                    for (int i = 0; i < 20 && alive.get(); i++) {
+                        ifs = core.getInterfacesList();
+                        if (ifs.contains(target)) { up = true; break; }
+                        if (ifs.contains(target + "mon")) { target = target + "mon"; up = true; break; }
+                        try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+                    }
+                    if (!alive.get()) return;
+                    if (!up && !ifs.isEmpty()) {
+                        target = ifs.get(0);
+                        core.setWifiInterface(target);
+                        wlan = target;
+                        up = true;
+                        final String adopted = target;
+                        log.writeLine("Adopted guest interface '" + adopted + "'", 2, "wifi");
+                        safeUi(() -> {
+                            ifaceValue.setText(adopted);
+                            ifaceMeta.setText(adopted);
+                        });
+                    }
+                    log.writeLine("Guest interfaces: " + ifs, up ? 2 : 3, "wifi");
+                    if (!up) {
+                        log.writeLine("Interface '" + target + "' never appeared — guest USB/driver diagnostics:", 3, "wifi");
+                        core.customChrootCommand("echo '### lsusb'; lsusb 2>&1; "
+                                + "echo '### ip link'; ip -br link 2>&1; "
+                                + "echo '### iw dev'; iw dev 2>&1; "
+                                + "echo '### dmesg'; dmesg 2>&1 | grep -iE 'usb|wlan|firmware|cfg80211|ieee80211|rtl|ath|mt7|88x' | tail -40");
+                        safeUi(this::showNoDriverState);
+                        return;
+                    }
+                    core.rootlessPrepWifi(target);
+                    try { Thread.sleep(1200); } catch (InterruptedException ignored) {}
+                    log.writeLine("Adapter ready — scanning…", 2, "wifi");
+                }
                 ArrayList<String> wlans = core.getInterfacesList();
                 if (wlans.contains(wlan + "mon")) {
                     wlan = wlan + "mon";
@@ -254,6 +302,14 @@ public class Wifi extends Fragment {
                 }
 
                 if (activity == null || !alive.get()) return;
+                if (list.isEmpty() && core.isRootless()) {
+                    new com.zalexdev.stryker.logger.Logger().writeLine(
+                            "Scan returned 0 networks — guest state:", 3, "wifi");
+                    core.customChrootCommand("echo '### iw dev'; iw dev 2>&1; "
+                            + "echo '### reg'; iw reg get 2>&1; "
+                            + "echo '### link'; ip -br link 2>&1; "
+                            + "echo '### scan-head'; iw dev " + wlan + " scan 2>&1 | head -25");
+                }
                 if (list.isEmpty()) {
                     safeUi(() -> {
                         if (img != null) {
@@ -264,6 +320,8 @@ public class Wifi extends Fragment {
                         text1.setText(R.string.wifi_empty_title);
                         textSub.setText(R.string.cant_find_netw);
                         tryagain.setVisibility(View.VISIBLE);
+                        tryagain.setText(R.string.try_again);
+                        tryagain.setOnClickListener(v -> scan());
                         scanProgress.setVisibility(View.GONE);
                         statusValue.setText(R.string.wifi_status_failed);
                         subtitle.setText(R.string.wifi_subtitle_none);
@@ -303,6 +361,40 @@ public class Wifi extends Fragment {
     private void renderListState(boolean hasNetworks) {
         emptyCard.setVisibility(hasNetworks ? View.GONE : View.VISIBLE);
         listCard.setVisibility(hasNetworks ? View.VISIBLE : View.GONE);
+    }
+
+    private void showNoAdapterState() {
+        if (img != null) { img.setAnimation(R.raw.nothing); img.playAnimation(); }
+        renderListState(false);
+        text1.setText("No Wi-Fi adapter");
+        textSub.setText("Rootless Wi-Fi runs through a USB adapter passed into the VM. Plug one in and attach it.");
+        tryagain.setVisibility(View.VISIBLE);
+        tryagain.setText("Attach adapter");
+        tryagain.setOnClickListener(v -> { if (mainActivity != null) mainActivity.openUsbSheet(); });
+        scanProgress.setVisibility(View.GONE);
+        statusValue.setText(R.string.wifi_status_failed);
+        subtitle.setText("No adapter attached");
+        countChip.setText("0");
+        refresh.setEnabled(true);
+        refresh.setRefreshing(false);
+        fab.hide();
+    }
+
+    private void showNoDriverState() {
+        if (img != null) { img.setAnimation(R.raw.nothing); img.playAnimation(); }
+        renderListState(false);
+        text1.setText(R.string.wifi_no_driver_title);
+        textSub.setText(R.string.wifi_no_driver_body);
+        tryagain.setVisibility(View.VISIBLE);
+        tryagain.setText(R.string.try_again);
+        tryagain.setOnClickListener(v -> scan());
+        scanProgress.setVisibility(View.GONE);
+        statusValue.setText(R.string.wifi_status_failed);
+        subtitle.setText(R.string.wifi_no_driver_subtitle);
+        countChip.setText("0");
+        refresh.setEnabled(true);
+        refresh.setRefreshing(false);
+        fab.hide();
     }
 
     private void setScanIdleSubtitle() {
@@ -394,7 +486,7 @@ public class Wifi extends Fragment {
     }
 
     private void applyWifiInterface(String iface) {
-        core.putString("wlan_wifi", iface);
+        core.setWifiInterface(iface);
         wlan = iface;
         ifaceValue.setText(iface);
         ifaceMeta.setText(iface);
@@ -476,15 +568,16 @@ public class Wifi extends Fragment {
 
             new Thread(() -> {
                 restoreWpsInterface();
-                if (core.isPixieIfaceDown() && core.getHSInterface().contains("wlan0")) {
+                if (!core.isRootless() && core.isPixieIfaceDown()
+                        && core.getHSInterface().contains("wlan0")) {
                     core.customCommand("svc wifi enable");
                 }
             }).start();
         });
 
         ArrayList<String> tried = new ArrayList<>();
-        core.wpsDisableWifiIfEnabled();
         pixies[0] = new Thread(() -> {
+            core.wpsDisableWifiIfEnabled();
 
             final int[] total = {0};
 
@@ -536,7 +629,7 @@ public class Wifi extends Fragment {
 
 
                     String cmd = " python3 -u /CORE/PixieWps/pixie.py -i " + core.getWPSInterface()
-                            + " --pixie-force" + core.wpsIfaceDownFlag() + " -K -F -b " + temp.getMac();
+                            + core.wpsIfaceDownFlag() + " -K -F -b " + temp.getMac();
                     pixie[0] = new AdvancedProcess(activity, context, cmd, true) {
                         @Override
                         public void onFinished(ArrayList<String> outputList) {
@@ -642,24 +735,33 @@ public class Wifi extends Fragment {
         info.setVisibility(View.VISIBLE);
         networksHS = new ArrayList<>();
         wifimacs = new ArrayList<>();
+        hs = new ArrayList<>();
+        devices = new ArrayList<>();
 
         AtomicBoolean cancelattack = new AtomicBoolean(false);
         View outputcard = dialog.findViewById(R.id.output_card);
         outputtext.setMovementMethod(new ScrollingMovementMethod());
         AtomicReference<Timer> csvReader = new AtomicReference<>(new Timer());
 
+        final String hsDir = core.getShareRoot() + "/hs";
+        final String capturedDir = core.getShareRoot() + "/captured";
+
         final boolean[] device = {false};
         final int[] totalSuccess = {0};
         mdk4 = null;
-        outputtext.setText("Starting monitor mode on " + core.monitorManager.getHSInterface() + "...\n");
+        outputtext.setText("Starting monitor mode...\n");
         new Thread(() -> {
-            boolean monitor = core.monitorManager.enableMonitorMode(core.getHSInterface());
+            final String requestedIface = core.getHSInterface();
+            safeUi(() -> outputtext.setText("Starting monitor mode on " + requestedIface + "...\n"));
+            boolean monitor = core.monitorManager.enableMonitorMode(requestedIface);
+            String capIface = requestedIface;
             if (!monitor) {
-                safeUi(() -> outputtext.setText(getString(R.string.wifi_monitor_failed, core.getHSInterface())));
+                safeUi(() -> outputtext.setText(getString(R.string.wifi_monitor_failed, requestedIface)));
             } else {
-                core.customCommand("rm /sdcard/Stryker/hs/handshakenow*.cap");
-                core.customCommand("rm /sdcard/Stryker/hs/handshakenow*.csv");
-                String cmd = "airodump-ng " + core.getHSInterface() + " -w /sdcard/Stryker/hs/handshakenow --ignore-negative-one --output-format pcap,csv  --update 3";
+                capIface = core.getHSInterface();
+                core.customChrootCommand("mkdir -p /sdcard/Stryker/hs /sdcard/Stryker/captured; "
+                        + "rm -f /sdcard/Stryker/hs/handshakenow*");
+                String cmd = "airodump-ng " + capIface + " -w /sdcard/Stryker/hs/handshakenow --ignore-negative-one --output-format pcap,csv  --update 3";
                 airodump = new AdvancedProcess(activity, context, cmd, true) {
                     @Override
                     public void onFinished(ArrayList<String> outputList) {
@@ -697,14 +799,23 @@ public class Wifi extends Fragment {
                     }
                 };
                 airodump.setNoLog(true);
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
             }
 
-            boolean s = core.checkFile("/sdcard/Stryker/hs/handshakenow-01.csv");
+            boolean s = false;
+            if (monitor) {
+                for (int i = 0; i < 40 && alive.get(); i++) {
+                    if (core.checkFile(hsDir + "/handshakenow-01.csv")) {
+                        s = true;
+                        break;
+                    }
+                    if (airodump != null && !airodump.isRunning()) break;
+                    try {
+                        Thread.sleep(500);
+                    } catch (InterruptedException e) {
+                        break;
+                    }
+                }
+            }
             if (s) {
                 final String[] packet = {""};
                 csvReader.set(new Timer());
@@ -712,7 +823,7 @@ public class Wifi extends Fragment {
                     @Override
                     public void run() {
                         List<List<String>> records = new ArrayList<>();
-                        try (BufferedReader br = new BufferedReader(new FileReader("/sdcard/Stryker/hs/handshakenow-01.csv"))) {
+                        try (BufferedReader br = new BufferedReader(new FileReader(hsDir + "/handshakenow-01.csv"))) {
                             String line;
                             while ((line = br.readLine()) != null) {
                                 String[] values = line.split(",");
@@ -724,42 +835,48 @@ public class Wifi extends Fragment {
                         for (List<String> line : records) {
                             if (line.size() > 1) {
                                 if (line.get(0).equals("BSSID")) {
+                                    final int deviceCount = devices.size();
+                                    final int networkCount = networksHS.size();
+                                    final ArrayList<String> devSnap = new ArrayList<>(devices);
+                                    final ArrayList<String> hsSnap = new ArrayList<>(hs);
+                                    final ArrayList<String> ssidSnap = new ArrayList<>();
+                                    for (WiFINetwork n : networksHS) {
+                                        ssidSnap.add(n.getSsid());
+                                    }
+                                    final String packetNow = packet[0];
                                     safeUi(() -> {
                                         try {
-
-                                            successtext.setText("Devices: " + devices.size());
-                                            progress.setText("Networks: " + networksHS.size());
+                                            successtext.setText("Devices: " + deviceCount);
+                                            progress.setText("Networks: " + networkCount);
                                             StringBuilder sb = new StringBuilder();
-                                            if (hs.size() > 0) {
+                                            if (!hsSnap.isEmpty()) {
                                                 sb.append("\n\nHS: ");
-                                                for (String s : hs) {
+                                                for (String s : hsSnap) {
                                                     if (core.getBoolean("hide")) {
                                                         sb.append(Core.HIDDEN_MAC).append(" ");
                                                     } else {
                                                         sb.append(s).append(" ");
                                                     }
                                                 }
-
                                             }
                                             sb.append("\n\nNetworks: ");
-                                            for (WiFINetwork network : networksHS) {
-                                                sb.append(network.getSsid()).append(" ");
+                                            for (String s : ssidSnap) {
+                                                sb.append(s).append(" ");
                                             }
-                                            sb.append("\n\nPacket: ").append(packet[0]);
+                                            sb.append("\n\nPacket: ").append(packetNow);
                                             sb.append("\n\nDevices: ");
-                                            for (String d : devices) {
+                                            for (String d : devSnap) {
                                                 sb.append(d).append(" ");
                                             }
                                             outputtext.setText(sb.toString());
                                         } catch (Exception e) {
                                             e.printStackTrace();
                                         }
-
-
                                     });
 
                                     devices.clear();
                                     networksHS.clear();
+                                    wifimacs.clear();
                                     device[0] = false;
                                 }
                                 if (line.get(0).equals("Station MAC")) {
@@ -788,7 +905,12 @@ public class Wifi extends Fragment {
                         }
                     }
                 }, 0, 2500);
-                mdk4 = new AdvancedProcess(activity, context, "mdk4 " + core.getDeauthInterface() + " d", true) {
+                String deauthIface = core.getDeauthInterface();
+                if (!deauthIface.equals(capIface)) {
+                    core.monitorManager.enableMonitorMode(deauthIface);
+                    deauthIface = core.getDeauthInterface();
+                }
+                mdk4 = new AdvancedProcess(activity, context, "mdk4 " + deauthIface + " d", true) {
                     @Override
                     public void onFinished(ArrayList<String> outputList) {
                         core.toaster("Mdk4 stopped");
@@ -808,7 +930,7 @@ public class Wifi extends Fragment {
                     }
                 };
 
-            } else {
+            } else if (monitor) {
                 safeUi(() -> outputtext.setText("Failed to start attack. Please try again."));
             }
         }).start();
@@ -828,16 +950,30 @@ public class Wifi extends Fragment {
             dialog.setCancelable(true);
             outputcard.setVisibility(View.GONE);
             resulttext.setVisibility(View.VISIBLE);
-            if (hs.size() > 0) {
-                resulttext.setText("Success: " + totalSuccess[0] + "\nFile saved to: /sdcard/Stryker/captured");
-                Date date = new Date();
-                SimpleDateFormat formatter = new SimpleDateFormat("dd-MM_HH:mm", Locale.ENGLISH);
-                String strDate = formatter.format(date);
-                core.moveFile("/sdcard/Stryker/hs/handshakenow-01.cap", "/sdcard/Stryker/captured/MassHS_" + hs.size() + "_" + strDate + ".cap");
+            final int captured = hs.size();
+            if (captured > 0) {
+                resulttext.setText("Success: " + totalSuccess[0] + "\nSaving capture…");
             } else {
                 resulttext.setText("Failed to capture handshake");
             }
             new Thread(() -> {
+                if (captured > 0) {
+                    String strDate = new SimpleDateFormat("dd-MM_HH-mm", Locale.ENGLISH).format(new Date());
+                    String dest = capturedDir + "/MassHS_" + captured + "_" + strDate + ".cap";
+                    java.io.File src = newestCapture(hsDir, "handshakenow-");
+                    boolean saved = false;
+                    if (src != null) {
+                        //noinspection ResultOfMethodCallIgnored
+                        new java.io.File(capturedDir).mkdirs();
+                        core.moveFile(src.getAbsolutePath(), dest);
+                        saved = new java.io.File(dest).isFile();
+                    }
+                    final boolean ok = saved;
+                    safeUi(() -> resulttext.setText(ok
+                            ? "Success: " + totalSuccess[0] + "\nFile saved to: " + dest
+                            : "Success: " + totalSuccess[0]
+                              + "\nBut the capture file could not be saved — check the log"));
+                }
                 core.monitorManager.disableMonitorMode(core.getHSInterface());
                 core.monitorManager.disableMonitorMode(core.getDeauthInterface());
             }).start();
@@ -866,9 +1002,11 @@ public class Wifi extends Fragment {
         MaterialCardView info_card = dialog.findViewById(R.id.info_card);
         info_card.setVisibility(View.GONE);
         outputtext.setMovementMethod(new ScrollingMovementMethod());
-        outputtext.append("Starting monitor mode on " + core.getDeauthInterface() + "...\n");
+        outputtext.append("Starting monitor mode...\n");
         new Thread(() -> {
-            if (core.monitorManager.enableMonitorMode(core.getDeauthInterface())) {
+            final String requestedIface = core.getDeauthInterface();
+            safeUi(() -> outputtext.append("Interface: " + requestedIface + "\n"));
+            if (core.monitorManager.enableMonitorMode(requestedIface)) {
                 mdk4 = new AdvancedProcess(activity, context, "mdk4 " + core.getDeauthInterface() + " d", true) {
 
                     @Override
@@ -941,6 +1079,18 @@ public class Wifi extends Fragment {
         dialog.show();
     }
 
+    private static java.io.File newestCapture(String dir, String prefix) {
+        java.io.File[] caps = new java.io.File(dir)
+                .listFiles((d, n) -> n.startsWith(prefix) && n.endsWith(".cap"));
+        java.io.File newest = null;
+        if (caps != null) {
+            for (java.io.File f : caps) {
+                if (newest == null || f.lastModified() > newest.lastModified()) newest = f;
+            }
+        }
+        return newest;
+    }
+
     public void smoothScrool(TextView outputtext) {
         if (outputtext != null && outputtext.getLayout() != null) {
             int lineCount = outputtext.getLineCount();
@@ -955,10 +1105,19 @@ public class Wifi extends Fragment {
     private void restoreWpsInterface() {
         new Thread(() -> {
             String wpsIface = core.getWPSInterface();
+            String hsIface = core.getHSInterface();
+            if (core.isRootless()) {
+                if (wpsIface != null && wpsIface.length() > 0) {
+                    core.customChrootCommand("ip link set " + wpsIface + " up", true);
+                }
+                if (hsIface != null && hsIface.length() > 0 && !hsIface.equals(wpsIface)) {
+                    core.customChrootCommand("ip link set " + hsIface + " up", true);
+                }
+                return;
+            }
             if (wpsIface != null && wpsIface.length() > 0) {
                 core.customCommand("ifconfig " + wpsIface + " up", true);
             }
-            String hsIface = core.getHSInterface();
             if (hsIface != null && hsIface.length() > 0 && !hsIface.equals(wpsIface)) {
                 core.customCommand("ifconfig " + hsIface + " up", true);
             }

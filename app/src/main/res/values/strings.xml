@@ -22,7 +22,6 @@
     <string name="add">Add </string>
     <string name="run">launch </string>
     <string name="exs">Exploits… </string>
-    <string name="bit">Unfortunately, your device is 32-bit and does not support the required library! Please try other features of the app! </string>
     <string name="usb">USB device connected </string>
     <string name="customvalue">Enter custom value </string>
     <string name="wifi">WiFi Networks </string>
@@ -54,21 +53,25 @@
     <string name="file_was_uploaded">The file has already been uploaded before! </string>
     <string name="upload_success">The file has been successfully uploaded, please check your mail! </string>
     <string name="please_connect">Please connect to the network first! </string>
-    <string name="saved_to">The results are saved in routerscan.csv! </string>
     <string name="stop">Stop</string>
     <string name="start">Start</string>
     <string name="scan_finised">Scan completed! </string>
     <string name="scan_finished_desc">Scan completed! You can save the result with the icon at the top! </string>
 
-    <string name="rs_notif_channel">Router scan</string>
-    <string name="rs_notif_title">Router scan running</string>
-    <string name="rs_notif_progress">%1$d%% · %2$d hosts · %3$d cracked</string>
-    <string name="rs_notif_done_title">Router scan finished</string>
-    <string name="rs_notif_done_text">%1$d of %2$d responsive hosts cracked</string>
-    <string name="rs_status_scanning">Scanning…</string>
-    <string name="rs_status_cracked">Cracked</string>
-    <string name="rs_status_done">No match</string>
     <string name="save">Save </string>
+    <string name="vnc_install_stage_refresh">Refresh package index</string>
+    <string name="vnc_install_stage_packages">Install XFCE and x11vnc</string>
+    <string name="vnc_install_stage_password">Prepare VNC password</string>
+    <string name="vnc_install_stage_scripts">Write helper scripts</string>
+    <string name="vnc_install_stage_verify">Verify installation</string>
+    <string name="vnc_section_stages">Install steps</string>
+    <string name="vnc_section_log">Installer output</string>
+    <string name="vm_disk_auto">Automatic</string>
+    <string name="vm_disk_auto_msg">The VM disk has no fixed size. It currently holds %1$s of real data inside a %2$s image, and expands on every boot to cover the %3$s still free on the phone.
+
+Storage is only consumed as the guest writes, and space freed inside the VM is returned to the phone on the next boot.</string>
+    <string name="local_vendor_unknown">Unknown vendor</string>
+    <string name="coose_port">Choose a port</string>
     <string name="saved_to_exp">Saved to exploits! </string>
     <string name="trying">Trying: </string>
     <string name="succes">Success! </string>
@@ -98,7 +101,6 @@
     <string name="mark_host_s_as_online">Mark host(s) as online </string>
     <string name="set_ranges">Set Ranges </string>
     <string name="ranges_and_ips">Ranges and IP </string>
-    <string name="router_scan_settings">Router Scan Settings </string>
     <string name="set_max_threads">Set the maximum number of threads </string>
     <string name="set_timeout_ms">Set timeout (ms) </string>
     <string name="initializing">Initialization… </string>
@@ -108,14 +110,6 @@
     <string name="auto_connect">AUTO-CONNECT </string>
     <string name="not_vuln_local">Sorry, target not vulnerable </string>
     <string name="vuln_for">Target vulnerable for: </string>
-    <string name="rs">Router Scan </string>
-    <string name="start_core">Starting core... </string>
-    <string name="failed_info">Failed to get information </string>
-    <string name="coose_port">Choose port </string>
-    <string name="webauth">WebAuth - </string>
-    <string name="ssid" translatable="false">"\nSSID - " </string>
-    <string name="psk">"\nPSK - " </string>
-    <string name="wps" translatable="false">"\nWPS - " </string>
     <string name="choose_opt">Choose option </string>
     <string name="cut_dev">Cut device </string>
     <string name="perm_cut">Permanent cut </string>
@@ -218,7 +212,6 @@
     <string name="dashboard_tile_handshakes">Handshakes</string>
     <string name="dashboard_tile_exploits">Exploit\nHub</string>
     <string name="dashboard_tile_searchsploit">Exploit\nDatabase</string>
-    <string name="dashboard_tile_routerscan">Router\nScan</string>
     <string name="dashboard_tile_geomac">GeoMac</string>
     <string name="dashboard_tile_metasploit">Metasploit</string>
     <string name="dashboard_card_terminal_title">Open Terminal</string>
@@ -449,6 +442,7 @@
     <string name="wifi_chip_wps">WPS</string>
     <string name="wifi_chip_lock">LOCK</string>
     <string name="wifi_chip_pixie">PIXIE</string>
+    <string name="wifi_chip_pixie_verified">PIXIE ✓</string>
     <string name="wifi_chip_key">KEY</string>
     <string name="wifi_chip_5g">5 GHz</string>
     <string name="wifi_signal_label">%1$d%%</string>
@@ -559,14 +553,14 @@
     <string name="core_mgr_section_source">Source</string>
     <string name="core_mgr_section_search">Search</string>
     <string name="core_mgr_section_packages">Packages</string>
-    <string name="core_mgr_source_apk">APK (Alpine)</string>
+    <string name="core_mgr_source_apk">APT (Debian)</string>
     <string name="core_mgr_source_pip">Python (pip)</string>
-    <string name="core_mgr_apk_short">apk</string>
+    <string name="core_mgr_apk_short">apt</string>
     <string name="core_mgr_pip_short">pip</string>
-    <string name="core_mgr_search_hint_apk">Search Alpine packages</string>
+    <string name="core_mgr_search_hint_apk">Search Debian packages</string>
     <string name="core_mgr_search_hint_pip">Install Python package</string>
     <string name="core_mgr_status_loading">Loading…</string>
-    <string name="core_mgr_status_updating">apk update…</string>
+    <string name="core_mgr_status_updating">apt update…</string>
     <string name="core_mgr_status_ready">Ready</string>
     <string name="core_mgr_status_count">%1$d installed</string>
     <string name="core_mgr_status_results">%1$d results</string>
@@ -580,12 +574,12 @@
     <string name="core_mgr_uninstall_ok">%1$s removed</string>
     <string name="core_mgr_uninstall_failed">Failed to remove %1$s</string>
     <string name="core_mgr_refresh">Refresh list</string>
-    <string name="core_mgr_update_index">apk update</string>
+    <string name="core_mgr_update_index">apt update</string>
     <string name="core_mgr_action_install">Install</string>
     <string name="core_mgr_action_uninstall">Uninstall</string>
     <string name="core_mgr_chip_installed">INSTALLED</string>
     <string name="core_mgr_chip_python">PIP</string>
-    <string name="core_mgr_chip_apk">APK</string>
+    <string name="core_mgr_chip_apk">APT</string>
     <string name="core_mgr_filter_all">All</string>
     <string name="core_mgr_filter_installed">Installed</string>
 
@@ -665,7 +659,7 @@
     <string name="msf_install_stages_header">Stages</string>
     <string name="msf_install_log_header">Live log</string>
     <string name="msf_install_warn">Installation downloads ~600 MB and compiles native gems. It runs in the background — you\'ll get a notification when it finishes.</string>
-    <string name="msf_stage_index">Refresh apk index</string>
+    <string name="msf_stage_index">Refresh apt index</string>
     <string name="msf_stage_deps">Install build deps</string>
     <string name="msf_stage_clone">Clone metasploit-framework</string>
     <string name="msf_stage_msfpc">Pull msfpc helper</string>
@@ -735,7 +729,7 @@
     <string name="payload_invalid">Fill all four fields first</string>
 
     <string name="hydra_install_title">HTC-Hydra</string>
-    <string name="hydra_install_subtitle">Multi-protocol bruteforcer · pulled from Alpine community repo into the chroot</string>
+    <string name="hydra_install_subtitle">Multi-protocol bruteforcer · pulled from the Debian repos into the toolset</string>
     <string name="hydra_section_status">Status</string>
     <string name="hydra_section_stages">Stages</string>
     <string name="hydra_section_log">Live log</string>
@@ -749,9 +743,29 @@
     <string name="hydra_btn_retry">Try again</string>
     <string name="hydra_btn_open">Open Local Network</string>
 
-    <string name="hydra_install_stage_refresh">Refresh apk index</string>
-    <string name="hydra_install_stage_install">apk add hydra</string>
+    <string name="hydra_install_stage_refresh">Refresh apt index</string>
+    <string name="hydra_install_stage_install">apt install hydra</string>
     <string name="hydra_install_stage_verify">Verify binary</string>
+
+    <string name="cameradar_install_title">Cameradar</string>
+    <string name="cameradar_install_subtitle">RTSP camera discovery and default-credential sweep · official release binary from GitHub</string>
+    <string name="cameradar_section_status">Status</string>
+    <string name="cameradar_section_stages">Stages</string>
+    <string name="cameradar_section_log">Live log</string>
+    <string name="cameradar_status_card_title">Cameradar runtime</string>
+    <string name="cameradar_status_idle">Tap Install to fetch the cameradar release binary</string>
+    <string name="cameradar_status_running">Installing…</string>
+    <string name="cameradar_status_done">Ready · launch from any camera host in Local Network</string>
+    <string name="cameradar_status_failed">Install failed — tap retry</string>
+    <string name="cameradar_install_warn">Probing cameras you do not own is illegal in most countries. Only target devices you own or have written consent to test.</string>
+    <string name="cameradar_btn_install">Install cameradar</string>
+    <string name="cameradar_btn_retry">Try again</string>
+    <string name="cameradar_btn_open">Open Local Network</string>
+
+    <string name="cameradar_install_stage_refresh">Install dependencies</string>
+    <string name="cameradar_install_stage_download">Download release</string>
+    <string name="cameradar_install_stage_unpack">Unpack binary</string>
+    <string name="cameradar_install_stage_verify">Verify binary</string>
 
     <string name="hydra_dialog_title">Hydra bruteforce</string>
     <string name="hydra_dialog_status_idle">Pick a service, target, and creds → Launch</string>
@@ -848,17 +862,34 @@
     <string name="nuclei_section_log">Live log</string>
     <string name="nuclei_status_card_title">Nuclei toolkit</string>
     <string name="nuclei_status_idle">Tap install to fetch Go and build nuclei (~3 min on Wi-Fi).</string>
-    <string name="nuclei_status_running">Building nuclei from source…</string>
+    <string name="nuclei_status_running">Installing nuclei…</string>
     <string name="nuclei_status_done">Ready — nuclei is installed.</string>
     <string name="nuclei_btn_install">Install</string>
     <string name="nuclei_btn_retry">Retry</string>
     <string name="nuclei_btn_open">Open scanner</string>
-    <string name="nuclei_install_warn">Building from source pulls Go (~200 MB) and the nuclei repo. Keep the screen awake until verify succeeds.</string>
-    <string name="nuclei_install_stage_prepare">Prepare clean Go environment</string>
-    <string name="nuclei_install_stage_refresh">Refresh apk index</string>
-    <string name="nuclei_install_stage_install_go">Install Go toolchain</string>
-    <string name="nuclei_install_stage_go_build">go install nuclei@latest</string>
+    <string name="nuclei_install_warn">Pulls the latest signed nuclei release for arm64 (~20 MB). Keep the screen awake until verify succeeds.</string>
+    <string name="nuclei_install_stage_prepare">Prepare install environment</string>
+    <string name="nuclei_install_stage_refresh">Refresh apt index</string>
+    <string name="nuclei_install_stage_install_go">Resolve latest release</string>
+    <string name="nuclei_install_stage_go_build">Download arm64 binary</string>
     <string name="nuclei_install_stage_deploy">Deploy nuclei to /usr/bin</string>
+    <string name="nuclei_install_stage_templates">Fetch template library (takes minutes)</string>
+
+    <string name="vm_required_terminal">Terminal needs the VM — start it from the dashboard first</string>
+
+    <string name="engine_not_chosen">Not set up yet</string>
+    <string name="wifi_attack_custom_pin">Custom pin</string>
+    <string name="wifi_attack_null_pin">Null PIN</string>
+    <string name="wifi_attack_null_pin_hint">empty WPS PIN</string>
+    <string name="wifi_null_pin_running">Trying the null PIN — some routers accept an empty WPS PIN and hand over the key straight away.</string>
+    <string name="wifi_wps_locked_result">This router has WPS locked. It refuses every PIN until it unlocks, which usually needs a reboot or a wait from minutes to hours.</string>
+    <string name="wifi_foreign_owner_result">Another Wi-Fi manager was using the adapter and interrupted the exchange. This is interference, not a verdict about the router.</string>
+    <string name="wifi_no_driver_title">Adapter driver missing</string>
+    <string name="wifi_no_driver_subtitle">Attached, but no driver</string>
+    <string name="wifi_no_driver_body">The adapter reached the VM, but no driver claimed it — no wlan interface appeared within 10s.\n\nOpen the Terminal and install the driver or firmware for this chipset, then tap Try again.</string>
+
+    <string name="local_netcut_no_l2_title">Netcut needs LAN access</string>
+    <string name="local_netcut_no_l2_body">Netcut works by ARP spoofing, which needs layer-2 access to the target network.\n\nIn rootless mode the VM sits behind a user-mode NAT (10.0.2.x), so ARP frames never reach the real LAN. Nothing would actually be cut.\n\nTo use it here, connect a passed-through USB Wi-Fi adapter to the target network in managed mode, or switch to the rooted engine.</string>
     <string name="nuclei_install_stage_verify">Verify nuclei -version</string>
 
     <string name="nuclei_main_title">Nuclei</string>
@@ -975,8 +1006,6 @@
     <string name="feat_nuclei_desc">Hunt web vulnerabilities at scale with thousands of community templates.</string>
     <string name="feat_searchsploit_title">SearchSploit</string>
     <string name="feat_searchsploit_desc">Search the offline Exploit-DB archive and pivot to ready-to-use PoCs.</string>
-    <string name="feat_router_title">Router Scan</string>
-    <string name="feat_router_desc">Enumerate routers, fingerprint firmware and probe for default credentials.</string>
     <string name="feat_hid_title">HID Attacks</string>
     <string name="feat_hid_desc">Turn the device into a keyboard and fire Ducky payloads with localized keymaps.</string>
     <string name="about_section_links">Official links</string>
@@ -1194,4 +1223,122 @@
     <string name="logs_cleared">Logs cleared.</string>
     <string name="logs_saved">Saved to %1$s</string>
     <string name="logs_save_failed">Couldn\'t export logs.</string>
+
+    <!-- ===== Virtual machine (rootless engine) settings ===== -->
+    <string name="settings_section_engine">Engine</string>
+    <string name="settings_vm_title">Virtual machine</string>
+    <string name="settings_vm_subtitle">Disk, CPU, RAM and speed tuning</string>
+
+    <string name="vm_title">Virtual machine</string>
+    <string name="vm_subtitle">Give the VM more room and tune it for your phone.</string>
+
+    <string name="vm_device_title">This device</string>
+    <string name="vm_section_resources">Resources</string>
+
+    <string name="vm_disk_title">Disk size</string>
+    <string name="vm_disk_subtitle">More space for tools</string>
+    <string name="vm_disk_dialog_title">VM disk size</string>
+    <string name="vm_disk_grow_confirm">Grow to %1$d GB. This stops the VM, resizes the disk, then reboots it. Continue?</string>
+    <string name="vm_disk_growing">Resizing disk…</string>
+    <string name="vm_disk_grown">Disk grown to %1$d GB — the filesystem expands on boot.</string>
+    <string name="vm_disk_grow_failed">Couldn\'t resize the disk: %1$s</string>
+
+    <string name="vm_cpu_title">CPU cores</string>
+    <string name="vm_cpu_subtitle">Virtual processors</string>
+    <string name="vm_cpu_dialog_title">vCPU cores</string>
+
+    <string name="vm_ram_title">Memory</string>
+    <string name="vm_ram_subtitle">RAM given to the VM</string>
+    <string name="vm_ram_dialog_title">VM memory (MB)</string>
+
+    <string name="vm_section_autotune">Auto-tune</string>
+    <string name="vm_recommend_title">Use recommended</string>
+    <string name="vm_recommend_applied">Applied recommended profile.</string>
+    <string name="vm_benchmark_title">Run benchmark</string>
+    <string name="vm_benchmark_subtitle">Test profiles, pick the fastest</string>
+    <string name="vm_benchmark_running">Benchmarking…</string>
+    <string name="vm_benchmark_reboot_warn">The benchmark reboots the VM a few times to time each profile. It takes a minute or two. Run it now?</string>
+    <string name="vm_benchmark_done">Best: %1$d vCPU · %2$d MB</string>
+    <string name="vm_benchmark_failed">Benchmark failed: %1$s</string>
+
+    <string name="vm_section_experiments">Experiments</string>
+    <string name="vm_experiments_warn">Speed tweaks. Some trade safety for speed — if the VM won\'t boot, turn them back off.</string>
+    <string name="vm_cache_title">Disk cache mode</string>
+    <string name="vm_cache_subtitle">unsafe = fastest, risks data on crash</string>
+    <string name="vm_cache_dialog_title">Disk cache mode</string>
+    <string name="vm_aio_title">Async I/O</string>
+    <string name="vm_aio_subtitle">io_uring can be faster</string>
+    <string name="vm_aio_dialog_title">Async I/O backend</string>
+    <string name="vm_mttcg_title">Multi-thread TCG</string>
+    <string name="vm_mttcg_subtitle">Use all cores when KVM is off</string>
+    <string name="vm_norng_title">Disable virtio-rng</string>
+    <string name="vm_norng_subtitle">Skip the RNG device</string>
+    <string name="vm_noshare_title">Disable file share</string>
+    <string name="vm_noshare_subtitle">No /sdcard share into the VM</string>
+    <string name="vm_pauth_title">Pointer auth (PAC)</string>
+    <string name="vm_pauth_subtitle">Off makes PAC opcodes free — biggest TCG win</string>
+    <string name="vm_pauth_dialog_title">Guest pointer authentication</string>
+    <string name="vm_pauth_off">off — not advertised (fastest)</string>
+    <string name="vm_pauth_impdef">impdef — fast QEMU hash</string>
+    <string name="vm_pauth_qarma">qarma — architectural, very slow</string>
+    <string name="vm_iothread_title">Disk I/O thread</string>
+    <string name="vm_iothread_subtitle">Keep virtio-blk off the main loop</string>
+    <string name="vm_fastboot_title">Guest fast-boot cmdline</string>
+    <string name="vm_fastboot_subtitle">Drop init_on_alloc, audit and KASLR in the VM</string>
+
+    <string name="vm_apply_restart">Apply &amp; restart VM</string>
+    <string name="vm_apply_hint">CPU, RAM and experiment changes take effect on the next VM start.</string>
+    <string name="vm_restarting">Restarting VM…</string>
+    <string name="vm_kvm">KVM</string>
+    <string name="vm_tcg">TCG</string>
+
+    <string name="vm_boot_title">Booting Linux VM</string>
+    <string name="vm_boot_stage_start">Starting the emulator…</string>
+    <string name="vm_boot_stage_kernel">Kernel is coming up…</string>
+    <string name="vm_boot_stage_rootfs">Mounting the root filesystem…</string>
+    <string name="vm_boot_stage_services">Starting guest services…</string>
+    <string name="vm_boot_stage_agent">Waiting for the guest agent…</string>
+    <string name="vm_boot_stage_ready">Guest is up</string>
+    <string name="vm_boot_stage_failed">The VM did not come up</string>
+    <string name="vm_boot_cpu">CPU</string>
+    <string name="vm_boot_ram">RAM</string>
+    <string name="vm_boot_dash">—</string>
+    <string name="vm_boot_log_header">BOOT LOG</string>
+    <string name="vm_boot_retry">Retry</string>
+    <string name="vm_boot_continue">Continue anyway</string>
+    <string name="vm_boot_back_blocked">The engine is still booting…</string>
+    <string name="vm_boot_pid">pid %1$d</string>
+    <string name="vm_boot_stage_restart">Stopping the running VM…</string>
+    <string name="vm_boot_safe_profile">Booted with the safe profile — experiments were disabled</string>
+    <string name="vm_boot_fallback_retry">First boot failed — retrying with the safe profile…</string>
+    <string name="intro_step_of">Step %1$d/%2$d</string>
+    <string name="intro_step_placeholder">Step 1/1</string>
+    <string name="vm_section_stats">Stats</string>
+    <string name="vm_section_usb">USB</string>
+    <string name="vm_section_logs">Console</string>
+    <string name="vm_usb_none">none</string>
+    <string name="vm_usb_attached_to_vm">attached to VM</string>
+    <string name="vm_usb_host_only">on phone</string>
+    <string name="vm_stats_offline">VM stopped</string>
+    <string name="vm_stats_blocked">not readable on this ROM</string>
+    <string name="vm_stats_waiting">collecting…</string>
+    <string name="vm_stats_range_span">last %1$s · 5s samples · keeps 24h</string>
+    <string name="vm_stats_range_empty">no samples yet</string>
+    <string name="vm_stats_peak">peak %1$d MB</string>
+    <string name="vm_aio_probing">Checking whether QEMU supports io_uring…</string>
+    <string name="vm_aio_unsupported">io_uring is not supported here (%1$s) — staying on threads</string>
+    <string name="vm_aio_supported">io_uring verified — apply and restart to use it</string>
+    <string name="vm_aio_sub_verified">verified</string>
+    <string name="vm_aio_sub_unsupported">unsupported on this device</string>
+    <string name="vm_aio_sub_untested">not tested yet</string>
+    <string name="vm_disk_restart_hint">Growing the disk…</string>
+    <string name="vm_safe_boot_title">Safe profile</string>
+    <string name="vm_safe_boot_subtitle">Armed after a failed boot; clears when you disable it</string>
+    <string name="vm_stats_cpu">VM CPU</string>
+    <string name="vm_stats_ram">VM RAM</string>
+    <string name="vm_boot_elapsed">%1$02d:%2$02d</string>
+    <string name="local_location_rationale">Location access lets Stryker read the Wi-Fi BSSID so the router MAC and vendor show up in the scan.</string>
+    <string name="vm_stat_cpu">CPU load</string>
+    <string name="vm_stat_ram">Memory</string>
+    <string name="vm_stat_placeholder">—</string>
 </resources>

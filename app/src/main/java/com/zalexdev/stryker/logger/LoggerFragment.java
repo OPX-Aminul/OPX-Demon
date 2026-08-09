@@ -10,7 +10,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.StrictMode;
 import android.os.SystemClock;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -23,6 +22,7 @@ import android.widget.ImageView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -55,7 +55,7 @@ public class LoggerFragment extends Fragment {
     private static final long COUNT_RESYNC_MS = 1500L;
 
     @SuppressLint("SdCardPath")
-    private static final String EXPORT_SDCARD = "/sdcard/Stryker/stryker.log";
+    private static final String EXPORT_NAME = "stryker.log";
 
     private Activity activity;
     private Context context;
@@ -395,11 +395,11 @@ public class LoggerFragment extends Fragment {
     private void saveLogs() {
         final LogFilter snapshot = filter.copy();
         submit(() -> {
-            long n = exportToSdcard(snapshot);
+            File saved = exportToShare(snapshot);
             ui.post(() -> {
                 if (destroyed) return;
-                core.toaster(n >= 0
-                        ? getString(R.string.logs_saved, EXPORT_SDCARD)
+                core.toaster(saved != null
+                        ? getString(R.string.logs_saved, saved.getAbsolutePath())
                         : getString(R.string.logs_save_failed));
             });
         });
@@ -408,31 +408,51 @@ public class LoggerFragment extends Fragment {
     private void shareLogs() {
         final LogFilter snapshot = filter.copy();
         submit(() -> {
-            long n = exportToSdcard(snapshot);
+            File exported = exportToShare(snapshot);
             ui.post(() -> {
                 if (destroyed || !isAdded()) return;
-                if (n < 0) {
+                if (exported == null) {
                     core.toaster(getString(R.string.logs_save_failed));
                     return;
                 }
-                StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder().build());
+                Uri uri;
+                try {
+                    uri = FileProvider.getUriForFile(requireContext(),
+                            requireContext().getPackageName() + ".provider", exported);
+                } catch (IllegalArgumentException e) {
+                    core.toaster(getString(R.string.logs_save_failed));
+                    return;
+                }
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd-HH-mm", Locale.getDefault());
                 Intent intent = new Intent(Intent.ACTION_SEND);
-                intent.setType("text/*");
-                intent.putExtra(Intent.EXTRA_STREAM, Uri.parse("file://" + EXPORT_SDCARD));
+                intent.setType("text/plain");
+                intent.putExtra(Intent.EXTRA_STREAM, uri);
                 intent.putExtra(Intent.EXTRA_SUBJECT, "Stryker log");
                 intent.putExtra(Intent.EXTRA_TEXT, "Stryker log at: " + sdf.format(new Date()));
-                startActivity(Intent.createChooser(intent, getString(R.string.logs_share)));
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                Intent chooser = Intent.createChooser(intent, getString(R.string.logs_share));
+                chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(chooser);
             });
         });
     }
 
-    private long exportToSdcard(LogFilter snapshot) {
-        File out = new File(context.getFilesDir(), "stryker_export.log");
-        long n = store.export(out, snapshot);
-        if (n < 0) return -1;
-        core.customCommand("mkdir -p /sdcard/Stryker && cp " + out.getAbsolutePath() + " " + EXPORT_SDCARD);
-        return n;
+    private File exportToShare(LogFilter snapshot) {
+        File out = new File(context.getFilesDir(), EXPORT_NAME);
+        if (store.export(out, snapshot) < 0) return null;
+        File shareDir = new File(core.getShareRoot());
+        if (!shareDir.isDirectory() && !shareDir.mkdirs()) return out;
+        File target = new File(shareDir, EXPORT_NAME);
+        try (java.io.InputStream in = new java.io.FileInputStream(out);
+             java.io.OutputStream os = new java.io.FileOutputStream(target)) {
+            byte[] buf = new byte[8192];
+            int r;
+            while ((r = in.read(buf)) != -1) os.write(buf, 0, r);
+            os.flush();
+        } catch (java.io.IOException e) {
+            return out;
+        }
+        return target;
     }
 
     private void goBack() {

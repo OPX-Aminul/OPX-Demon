@@ -48,6 +48,30 @@ public final class RemoteManifest {
         }
     }
 
+    public static final class RootlessAssets {
+        public final Asset qemu;
+        public final Asset kernel;
+        public final Asset initrd;
+        public final Asset libslirp;
+        public final Asset rootfs;
+
+        RootlessAssets(Asset qemu, Asset kernel, Asset initrd, Asset libslirp, Asset rootfs) {
+            this.qemu = qemu;
+            this.kernel = kernel;
+            this.initrd = initrd;
+            this.libslirp = libslirp;
+            this.rootfs = rootfs;
+        }
+
+        public boolean isComplete() {
+            return qemu != null && qemu.isUsable()
+                    && kernel != null && kernel.isUsable()
+                    && initrd != null && initrd.isUsable()
+                    && libslirp != null && libslirp.isUsable()
+                    && rootfs != null && rootfs.isUsable();
+        }
+    }
+
     public static final class NotificationItem {
         public final int id;
         public final String title;
@@ -65,7 +89,7 @@ public final class RemoteManifest {
     public int manifestVersion = 1;
     public String coreVersion = "";
     public Asset chroot64;
-    public Asset chroot32;
+    public RootlessAssets rootless;
     public AppUpdate app;
     public final List<News> news = new ArrayList<>();
     public final List<NotificationItem> notifications = new ArrayList<>();
@@ -77,9 +101,31 @@ public final class RemoteManifest {
 
         JSONObject core = root.optJSONObject("core");
         if (core != null) {
-            manifest.coreVersion = core.optString("version", "");
-            manifest.chroot64 = asset(core.optJSONObject("chroot64"));
-            manifest.chroot32 = asset(core.optJSONObject("chroot32"));
+            // core.chroot64 / core.chroot32 are the legacy Alpine tarballs. Builds below 6 are
+            // already published and read those keys directly, so they can never be repointed.
+            // This build takes its rootfs only from core.debian, and never falls back to the
+            // legacy keys — installing an Alpine tarball into a Debian layout would be worse
+            // than failing.
+            JSONObject debian = core.optJSONObject("debian");
+            if (debian != null
+                    && com.zalexdev.stryker.BuildConfig.VERSION_CODE
+                       >= debian.optInt("min_version_code", 0)) {
+                manifest.coreVersion = debian.optString("version", core.optString("version", ""));
+                manifest.chroot64 = asset(debian.optJSONObject("chroot64"));
+            } else {
+                manifest.coreVersion = "";
+                manifest.chroot64 = null;
+            }
+        }
+
+        JSONObject rootless = root.optJSONObject("rootless");
+        if (rootless != null) {
+            manifest.rootless = new RootlessAssets(
+                    asset(rootless.optJSONObject("qemu")),
+                    asset(rootless.optJSONObject("kernel")),
+                    asset(rootless.optJSONObject("initrd")),
+                    asset(rootless.optJSONObject("libslirp")),
+                    asset(rootless.optJSONObject("rootfs")));
         }
 
         JSONObject app = root.optJSONObject("app");

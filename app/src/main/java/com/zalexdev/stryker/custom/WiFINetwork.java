@@ -11,6 +11,7 @@ public class WiFINetwork {
     public Boolean isOK = false;
     public Boolean isBlocked = false;
     public Boolean isVulnerable = false;
+    public Boolean isVulnVerified = false;
     public String model = "";
     public int power = 40;
     public int channel = 1;
@@ -186,6 +187,14 @@ public class WiFINetwork {
     }
     public boolean isVulnerable() {
         return isVulnerable;
+    }
+
+    public void setVulnVerified(Boolean verified) {
+        isVulnVerified = verified;
+    }
+
+    public boolean isVulnVerified() {
+        return isVulnVerified;
     }
 
     public void setInfo(ArrayList<String> info) {

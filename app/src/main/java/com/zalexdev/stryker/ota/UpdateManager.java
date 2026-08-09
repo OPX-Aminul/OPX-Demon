@@ -47,7 +47,8 @@ public final class UpdateManager {
             if (app.versionCode <= BuildConfig.VERSION_CODE) {
                 return;
             }
-            if (app.url == null || !app.url.startsWith("https://")) {
+            if (app.url == null || !app.url.startsWith("https://")
+                    || app.sha256 == null || app.sha256.isEmpty()) {
                 return;
             }
             SharedPreferences prefs = ManifestService.prefs(appContext);

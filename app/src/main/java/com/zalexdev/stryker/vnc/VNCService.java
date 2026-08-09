@@ -17,12 +17,7 @@ import com.zalexdev.stryker.R;
 import com.zalexdev.stryker.utils.Core;
 import com.zalexdev.stryker.utils.Utils;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -67,13 +62,8 @@ public class VNCService extends Service {
                 final String param1 = intent.getStringExtra(EXTRA_RESOLUTION);
                 final String param2 = intent.getStringExtra(EXTRA_PORT);
                 new Thread(() -> {
-                    try {
-                        if (!isVNCStarted()) {
-                            startVNC(param1, param2);
-                        }
-                    } catch (IOException | InterruptedException e) {
-                        e.printStackTrace();
-                    }
+                    if (!isVNCStarted()) startVNC(param1, param2);
+                    else openPortForward(param2);
                 }).start();
                 try {
                     Thread.sleep(5);
@@ -124,22 +114,40 @@ public class VNCService extends Service {
         }
     }
 
-    public void startVNC(String resolution, String port) throws IOException, InterruptedException {
-        if (vnc != null) {
-            vnc.destroy();
-        }
-
+    public void startVNC(String resolution, String port) {
         Intent intent = new Intent();
         intent.setAction(ACTION_START);
         intent.addCategory(Intent.CATEGORY_DEFAULT);
         sendBroadcast(intent);
 
-        vnc = core.generateSuProcess();
-        OutputStream input = vnc.getOutputStream();
-        input.write(("/data/data/com.zalexdev.stryker/files/busybox chroot /data/local/stryker/release /usr/bin/sudo -E PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH /bin/su\n").getBytes());
-        input.write(("vncserver-start -p " + port + " -r " + resolution + "\n").getBytes());
-        input.flush();
-        vnc.waitFor();
+        core.customChrootCommand("mkdir -p /tmp; setsid nohup vncserver-start -p " + port
+                + " -r " + resolution + " > /tmp/vncserver-start.log 2>&1 < /dev/null &");
+        openPortForward(port);
+    }
+
+    private void openPortForward(String value) {
+        if (!core.isRootless()) return;
+        int p = parsePort(value);
+        if (p <= 0) return;
+        boolean ok = core.rootless().forwardPort(p, p);
+        core.logger.writeLine(ok
+                ? "VNC port " + p + " forwarded into the VM"
+                : "VNC port " + p + " could not be forwarded (QMP unavailable)", ok ? 2 : 3);
+    }
+
+    private void closePortForward(String value) {
+        if (!core.isRootless()) return;
+        int p = parsePort(value);
+        if (p > 0) core.rootless().unforwardPort(p);
+    }
+
+    private static int parsePort(String value) {
+        try {
+            int p = Integer.parseInt(value == null ? "" : value.trim());
+            return p > 0 && p < 65536 ? p : -1;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     public void stopVNC() throws IOException {
@@ -152,34 +160,23 @@ public class VNCService extends Service {
         intent.addCategory(Intent.CATEGORY_DEFAULT);
         sendBroadcast(intent);
 
-        vnc = core.generateSuProcess();
-        OutputStream input = vnc.getOutputStream();
-        InputStream output = vnc.getInputStream();
-        InputStream error = vnc.getErrorStream();
-        ArrayList<String> outputList = new ArrayList<>();
-        input.write(("/data/data/com.zalexdev.stryker/files/busybox chroot /data/local/stryker/release /usr/bin/sudo -E PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH /bin/su\n").getBytes());
-        input.write(("vncserver-stop\n").getBytes());
-        input.write(("exit\n").getBytes());
-        input.write(("exit\n").getBytes());
-        input.flush();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(output));
-        String line;
-        while ((line = reader.readLine()) != null) {
-            outputList.add(line);
-        }
-        reader = new BufferedReader(new InputStreamReader(error));
-        while ((line = reader.readLine()) != null) {
-            outputList.add(line);
-        }
+        vnc = null;
+        core.customChrootCommand("vncserver-stop");
+        closePortForward(port);
 
-        vnc.destroy();
         timer.cancel();
         stopForeground(false);
         stopSelf();
     }
 
     private boolean isVNCStarted() {
-        return !core.customChrootCommand("pidof Xvfb").isEmpty();
+        java.util.ArrayList<String> out = core.customChrootCommand("pidof Xvfb", true);
+        for (String l : out) {
+            if (l == null) continue;
+            String t = l.trim();
+            if (!t.isEmpty() && t.matches("[0-9 ]+")) return true;
+        }
+        return false;
     }
 
     public void checkVNC() {

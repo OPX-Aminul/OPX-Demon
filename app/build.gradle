@@ -10,8 +10,12 @@ android {
         applicationId "com.zalexdev.stryker"
         minSdk 24
         targetSdk 28
-        versionCode 450
-        versionName "4.5R"
+        versionCode 600
+        versionName "6.0"
+
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -65,7 +69,9 @@ android {
     }
 
     aaptOptions {
-        noCompress "tar.gz", "gz", "db", "sqlite"
+        // Keep the rootless engine artifacts stored (not re-compressed) so extraction is fast and
+        // the already-gzipped rootfs isn't double-compressed. Suffix match covers the ext-less files.
+        noCompress "tar.gz", "gz", "imgz", "db", "sqlite", "img", "so", "qemu-system-aarch64", "Image"
     }
 
     lint {

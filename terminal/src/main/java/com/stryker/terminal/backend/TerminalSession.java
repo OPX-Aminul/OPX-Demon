@@ -72,6 +72,10 @@ public class TerminalSession extends TerminalOutput {
 
   private int mTerminalFileDescriptor;
 
+  private boolean mSockMode;
+  private java.io.Closeable mConn;
+  private static final int SOCK_ALIVE_PID = 0x7FFF0000;
+
   public String mSessionName;
 
   @SuppressLint("HandlerLeak")
@@ -113,13 +117,30 @@ public class TerminalSession extends TerminalOutput {
     this.mEnv = env;
   }
 
+  private static final String VM_RESIZE_MARKER =
+      "/data/data/com.zalexdev.stryker/files/.vm_pty_resize";
+
   public void updateSize(int columns, int rows) {
     if (mEmulator == null) {
       initializeEmulator(columns, rows);
     } else {
-      JNI.setPtyWindowSize(mTerminalFileDescriptor, rows, columns);
+      if (!mSockMode) JNI.setPtyWindowSize(mTerminalFileDescriptor, rows, columns);
       mEmulator.resize(columns, rows);
+      pushVmWindowSize(columns, rows);
     }
+  }
+
+  /**
+   * The rootless VM runs its own PTY behind a socket, so the local TIOCSWINSZ above never reaches
+   * it. stryker-ch drops a marker while it is attached to the guest's resizable PTY server; only
+   * then is it safe to send the out-of-band frame, which that server consumes.
+   */
+  private void pushVmWindowSize(int columns, int rows) {
+    if (mShellPid <= 0) return;
+    if (!new java.io.File(VM_RESIZE_MARKER).exists()) return;
+    byte[] frame = ("\000WINCH:" + rows + ":" + columns + "\000")
+        .getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+    write(frame, 0, frame.length);
   }
 
   public String getTitle() {
@@ -128,6 +149,12 @@ public class TerminalSession extends TerminalOutput {
 
   public void initializeEmulator(int columns, int rows) {
     mEmulator = new TerminalEmulator(this, columns, rows, 2000);
+
+    if (mShellPath != null && (mShellPath.startsWith("tcp:") || mShellPath.startsWith("pty:")
+        || mShellPath.startsWith("unix:"))) {
+      initializeSocket();
+      return;
+    }
 
     int[] processId = new int[1];
     mTerminalFileDescriptor = JNI.createSubprocess(mShellPath, mCwd, mArgs, mEnv, processId, rows, columns);
@@ -171,6 +198,89 @@ public class TerminalSession extends TerminalOutput {
       public void run() {
         int processExitCode = JNI.waitFor(mShellPid);
         mMainThreadHandler.sendMessage(mMainThreadHandler.obtainMessage(MSG_PROCESS_EXITED, processExitCode));
+      }
+    }.start();
+  }
+
+  private void initializeSocket() {
+    mSockMode = true;
+    mShellPid = SOCK_ALIVE_PID;
+
+    final boolean unix = mShellPath.startsWith("unix:");
+    final boolean pty = mShellPath.startsWith("pty:");
+    final boolean translateCr = !unix && !pty;
+    final String label = unix ? mShellPath.substring(5) : mShellPath.substring(4);
+
+    new Thread("TermSockConnect") {
+      @Override
+      public void run() {
+        InputStream in;
+        OutputStream out;
+        try {
+          if (unix) {
+            android.net.LocalSocket ls = new android.net.LocalSocket();
+            ls.connect(new android.net.LocalSocketAddress(label,
+                android.net.LocalSocketAddress.Namespace.FILESYSTEM));
+            mConn = ls;
+            in = ls.getInputStream();
+            out = ls.getOutputStream();
+          } else {
+            final int colon = label.lastIndexOf(':');
+            final String host = colon > 0 ? label.substring(0, colon) : "127.0.0.1";
+            int p;
+            try { p = Integer.parseInt(label.substring(colon + 1)); } catch (Exception e) { p = 1050; }
+            java.net.Socket sock = new java.net.Socket();
+            sock.connect(new java.net.InetSocketAddress(host, p), 8000);
+            sock.setTcpNoDelay(true);
+            mConn = sock;
+            in = sock.getInputStream();
+            out = sock.getOutputStream();
+          }
+        } catch (Exception e) {
+          byte[] msg = ("\r\n[Cannot reach VM console (" + label
+              + ") — is the VM booted? Start it from the dashboard.]\r\n")
+              .getBytes(StandardCharsets.UTF_8);
+          mProcessToTerminalIOQueue.write(msg, 0, msg.length);
+          mMainThreadHandler.sendEmptyMessage(MSG_NEW_INPUT);
+          mMainThreadHandler.sendMessage(mMainThreadHandler.obtainMessage(MSG_PROCESS_EXITED, 0));
+          return;
+        }
+
+        final InputStream fin = in;
+        new Thread("TermSockReader") {
+          @Override
+          public void run() {
+            final byte[] buffer = new byte[4096];
+            try {
+              while (true) {
+                int read = fin.read(buffer);
+                if (read == -1) break;
+                if (!mProcessToTerminalIOQueue.write(buffer, 0, read)) break;
+                mMainThreadHandler.sendEmptyMessage(MSG_NEW_INPUT);
+              }
+            } catch (Exception ignored) {
+            }
+            mMainThreadHandler.sendMessage(mMainThreadHandler.obtainMessage(MSG_PROCESS_EXITED, 0));
+          }
+        }.start();
+
+        try { out.write('\n'); out.flush(); } catch (Exception ignored) {}
+
+        final byte[] buffer = new byte[4096];
+        try {
+          while (true) {
+            int bytesToWrite = mTerminalToProcessIOQueue.read(buffer, true);
+            if (bytesToWrite == -1) break;
+            if (translateCr) {
+              for (int i = 0; i < bytesToWrite; i++) {
+                if (buffer[i] == (byte) '\r') buffer[i] = (byte) '\n';
+              }
+            }
+            out.write(buffer, 0, bytesToWrite);
+            out.flush();
+          }
+        } catch (Exception ignored) {
+        }
       }
     }.start();
   }
@@ -221,6 +331,10 @@ public class TerminalSession extends TerminalOutput {
 
   public void finishIfRunning() {
     if (isRunning()) {
+      if (mSockMode) {
+        try { if (mConn != null) mConn.close(); } catch (Exception ignored) {}
+        return;
+      }
       try {
         Os.kill(mShellPid, OsConstants.SIGKILL);
       } catch (ErrnoException e) {
@@ -249,7 +363,11 @@ public class TerminalSession extends TerminalOutput {
 
     mTerminalToProcessIOQueue.close();
     mProcessToTerminalIOQueue.close();
-    JNI.close(mTerminalFileDescriptor);
+    if (mSockMode) {
+      try { if (mConn != null) mConn.close(); } catch (Exception ignored) {}
+    } else {
+      JNI.close(mTerminalFileDescriptor);
+    }
   }
 
   @Override

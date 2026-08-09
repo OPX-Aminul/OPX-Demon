@@ -15,8 +15,40 @@ import java.util.function.Consumer;
 public class SuUtils {
 
     private static final String EXECUTE = NeoTermPath.ROOT_PATH + "/chroot_exec ";
+    private static final String ROOTLESS_MARKER = NeoTermPath.ROOT_PATH + "/rootless/.active";
+    private static final String GUEST_SENTINEL = "__STRYKER_EXIT__";
+    private static final int GUEST_PORT = 1050;
+
+    public static boolean isRootless(){
+        return new java.io.File(ROOTLESS_MARKER).exists();
+    }
+
+    private static ArrayList<String> guestCommand(String command){
+        ArrayList<String> out = new ArrayList<>();
+        try (java.net.Socket s = new java.net.Socket()) {
+            s.connect(new java.net.InetSocketAddress("127.0.0.1", GUEST_PORT), 4000);
+            s.setSoTimeout(30000);
+            OutputStream os = s.getOutputStream();
+            os.write(("export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; "
+                    + "export HOME=/root\n"
+                    + command + "\n"
+                    + "printf '\\n" + GUEST_SENTINEL + "%s\\n' \"$?\"\n")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            os.flush();
+            BufferedReader br = new BufferedReader(new InputStreamReader(
+                    s.getInputStream(), java.nio.charset.StandardCharsets.UTF_8));
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.startsWith(GUEST_SENTINEL)) break;
+                out.add(line);
+            }
+        } catch (IOException ignored) {
+        }
+        return out;
+    }
 
     public static ArrayList<String> customCommand(String command){
+        if (isRootless()) return guestCommand(command);
         ArrayList<String> result = new ArrayList<>();
         Process process = generateSuProcess();
         try {
@@ -43,13 +75,14 @@ public class SuUtils {
     }
 
     public static ArrayList<String> chrootCommand(String command){
+        if (isRootless()) return guestCommand(command);
         ArrayList<String> result = new ArrayList<>();
         Process process = generateSuProcess();
         try {
             OutputStream stdin = process.getOutputStream();
             InputStream stderr = process.getErrorStream();
             InputStream stdout = process.getInputStream();
-            stdin.write((EXECUTE + "'ash'" + '\n').getBytes());
+            stdin.write((EXECUTE + "'bash'" + '\n').getBytes());
             stdin.write((command + '\n').getBytes());
             stdin.write(("exit\n").getBytes());
             stdin.flush();
@@ -135,7 +168,7 @@ public class SuUtils {
     public static void getMonitorInterfaces(Activity activity, Consumer<ArrayList<Iface>> l){
         new Thread(() -> {
             ArrayList<String> raw = chrootCommand(
-                "iw dev | grep 'Interface\\|type' | sed -r 's/type//g' | sed -r 's/Interface//g' | sed 'N;s/\\n/,/'");
+                "iw dev 2>/dev/null | awk '$1==\"Interface\"{n=$2} $1==\"type\"{if(n!=\"\"){print n\",\"$2; n=\"\"}}'");
             ArrayList<Iface> out = parseInterfaces(raw);
             activity.runOnUiThread(() -> l.accept(out));
         }).start();
@@ -160,13 +193,14 @@ public class SuUtils {
 
     public static void setMonitorMode(Activity activity, String ifc, boolean enable, Runnable done){
         new Thread(() -> {
+            boolean host = !isRootless();
             if (enable) {
-                if (isInternal(ifc)) customCommand("svc wifi disable");
-                chrootCommand(monitorCommand(ifc));
+                if (host && isInternal(ifc)) customCommand("svc wifi disable");
+                chrootCommand(host ? monitorCommand(ifc) : guestMonitorCommand(ifc));
             } else {
-                if (isInternal(ifc)) customCommand("svc wifi disable");
-                chrootCommand(disableCommand(ifc));
-                if (isInternal(ifc)
+                if (host && isInternal(ifc)) customCommand("svc wifi disable");
+                chrootCommand(host ? disableCommand(ifc) : guestDisableCommand(ifc));
+                if (host && isInternal(ifc)
                         && !isMonitorEnabled(ifc)
                         && !isMonitorEnabled(ifc + "mon")) {
                     customCommand("ip link set " + ifc + " up");
@@ -179,7 +213,7 @@ public class SuUtils {
 
     private static boolean isMonitorEnabled(String ifc){
         ArrayList<String> raw = chrootCommand(
-            "iw dev | grep 'Interface\\|type' | sed -r 's/type//g' | sed -r 's/Interface//g' | sed 'N;s/\\n/,/'");
+            "iw dev 2>/dev/null | awk '$1==\"Interface\"{n=$2} $1==\"type\"{if(n!=\"\"){print n\",\"$2; n=\"\"}}'");
         for (Iface i : parseInterfaces(raw)) {
             if (i.name.equals(ifc)) return i.isMonitor();
         }
@@ -196,6 +230,20 @@ public class SuUtils {
         if ("swlan0".equals(ifc))
             return "ip link set swlan0 down; echo '4' > /sys/module/wlan/parameters/con_mode; ip link set swlan0 up";
         return "airmon-ng start " + ifc;
+    }
+
+    private static String guestMonitorCommand(String ifc){
+        return "rfkill unblock all 2>/dev/null; airmon-ng check kill >/dev/null 2>&1; "
+                + "ip link set " + ifc + " down 2>/dev/null; "
+                + "iw dev " + ifc + " set type monitor 2>/dev/null || airmon-ng start " + ifc + "; "
+                + "ip link set " + ifc + " up 2>/dev/null";
+    }
+
+    private static String guestDisableCommand(String ifc){
+        return "airmon-ng stop " + ifc + " 2>/dev/null; "
+                + "ip link set " + ifc + " down 2>/dev/null; "
+                + "iw dev " + ifc + " set type managed 2>/dev/null; "
+                + "ip link set " + ifc + " up 2>/dev/null";
     }
 
     private static String disableCommand(String ifc){

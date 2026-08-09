@@ -26,8 +26,9 @@ class UserScriptComponent : NeoComponent {
   override fun onServiceObtained() = checkForFiles()
 
   fun extractDefaultScript(context: Context) = kotlin.runCatching {
-    SuUtils.customCommand("mkdir -p ${NeoTermPath.USR_PATH}/")
-    SuUtils.customCommand("rm -rf ${NeoTermPath.BIN_PATH}/*")
+    File(NeoTermPath.USR_PATH).mkdirs()
+    binDir.listFiles()?.forEach { it.deleteRecursively() }
+    binDir.mkdirs()
 
     context.extractAssetsDir("scripts", NeoTermPath.USER_SCRIPT_PATH)
     scriptDir.listFiles()?.forEach {
@@ -35,7 +36,9 @@ class UserScriptComponent : NeoComponent {
     }
 
     context.extractAssetsDir("bin", NeoTermPath.BIN_PATH)
-    SuUtils.customCommand("chmod 448 ${NeoTermPath.BIN_PATH}/*")
+    binDir.listFiles()?.forEach {
+      Os.chmod(it.absolutePath, 448)
+    }
 
   }.onFailure {
     NLog.e("UserScript", "Failed to extract default user scripts: ${it.localizedMessage}")

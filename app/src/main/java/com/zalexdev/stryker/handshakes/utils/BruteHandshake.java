@@ -18,6 +18,7 @@ import androidx.core.app.NotificationCompat;
 import com.zalexdev.stryker.MainActivity;
 import com.zalexdev.stryker.R;
 import com.zalexdev.stryker.custom.WiFINetwork;
+import com.zalexdev.stryker.engine.GuestExec;
 import com.zalexdev.stryker.logger.Logger;
 import com.zalexdev.stryker.utils.Core;
 import com.zalexdev.stryker.utils.Utils;
@@ -42,6 +43,7 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
     public Context context;
     public int id;
     public Process process;
+    public GuestExec.Session guestSession;
     public Logger logger;
 
     public BruteHandshake(String p, String w, Core c, Activity a, Context con, TextView pr, TextView t, int i) {
@@ -69,6 +71,29 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
         WiFINetwork result = new WiFINetwork();
         logger.writeLine("Starting brute handshake",1);
         try {
+            if (core.isRootless()) {
+                String guestCmd = "aircrack-ng -w/sdcard/Stryker/wordlists/" + wordlist
+                        + " /sdcard/Stryker/captured/" + path + " ";
+                guestSession = core.rootless().openStream(guestCmd);
+                BufferedReader gbr = guestSession.reader;
+                while ((line = gbr.readLine()) != null) {
+                    if (line.startsWith(GuestExec.Session.SENTINEL)) break;
+                    logger.writeLine(line,2);
+                    onProgressUpdate(line);
+                    if (line.contains("KEY FOUND! [ ")) {
+                        Pattern pattern = Pattern.compile("\\[ (.*?)\\]");
+                        Matcher matcher = pattern.matcher(line);
+                        if (matcher.find()) {
+                            result.setPsk(matcher.group(1));
+                        }
+                        result.setOK(true);
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            CreateNotification("Success", "Password found: " + result.getPsk(), 100, 100);
+                        }
+                    }
+                }
+                guestSession.close();
+            } else {
             process = Runtime.getRuntime().exec("su");
             OutputStream stdin = process.getOutputStream();
             InputStream stderr = process.getErrorStream();
@@ -103,6 +128,7 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
             br.close();
             process.waitFor();
             process.destroy();
+            }
 
         } catch (IOException | InterruptedException e) {
         }
@@ -124,6 +150,9 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
     public void kill() {
         if (process != null) {
             process.destroy();
+        }
+        if (guestSession != null) {
+            guestSession.close();
         }
     }
 

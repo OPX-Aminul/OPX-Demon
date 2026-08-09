@@ -135,12 +135,15 @@ public class SploitDetailSheet extends BottomSheetDialogFragment {
                 return;
             }
             new Thread(() -> {
-                String src = sploit.getPath().startsWith("/") ? sploit.getPath() : "/" + sploit.getPath();
-                core.copyFile("/data/local/stryker/release/exploitdb" + src,
-                        core.getStorage() + "Stryker/exploits/");
+                boolean copied = ArsenalDatabaseTab.copyToHub(
+                        core, ArsenalDatabaseTab.guestSploitPath(sploit.getPath()));
                 if (getActivity() != null) {
-                    getActivity().runOnUiThread(() ->
-                            core.toaster(getString(R.string.arsenal_db_saved_file)));
+                    getActivity().runOnUiThread(() -> {
+                        if (!isAdded()) return;
+                        core.toaster(getString(copied
+                                ? R.string.arsenal_db_saved_file
+                                : R.string.error));
+                    });
                 }
             }).start();
         });

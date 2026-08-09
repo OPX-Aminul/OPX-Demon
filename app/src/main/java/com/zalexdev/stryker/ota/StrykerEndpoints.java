@@ -8,10 +8,15 @@ public final class StrykerEndpoints {
             "https://raw.githubusercontent.com/zalexdev/strykerapp/main/stryker_manifest.json";
 
     public static final String FALLBACK_CHROOT_64 =
-            "https://github.com/zalexdev/strykerapp/releases/download/chroot-main/chroot64.tar.gz";
+            "https://github.com/zalexdev/strykerapp/releases/download/chroot-main/chroot64-debian.tar.gz";
 
-    public static final String FALLBACK_CHROOT_32 =
-            "https://github.com/zalexdev/strykerapp/releases/download/chroot-main/chroot32.tar.gz";
+    private static final String ROOTLESS_BASE =
+            "https://github.com/zalexdev/strykerapp/releases/download/rootless-main/";
+    public static final String FALLBACK_ROOTLESS_QEMU     = ROOTLESS_BASE + "qemu-system-aarch64";
+    public static final String FALLBACK_ROOTLESS_KERNEL   = ROOTLESS_BASE + "Image";
+    public static final String FALLBACK_ROOTLESS_LIBSLIRP = ROOTLESS_BASE + "libslirp.so";
+    public static final String FALLBACK_ROOTLESS_INITRD   = ROOTLESS_BASE + "initrd.img";
+    public static final String FALLBACK_ROOTLESS_ROOTFS   = ROOTLESS_BASE + "rootfs.imgz";
 
     public static final String PREFS = "stryker_ota";
 

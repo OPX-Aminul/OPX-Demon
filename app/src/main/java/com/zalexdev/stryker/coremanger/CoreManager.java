@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -34,14 +35,13 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.zalexdev.stryker.R;
 import com.zalexdev.stryker.custom.Package;
+import com.zalexdev.stryker.engine.Apt;
 import com.zalexdev.stryker.install.InstallService;
 import com.zalexdev.stryker.utils.Core;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class CoreManager extends Fragment {
 
@@ -49,7 +49,7 @@ public class CoreManager extends Fragment {
     private Context context;
     private Activity activity;
 
-    private ArrayList<Package> installedApk = new ArrayList<>();
+    private ArrayList<Package> installedPackages = new ArrayList<>();
     private ArrayList<Package> installedPip = new ArrayList<>();
     private ArrayList<Package> visiblePackages = new ArrayList<>();
 
@@ -58,9 +58,12 @@ public class CoreManager extends Fragment {
     private TextInputLayout searchLayout;
     private TextInputEditText search;
     private LinearProgressIndicator progress;
-    private Chip apk;
+    private Chip pkgChip;
     private Chip pip;
     private Chip filterInstalled;
+    private final android.os.Handler searchHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable searchTask = () -> {};
     private MaterialCardView emptyCard;
     private MaterialCardView listCard;
     private SwipeRefreshLayout refresh;
@@ -68,8 +71,8 @@ public class CoreManager extends Fragment {
     private TextView sourceStatus;
     private TextView countChip;
 
-    private boolean apkMode = true;
-    private boolean apkIndexUpdated = false;
+    private boolean pkgMode = true;
+    private boolean indexUpdated = false;
 
     private LinearLayout toolsContainer;
     private final LinkedHashMap<String, ToolRow> toolRows = new LinkedHashMap<>();
@@ -131,7 +134,7 @@ public class CoreManager extends Fragment {
         searchLayout = view.findViewById(R.id.search_layout);
         search = view.findViewById(R.id.search);
         progress = view.findViewById(R.id.progressbar);
-        apk = view.findViewById(R.id.apktoogle);
+        pkgChip = view.findViewById(R.id.apktoogle);
         pip = view.findViewById(R.id.piptoggle);
         filterInstalled = view.findViewById(R.id.cm_filter_installed);
         emptyCard = view.findViewById(R.id.cm_empty_card);
@@ -142,14 +145,17 @@ public class CoreManager extends Fragment {
         countChip = view.findViewById(R.id.cm_count_chip);
 
         refresh.setOnRefreshListener(this::reloadInstalled);
-        apk.setOnClickListener(v -> switchSource(true));
+        pkgChip.setOnClickListener(v -> switchSource(true));
         pip.setOnClickListener(v -> switchSource(false));
         filterInstalled.setOnCheckedChangeListener((b, checked) -> renderList(search.getText() == null ? "" : search.getText().toString()));
 
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                renderList(s == null ? "" : s.toString());
+                final String q = s == null ? "" : s.toString();
+                searchHandler.removeCallbacks(searchTask);
+                searchTask = () -> renderList(q);
+                searchHandler.postDelayed(searchTask, 250);
             }
             @Override public void afterTextChanged(Editable s) {
                 core.putString("cm_search", s == null ? "" : s.toString());
@@ -265,6 +271,8 @@ public class CoreManager extends Fragment {
 
     @Override
     public void onDestroyView() {
+        searchHandler.removeCallbacks(searchTask);
+        mAdapter = null;
         if (toolReceiverRegistered) {
             try { requireContext().unregisterReceiver(toolReceiver); } catch (IllegalArgumentException ignored) {}
             toolReceiverRegistered = false;
@@ -272,15 +280,15 @@ public class CoreManager extends Fragment {
         super.onDestroyView();
     }
 
-    private void switchSource(boolean toApk) {
-        apkMode = toApk;
-        core.putString("cm_source", toApk ? "apk" : "pip");
-        apk.setChecked(toApk);
-        pip.setChecked(!toApk);
-        sourceTitle.setText(toApk ? R.string.core_mgr_source_apk : R.string.core_mgr_source_pip);
-        searchLayout.setHint(toApk ? R.string.core_mgr_search_hint_apk : R.string.core_mgr_search_hint_pip);
+    private void switchSource(boolean toPkg) {
+        pkgMode = toPkg;
+        core.putString("cm_source", toPkg ? "apk" : "pip");
+        pkgChip.setChecked(toPkg);
+        pip.setChecked(!toPkg);
+        sourceTitle.setText(toPkg ? R.string.core_mgr_source_apk : R.string.core_mgr_source_pip);
+        searchLayout.setHint(toPkg ? R.string.core_mgr_search_hint_apk : R.string.core_mgr_search_hint_pip);
         searchLayout.setEndIconDrawable(AppCompatResources.getDrawable(context,
-                toApk ? R.drawable.search : R.drawable.download));
+                toPkg ? R.drawable.search : R.drawable.download));
         reloadInstalled();
     }
 
@@ -288,8 +296,8 @@ public class CoreManager extends Fragment {
         freezeUi();
         sourceStatus.setText(R.string.core_mgr_status_loading);
         new Thread(() -> {
-            if (apkMode) {
-                installedApk = parseApkInstalled(core.customChrootCommand("apk info -v"));
+            if (pkgMode) {
+                installedPackages = parseInstalled(core.customChrootCommand(Apt.listInstalled()));
             } else {
                 installedPip = parsePipInstalled(core.customChrootCommand("pip list | tail -n +3 | awk '{print $1\"==\"$2}'"));
             }
@@ -305,18 +313,18 @@ public class CoreManager extends Fragment {
     private void triggerRemoteSearch() {
         String q = search.getText() == null ? "" : search.getText().toString().trim();
         if (q.isEmpty()) return;
-        if (!apkMode) {
+        if (!pkgMode) {
             installPipDirect(q);
             return;
         }
         freezeUi();
         sourceStatus.setText(R.string.core_mgr_status_updating);
         new Thread(() -> {
-            if (!apkIndexUpdated) {
-                core.customChrootCommand("apk update");
-                apkIndexUpdated = true;
+            if (!indexUpdated) {
+                core.customChrootCommand(TextUtils.join("; ", Apt.env()) + "; " + Apt.update());
+                indexUpdated = true;
             }
-            ArrayList<Package> w = parseApk(core.customChrootCommand("apk search " + q), q);
+            ArrayList<Package> w = parseSearch(core.customChrootCommand(Apt.search(q)), q);
             ui(() -> {
                 visiblePackages = w;
                 showResults(visiblePackages);
@@ -338,7 +346,7 @@ public class CoreManager extends Fragment {
     }
 
     private void renderList(String filter) {
-        ArrayList<Package> base = apkMode ? installedApk : installedPip;
+        ArrayList<Package> base = pkgMode ? installedPackages : installedPip;
         ArrayList<Package> out = new ArrayList<>();
         boolean onlyInstalled = filterInstalled.isChecked();
         String f = filter.toLowerCase().trim();
@@ -359,8 +367,15 @@ public class CoreManager extends Fragment {
         } else {
             listCard.setVisibility(View.VISIBLE);
             emptyCard.setVisibility(View.GONE);
-            mAdapter = new CoreAdapter(context, activity, list, this::reloadInstalled);
-            mRecyclerView.setAdapter(mAdapter);
+            if (mAdapter == null) {
+                mAdapter = new CoreAdapter(context, activity, list, this::reloadInstalled);
+                mRecyclerView.setHasFixedSize(true);
+                mRecyclerView.setItemViewCacheSize(24);
+                mRecyclerView.setAdapter(mAdapter);
+            } else {
+                mAdapter.submit(list);
+                mRecyclerView.scrollToPosition(0);
+            }
         }
     }
 
@@ -371,7 +386,7 @@ public class CoreManager extends Fragment {
 
     public void freezeUi() {
         searchLayout.setEnabled(false);
-        apk.setEnabled(false);
+        pkgChip.setEnabled(false);
         pip.setEnabled(false);
         mRecyclerView.setEnabled(false);
         progress.setVisibility(View.VISIBLE);
@@ -379,47 +394,53 @@ public class CoreManager extends Fragment {
 
     public void unfreezeUi() {
         searchLayout.setEnabled(true);
-        apk.setEnabled(true);
+        pkgChip.setEnabled(true);
         pip.setEnabled(true);
         mRecyclerView.setEnabled(true);
         progress.setVisibility(View.INVISIBLE);
     }
 
-    public ArrayList<Package> parseApk(ArrayList<String> out, String q) {
+    public ArrayList<Package> parseSearch(ArrayList<String> out, String q) {
         ArrayList<Package> res = new ArrayList<>();
-        for (String pkg : out) {
+        if (out == null) return res;
+        for (String line : out) {
+            if (line == null) continue;
+            String row = line.trim();
+            if (row.isEmpty()) continue;
+            int sep = row.indexOf(" - ");
+            String name = (sep > 0 ? row.substring(0, sep) : row).trim();
+            if (name.isEmpty() || name.contains(" ")) continue;
             Package temp = new Package();
-            Matcher r = Pattern.compile("-r[0-9]+").matcher(pkg);
-            if (r.find()) pkg = pkg.replace(r.group(), "");
-            String[] parts = pkg.split("-");
-            if (parts.length < 2) continue;
-            String version = parts[parts.length - 1];
-            temp.setVersion(version);
-            temp.setName(pkg.replace("-" + version, ""));
-            for (Package p : installedApk) {
-                if (p.getName().equals(temp.getName())) {
+            temp.setName(name);
+            temp.setVersion("");
+            temp.setIsPythonPackage(false);
+            for (Package p : installedPackages) {
+                if (p.getName().equals(name)) {
                     temp.setInstalled(true);
+                    temp.setVersion(p.getVersion());
                     break;
                 }
             }
-            if (temp.getName().equals(q)) res.add(0, temp);
+            if (name.equals(q)) res.add(0, temp);
             else res.add(temp);
-            temp.setIsPythonPackage(false);
         }
         return res;
     }
 
-    public ArrayList<Package> parseApkInstalled(ArrayList<String> out) {
+    public ArrayList<Package> parseInstalled(ArrayList<String> out) {
         ArrayList<Package> res = new ArrayList<>();
-        for (String pkg : out) {
-            Package temp = new Package();
-            Matcher r = Pattern.compile("-r[0-9]+").matcher(pkg);
-            if (r.find()) pkg = pkg.replace(r.group(), "");
-            String[] parts = pkg.split("-");
+        if (out == null) return res;
+        for (String line : out) {
+            if (line == null) continue;
+            String row = line.trim();
+            if (row.isEmpty()) continue;
+            String[] parts = row.split("\t");
             if (parts.length < 2) continue;
-            String version = parts[parts.length - 1];
-            temp.setVersion(version);
-            temp.setName(pkg.replace("-" + version, ""));
+            String name = parts[0].trim();
+            if (name.isEmpty()) continue;
+            Package temp = new Package();
+            temp.setName(name);
+            temp.setVersion(parts[1].trim());
             temp.setInstalled(true);
             temp.setIsPythonPackage(false);
             res.add(temp);

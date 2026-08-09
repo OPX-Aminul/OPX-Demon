@@ -1,7 +1,7 @@
 #!/system/bin/sh
 
-SELF_PATH=$(readlink -f $0)
-. ${SELF_PATH%/*}/bootroot_env
+SELF_PATH=$(readlink -f "$0")
+. "${SELF_PATH%/*}/bootroot_env"
 
 #############################
 #### DEFINE GLOBAL VARIABLES ####
@@ -21,15 +21,14 @@ isAllunmounted=0
 ### Kill all running services and processes ###
 f_kill_pids() {
     echo "[!] Killing all running services..."
-    local lsof_full=$($BUSYBOX lsof | awk '{print $1}' | grep -c '^lsof')
+    lsof_full=$($BUSYBOX lsof 2> /dev/null | awk '{print $1}' | grep -c '^lsof')
     if [ "${lsof_full}" -eq 0 ]; then
-        local pids=$($BUSYBOX lsof | grep "$MNT" | awk '{print $1}' | uniq)
+        pids=$($BUSYBOX lsof 2> /dev/null | grep "$MNT" | awk '{print $1}' | uniq)
     else
-        local pids=$($BUSYBOX lsof | grep "$MNT" | awk '{print $2}' | uniq)
+        pids=$($BUSYBOX lsof 2> /dev/null | grep "$MNT" | awk '{print $2}' | uniq)
     fi
     if [ -n "${pids}" ]; then
         kill -9 ${pids} 2> /dev/null
-        return $?
     fi
     return 0
 }
@@ -43,16 +42,16 @@ f_restore_setup() {
 
     ## Remove all the remaining chroot VNC session pid and log files..##
     echo "[!] Removing all the remaining chroot VNC session pid and log files..."
-    rm -rf $MNT/tmp/.X11* $MNT/tmp/.X*-lock $MNT/root/.vnc/*.pid $MNT/root/.vnc/*.log > /dev/null 2>&1
+    rm -rf "$MNT"/tmp/.X11* "$MNT"/tmp/.X*-lock "$MNT"/root/.vnc/*.pid "$MNT"/root/.vnc/*.log > /dev/null 2>&1
 }
 
 ########## Umount the fs one by one ##########
 f_umount_fs() {
-    if $BUSYBOX mountpoint -q $MNT/$1; then
+    if $BUSYBOX mountpoint -q "$MNT/$1"; then
         if $BUSYBOX umount -l "$MNT/$1" || $BUSYBOX umount -f "$MNT/$1"; then
             echo "[+] Umounted $MNT/$1"
             if [ ! "$1" = "dev/pts" -a ! "$1" = "dev/shm" ]; then
-                if rm -rf $MNT/$1; then
+                if rm -rf "$MNT/$1"; then
                     echo "[+] Removed $MNT/$1"
                 else
                     echo "[-] Failed to remove $MNT/$1"
@@ -64,9 +63,9 @@ f_umount_fs() {
             isAllunmounted=1
         fi
     else
-        if [ -d $MNT/$1 ]; then
+        if [ -d "$MNT/$1" ]; then
             echo "[+] $MNT/$1 is unmounted already."
-            if rm -rf $MNT/$1; then
+            if rm -rf "$MNT/$1"; then
                 echo "[+] Removed $MNT/$1"
             else
                 echo "[-] Failed to remove $MNT/$1"
@@ -74,7 +73,6 @@ f_umount_fs() {
             fi
         fi
     fi
-
 }
 
 ########## Umount if chroot directory is NOT a mountpoint(directory method) ##########
@@ -84,8 +82,7 @@ f_dir_umount() {
     f_restore_setup
     echo "[!] Removing all fs mounts..."
     f_umount_sdcard
-    FS=(dev/pts dev/shm dev proc sys system)
-    for i in "${FS[@]}"; do
+    for i in dev/pts dev/shm dev proc sys system; do
         f_umount_fs "$i"
     done
 }
@@ -96,6 +93,7 @@ f_is_mntpoint() {
         $BUSYBOX mountpoint -q "$MNT" && return 0
         return 1
     fi
+    return 2
 }
 
 ########## Unmount sdcard so it wont break internal storage ##########
@@ -124,22 +122,23 @@ f_umount_sdcard() {
 f_is_mntpoint
 res=$?
 case $res in
-1)
+2)
+    echo "[!] $MNT directory is not existed! Aborting..."
+    exit 1
+    ;;
+*)
     echo "[!] $MNT unmounting chroot now..."
     f_dir_umount
     ;;
-*)
-    echo "[!] $MNT directory is not existed! Aborting..."
-    exit 1
 esac
 
-if [ -z "$(cat /proc/mounts | grep $MNT)" ]; then
-    echo "[+] All done."
-    isAllunmounted=0
-else
+if grep -q "$MNT" /proc/mounts; then
     echo "[-] There are still mounted points not unmounted yet."
     echo "[-] Try run this script again and see if they can be unmounted now."
     isAllunmounted=1
+else
+    echo "[+] All done."
+    isAllunmounted=0
 fi
 
-return $isAllunmounted
+exit $isAllunmounted

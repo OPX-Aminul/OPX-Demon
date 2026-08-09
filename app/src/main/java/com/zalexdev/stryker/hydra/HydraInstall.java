@@ -128,7 +128,7 @@ public class HydraInstall extends Fragment {
             renderFromService(status);
         } else {
             new Thread(() -> {
-                boolean already = core.checkFile("/data/local/stryker/release/usr/bin/hydra");
+                boolean already = core.hasBinary("hydra");
                 runOnUi(() -> {
                     if (already) {
                         core.putBoolean("hydra", true);
@@ -239,14 +239,14 @@ public class HydraInstall extends Fragment {
         if (line == null) return;
         if (line.contains("×")) {
             String marker = line.replace("×", "").trim();
-            if (marker.startsWith("Refreshing apk index")) {
+            if (marker.startsWith("Refreshing package index")) {
                 markStage(HydraInstallStage.REFRESH, RowState.ACTIVE);
                 updateSubtitle(marker);
             } else if (marker.startsWith("Installing hydra")) {
                 markStage(HydraInstallStage.REFRESH, RowState.DONE);
                 markStage(HydraInstallStage.INSTALL, RowState.ACTIVE);
                 updateSubtitle(marker);
-            } else if (marker.startsWith("Done apk")) {
+            } else if (marker.startsWith("Done installing")) {
                 markStage(HydraInstallStage.INSTALL, RowState.DONE);
                 markStage(HydraInstallStage.VERIFY, RowState.ACTIVE);
             }

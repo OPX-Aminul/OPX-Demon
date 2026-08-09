@@ -29,16 +29,37 @@ their licenses in the in-app *About → Open-source licenses* screen.
 
 | Asset | Origin | License | Notes |
 |---|---|---|---|
-| `busybox32` / `busybox64` | [BusyBox](https://busybox.net) v1.36.1 (osm0sis build) | **GPL-2.0-only** | Shipped as a standalone executable, invoked via `exec` from shell scripts (mere aggregation / separate program). Not statically linked into app code. Corresponding source: busybox.net. |
+| `busybox64` | [BusyBox](https://busybox.net) v1.36.1 (osm0sis build) | **GPL-2.0-only** | Shipped as a standalone executable, invoked via `exec` from shell scripts (mere aggregation / separate program). Not statically linked into app code. Corresponding source: busybox.net. |
 | `bash` | [GNU Bash](https://www.gnu.org/software/bash/) | **GPL-3.0-or-later** | |
 | `sqlite3` | [SQLite](https://sqlite.org) 3.21.0 | **Public Domain** | |
 | `devices.txt` | [linux-usb.org `usb.ids`](http://www.linux-usb.org/usb-ids.html) | **GPL-2.0+ / BSD-3 (dual)** | USB vendor/product database. |
-| `auth_basic.txt` / `auth_digest.txt` / `auth_form.txt` | Router Scan default-credential wordlists (© Stas'M) | Router Scan project | Attribution preserved in file headers. |
 | `checker.py` | CVE-2022-27255 PoC — [infobyte/cve-2022-27255](https://github.com/infobyte/cve-2022-27255) (© Martin Tartarelli, Octavio Gianatiempo) | upstream PoC | Attribution preserved in file header. |
 | Fonts: `SourceCodePro.ttf`, `ZedMono*.ttf`, `UbuntuMono.ttf`, `eks_font.ttf` | Adobe Source Code Pro; be5invis Iosevka/Zed Mono; Canonical Ubuntu Mono; Google Noto | **OFL-1.1** / **UFL-1.0** | License texts retained; OFL Reserved Font Names respected. |
 
-## Runtime-downloaded tools (not distributed in the APK)
+## Guest-core payload (`assets/rootless/stryker-guest-core.tar`)
 
-Nmap, Metasploit Framework, Nuclei, Hydra, SearchSploit and the Alpine `chroot` core are
-**not** bundled in the APK — they are fetched at first launch into the on-device chroot and
-remain under their respective upstream licenses.
+Unpacked into the Linux environment at first boot. Each tool runs as a separate program
+inside the guest and is aggregated with, not linked into, Stryker.
+
+| Path in tar | Origin | License |
+|---|---|---|
+| `CORE/SMB/mysmb.py`, `CORE/RDP/mysmb.py`, `exploits/mysmb.py` | derived from [impacket](https://github.com/fortra/impacket) (© SecureAuth / Fortra) | **Apache-2.0** |
+| `CORE/Cameradar/credentials.json`, `CORE/Cameradar/routes` | [Ullaakut/cameradar](https://github.com/Ullaakut/cameradar) RTSP route and credential dictionaries | **MIT** |
+| `CORE/PixieWps/pixie.py` | derived from OneShotPin 0.0.2 (© 2017 rofl0r, modified by drygdryg / kimocoder), with ideas from [OneShot-Extended](https://github.com/chkndrp/OneShot-Extended); substantially rewritten for Stryker | **GPL-3.0** |
+
+Corresponding source and the full license text of each are available from the upstream
+projects linked above and on request.
+
+## Distributed by this project (GitHub releases and/or APK assets)
+
+| Artifact | Origin | License | Notes |
+|---|---|---|---|
+| `qemu-system-aarch64` | [QEMU](https://www.qemu.org) — custom build (`--enable-libusb`, virtfs) | **GPL-2.0-only** | Not stock Debian QEMU. Corresponding source and build configuration on request. |
+| `Image`, `initrd.img` | Debian kernel `6.12.94+deb13-arm64` | **GPL-2.0** | Unmodified Debian binary; source via `apt source linux`. |
+| `libslirp.so` | [libslirp](https://gitlab.freedesktop.org/slirp/libslirp) | **BSD-3-Clause** | Binary redistribution requires the upstream copyright notice, reproduced in the release notes. |
+| `rootfs.imgz`, `chroot64-debian.tar.gz` | Debian trixie arm64 | per-package | `/usr/share/doc/<package>/copyright` inside the image; see <https://www.debian.org/legal/licenses/>. |
+
+## Runtime-downloaded tools (not distributed by this project)
+
+Metasploit Framework, Nuclei, Hydra and SearchSploit are fetched at first launch from their
+own upstream sources and remain under their respective upstream licenses.

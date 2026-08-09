@@ -106,9 +106,9 @@ public class LicenseActivity extends AppCompatActivity {
                 "https://www.sqlite.org/copyright.html"));
 
         l.add(License.section("Chroot environment & security tools"));
-        l.add(License.of("Alpine Linux (apk-tools, musl)", "Mixed — apk-tools GPL-2.0, musl MIT",
-                "Alpine Linux team; musl: Rich Felker and contributors",
-                "https://alpinelinux.org/"));
+        l.add(License.of("Debian GNU/Linux", "Mixed free licences — GPL, LGPL, MIT, BSD and others",
+                "The Debian Project and contributors",
+                "https://www.debian.org/"));
         l.add(License.of("Metasploit Framework", "BSD 3-Clause License", "Copyright (c) 2006-2024 Rapid7, Inc.",
                 "https://github.com/rapid7/metasploit-framework/blob/master/LICENSE"));
         l.add(License.of("MSFPC", "MIT License", "Copyright (c) 2015 g0tmi1k",
@@ -143,7 +143,8 @@ public class LicenseActivity extends AppCompatActivity {
                 "https://curl.se/docs/copyright.html"));
         l.add(License.of("OpenSSL", "Apache License 2.0", "The OpenSSL Project Authors",
                 "https://openssl-library.org/source/license/"));
-        l.add(License.of("ca-certificates (Mozilla CA bundle)", "MPL-2.0 AND MIT", "Mozilla Foundation; Alpine team",
+        l.add(License.of("ca-certificates (Mozilla CA bundle)", "MPL-2.0 AND MIT",
+                "Mozilla Foundation; Debian ca-certificates maintainers",
                 "https://www.mozilla.org/MPL/2.0/"));
         l.add(License.of("DejaVu fonts", "Bitstream Vera Fonts License (parts public domain)",
                 "Bitstream, Inc.; Tavmjong Bah; DejaVu authors",

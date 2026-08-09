@@ -121,8 +121,22 @@ public class SettingsHomeFragment extends Fragment {
         changeCommands.setOnClickListener(v -> openSub(new CustomCommandsWifi(), "cmd"));
         debug.setOnClickListener(v -> openSub(new LoggerFragment(), "logs"));
 
-        unmountLayout.setOnClickListener(v -> confirmUnmount());
-        deleteLayout.setOnClickListener(v -> confirmDelete());
+        LinearLayout engineSection = view.findViewById(R.id.engine_section);
+        LinearLayout vmSettingsRow = view.findViewById(R.id.vm_settings_row);
+        if (core.isRootless()) {
+            engineSection.setVisibility(View.VISIBLE);
+            vmSettingsRow.setOnClickListener(v -> openSub(new VmSettingsFragment(), "vm"));
+        } else {
+            engineSection.setVisibility(View.GONE);
+        }
+
+        if (core.isRootless()) {
+            unmountLayout.setVisibility(View.GONE);
+            deleteLayout.setVisibility(View.GONE);
+        } else {
+            unmountLayout.setOnClickListener(v -> confirmUnmount());
+            deleteLayout.setOnClickListener(v -> confirmDelete());
+        }
     }
 
     private void openSub(Fragment f, String tag) {

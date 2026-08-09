@@ -53,9 +53,12 @@ public final class LogTool {
         KEYWORDS.put("xfce4-session", "vnc");
         KEYWORDS.put("startxfce4", "vnc");
         KEYWORDS.put("xvfb", "vnc");
-        KEYWORDS.put("apk", "apk");
-        KEYWORDS.put("apt", "apk");
-        KEYWORDS.put("pip", "apk");
+        KEYWORDS.put("apt-get", "apt");
+        KEYWORDS.put("apt-cache", "apt");
+        KEYWORDS.put("apt", "apt");
+        KEYWORDS.put("dpkg-query", "apt");
+        KEYWORDS.put("dpkg", "apt");
+        KEYWORDS.put("pip", "apt");
         KEYWORDS.put("iwconfig", "iface");
         KEYWORDS.put("iwlist", "iface");
         KEYWORDS.put("ifconfig", "iface");
@@ -164,13 +167,12 @@ public final class LogTool {
                 case "su":
                 case "sudo":
                 case "sh":
-                case "ash":
                 case "bash":
                 case "busybox":
                 case "chroot":
                 case "env":
                 case "chroot_exec":
-                case "ash_exec":
+                case "bash_exec":
                 case "stryker-ch":
                     continue;
                 default:

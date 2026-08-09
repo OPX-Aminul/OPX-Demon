@@ -6,25 +6,29 @@ unset LD_PRELOAD
 ## Define the owner app package name.
 APP_PGK_NAME=com.zalexdev.stryker
 
-## Define chroot sudo path
-CHROOT_EXEC=/usr/bin/sudo
+## Login shell used inside the Debian chroot.
+CHROOT_SHELL=/bin/bash
 
-## Combine android $PATH to chroot $PATH
-export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH
+## PATH handed to every in-chroot process.
+CHROOT_PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+## Android-side PATH for the helper scripts themselves.
+export PATH=/system/bin:/system/xbin:/sbin:$PATH
 
 ## Define busybox path.
 BUSYBOX=/data/data/$APP_PGK_NAME/files/busybox
 
 ## Define stryker binaries.
-chmod 777 /data/data/$APP_PGK_NAME/files/busybox
-chmod 777 /data/data/$APP_PGK_NAME/files/chroot_exec
-chmod 777 /data/data/$APP_PGK_NAME/files/boot_bash
+chmod 700 /data/data/$APP_PGK_NAME/files/busybox 2> /dev/null
+for helper in chroot_exec bash_exec bootroot killroot; do
+    chmod 700 "/data/data/$APP_PGK_NAME/files/$helper" 2> /dev/null
+done
 
 ## Define chroot path to MNT variable.
-MNT="/data/local/stryker/release/"
+MNT="/data/local/stryker/release"
 
 ## Validate busybox path.
-if [ -z "$BUSYBOX" ]; then
+if [ ! -x "$BUSYBOX" ]; then
     echo "[-] No busybox found."
     exit 1
 fi

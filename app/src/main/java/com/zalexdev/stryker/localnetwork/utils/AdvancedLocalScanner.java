@@ -8,6 +8,7 @@ import android.net.wifi.WifiManager;
 
 import com.zalexdev.stryker.custom.Device;
 import com.zalexdev.stryker.custom.Port;
+import com.zalexdev.stryker.localnetwork.nonroot.NonRootScanner;
 import com.zalexdev.stryker.logger.Logger;
 import com.zalexdev.stryker.utils.AdvancedProcess;
 import com.zalexdev.stryker.utils.Core;
@@ -40,6 +41,8 @@ public abstract class AdvancedLocalScanner {
     public String gateway;
     public Thread mainThread;
     public String iface;
+    public NonRootScanner nonRoot;
+    public volatile boolean detached;
     public ArrayList<Device> devicesOld = new ArrayList<>();
 
     public AdvancedLocalScanner(Activity activity, Context context, String iface) {
@@ -47,10 +50,12 @@ public abstract class AdvancedLocalScanner {
         AdvancedLocalScanner.context = context;
         this.iface = iface;
         core = new Core(context);
-        process = core.generateSuProcess();
-        output = process.getInputStream();
-        error = process.getErrorStream();
-        input = process.getOutputStream();
+        if (!core.isRootless()) {
+            process = core.generateSuProcess();
+            output = process.getInputStream();
+            error = process.getErrorStream();
+            input = process.getOutputStream();
+        }
         logger = new Logger();
         activity.runOnUiThread(this::onStarted);
 
@@ -84,6 +89,10 @@ public abstract class AdvancedLocalScanner {
     }
 
     public void startScan() {
+        if (core.isRootless()) {
+            startScanRootless();
+            return;
+        }
         String cmd = "nmap " + getGateway(iface) + " -sn -PE -n -PP -T4 --stats-every 1s";
         new AdvancedProcess(activity, context, cmd, true) {
             @Override
@@ -238,6 +247,60 @@ public abstract class AdvancedLocalScanner {
         };
     }
 
+    private void startScanRootless() {
+        logger.writeLine("Starting non-root LAN discovery (ICMP + TCP + NetBIOS + mDNS + SSDP + SNMP)", 1);
+        nonRoot = new NonRootScanner(context, core, new NonRootScanner.Callback() {
+            @Override
+            public void onStatus(String message) {
+                if (detached) return;
+                logger.writeLine(message, 1);
+            }
+
+            @Override
+            public void onProgress(int percent) {
+                if (detached) return;
+                activity.runOnUiThread(() -> {
+                    if (!detached) AdvancedLocalScanner.this.onProgressUpdate(percent);
+                });
+            }
+
+            @Override
+            public void onDeviceAdded(Device device, int index) {
+                if (detached) return;
+                activity.runOnUiThread(() -> {
+                    if (!detached) AdvancedLocalScanner.this.onDeviceAdded(device);
+                });
+            }
+
+            @Override
+            public void onDeviceChanged(Device device, int index) {
+                if (detached) return;
+                activity.runOnUiThread(() -> {
+                    if (!detached) AdvancedLocalScanner.this.onDeviceChanged(device, index);
+                });
+            }
+
+            @Override
+            public void onFinished(ArrayList<Device> found) {
+                if (detached) return;
+                devicesOld = found;
+                activity.runOnUiThread(() -> {
+                    if (!detached) AdvancedLocalScanner.this.onFinishedScan();
+                });
+            }
+        });
+        nonRoot.start();
+    }
+
+    public void stopScan() {
+        detached = true;
+        if (nonRoot != null) {
+            nonRoot.cancel();
+            nonRoot = null;
+        }
+        if (mainThread != null) mainThread.interrupt();
+    }
+
     public String getGateway() {
         WifiManager wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
         DhcpInfo dhcp = wifiManager.getDhcpInfo();
@@ -281,10 +344,7 @@ public abstract class AdvancedLocalScanner {
                 if (mac.find()) {
                     device.setMac(Objects.requireNonNull(mac.group(0)).toUpperCase(Locale.ROOT));
                 }
-                String vendor = temp.replace("MAC Address: ", "").replace(mac + " ", "").replace("(", "").replace(")", "");
-                if (mac.find()) {
-                    vendor = vendor.replace(mac.group() + " ", "");
-                }
+                String vendor = com.zalexdev.stryker.localnetwork.utils.MacLine.vendorOf(temp);
                 device.setVendor(vendor);
                 result.add(device);
                 device = new Device();
@@ -375,10 +435,7 @@ public abstract class AdvancedLocalScanner {
                 if (mac.find()) {
                     device.setMac(Objects.requireNonNull(mac.group(0)).toUpperCase(Locale.ROOT));
                 }
-                String vendor = temp.replace("MAC Address: ", "").replace(mac + " ", "").replace("(", "").replace(")", "");
-                if (mac.find()) {
-                    vendor = vendor.replace(mac.group() + " ", "");
-                }
+                String vendor = com.zalexdev.stryker.localnetwork.utils.MacLine.vendorOf(temp);
                 device.setVendor(vendor);
             } else if (temp.contains("Running:")) {
                 device.setOs(temp.replace("Running: ", "").replace("Microsoft", ""));
@@ -412,10 +469,13 @@ public abstract class AdvancedLocalScanner {
     }
 
     public void start() {
-        process = core.generateSuProcess();
-        output = process.getInputStream();
-        error = process.getErrorStream();
-        input = process.getOutputStream();
+        detached = false;
+        if (!core.isRootless()) {
+            process = core.generateSuProcess();
+            output = process.getInputStream();
+            error = process.getErrorStream();
+            input = process.getOutputStream();
+        }
         activity.runOnUiThread(this::onStarted);
         mainThread = new Thread(() -> {
             logger.writeLine("Rescan", 3);
