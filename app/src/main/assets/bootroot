@@ -1,13 +1,16 @@
 #!/system/bin/sh
 
-SELF_PATH=$(readlink -f $0)
-. ${SELF_PATH%/*}/bootroot_env
+SELF_PATH=$(readlink -f "$0")
+. "${SELF_PATH%/*}/bootroot_env"
 
 
 ######### CHECK IF WORKING CHROOT DIR EXISTS #########
 f_chk_chroot() {
-    [ ! -f $MNT$CHROOT_EXEC ] && echo "[-] sudo not installed." && return 1
-    if ! $BUSYBOX chroot $MNT /bin/uname; then
+    if [ ! -x "$MNT$CHROOT_SHELL" ]; then
+        echo "[-] $CHROOT_SHELL missing inside the chroot."
+        return 1
+    fi
+    if ! $BUSYBOX chroot "$MNT" /bin/uname -m > /dev/null 2>&1; then
         echo "[-] Chroot is corrupted. Error code [-0]"
         return 1
     fi
@@ -16,16 +19,13 @@ f_chk_chroot() {
 
 ######### CHECK IF FS IS ALL MOUNTED ALREADY #########
 f_isAllReady(){
-    local FS
-    FS=(proc sys dev dev/pts system sdcard/Stryker)
-    for i in "${FS[@]}"; do
-        if [ "$(grep $MNT/$i /proc/mounts)" ]; then
+    for i in proc sys dev dev/pts system sdcard/Stryker; do
+        if $BUSYBOX mountpoint -q "$MNT/$i"; then
             echo "[+] $i was mounted already."
             continue
-        else
-            echo "[-] FS is NOT all mounted yet."
-            return 1
         fi
+        echo "[-] FS is NOT all mounted yet."
+        return 1
     done
     [ ! -e "/dev/net/tun" ] && return 1
     [ ! -e "/dev/fd" -o ! -e "/dev/stdin" -o ! -e "/dev/stdout" -o ! -e "/dev/stderr" ] && return 1
@@ -65,7 +65,6 @@ f_mount_sdcard() {
 f_mount_fs() {
 
     $BUSYBOX mount -o remount,suid /data
-    $BUSYBOX chmod +s $MNT$CHROOT_EXEC
 
     ######### SET FD, Thanks @feefik and @zer0conf ########
     if [ ! -e "/dev/fd" -o ! -e "/dev/stdin" -o ! -e "/dev/stdout" -o ! -e "/dev/stderr" ]; then
@@ -82,42 +81,43 @@ f_mount_fs() {
     fi
 
     ######### SET DEV ########
-    if [ ! "$($BUSYBOX mountpoint $MNT/dev 2> /dev/null | grep 'is a')" ]; then
-        [ -d $MNT/dev ] && rm -rf $MNT/dev
-        [ ! -d $MNT/dev ] && mkdir -p $MNT/dev
-        $BUSYBOX mount -o bind /dev $MNT/dev && echo "[+] mounted /dev"
+    if ! $BUSYBOX mountpoint -q "$MNT/dev"; then
+        [ -d "$MNT/dev" ] && rm -rf "$MNT/dev"
+        mkdir -p "$MNT/dev"
+        $BUSYBOX mount -o bind /dev "$MNT/dev" && echo "[+] mounted /dev"
     fi
 
     ######### SET DEV PTS ########
-    if [ ! "$($BUSYBOX mountpoint $MNT/dev/pts 2> /dev/null | grep 'is a')" ]; then
-        $BUSYBOX mount -t devpts devpts $MNT/dev/pts && echo "[+] mounted /dev/pts"
+    if ! $BUSYBOX mountpoint -q "$MNT/dev/pts"; then
+        mkdir -p "$MNT/dev/pts"
+        $BUSYBOX mount -t devpts devpts "$MNT/dev/pts" && echo "[+] mounted /dev/pts"
     fi
 
     ######### SET DEV SHM ########
-    if [ ! "$($BUSYBOX mountpoint $MNT/dev/shm 2> /dev/null | grep 'is a')" ]; then
-        [ ! -d $MNT/dev/shm ] && mkdir -p $MNT/dev/shm
-        $BUSYBOX mount -o rw,nosuid,nodev,mode=1777 -t tmpfs tmpfs $MNT/dev/shm && echo "[+] mounted /dev/shm"
+    if ! $BUSYBOX mountpoint -q "$MNT/dev/shm"; then
+        mkdir -p "$MNT/dev/shm"
+        $BUSYBOX mount -o rw,nosuid,nodev,mode=1777 -t tmpfs tmpfs "$MNT/dev/shm" && echo "[+] mounted /dev/shm"
     fi
 
     ######### SET PROC ########
-    if [ ! "$($BUSYBOX mountpoint $MNT/proc 2> /dev/null | grep 'is a')" ]; then
-        [ -d $MNT/proc ] && rm -rf $MNT/proc
-        [ ! -d $MNT/proc ] && mkdir -p $MNT/proc
-        $BUSYBOX mount -t proc proc $MNT/proc && echo "[+] mounted /proc"
+    if ! $BUSYBOX mountpoint -q "$MNT/proc"; then
+        [ -d "$MNT/proc" ] && rm -rf "$MNT/proc"
+        mkdir -p "$MNT/proc"
+        $BUSYBOX mount -t proc proc "$MNT/proc" && echo "[+] mounted /proc"
     fi
 
     ######### SET SYS ########
-    if [ ! "$($BUSYBOX mountpoint $MNT/sys 2> /dev/null | grep 'is a')" ]; then
-        [ -d $MNT/sys ] && rm -rf $MNT/sys
-        [ ! -d $MNT/sys ] && mkdir -p $MNT/sys
-        $BUSYBOX mount -t sysfs sys $MNT/sys && echo "[+] mounted /sys"
+    if ! $BUSYBOX mountpoint -q "$MNT/sys"; then
+        [ -d "$MNT/sys" ] && rm -rf "$MNT/sys"
+        mkdir -p "$MNT/sys"
+        $BUSYBOX mount -t sysfs sys "$MNT/sys" && echo "[+] mounted /sys"
     fi
 
     ######### SET SYSTEM ########
-    if [ ! "$($BUSYBOX mountpoint $MNT/system 2> /dev/null | grep 'is a')" ]; then
-        [ -d $MNT/system ] && rm -rf $MNT/system
-        [ ! -d $MNT/system ] && mkdir -p $MNT/system
-        $BUSYBOX mount -o bind /system $MNT/system && echo "[+] mounted /system"
+    if ! $BUSYBOX mountpoint -q "$MNT/system"; then
+        [ -d "$MNT/system" ] && rm -rf "$MNT/system"
+        mkdir -p "$MNT/system"
+        $BUSYBOX mount -o bind /system "$MNT/system" && echo "[+] mounted /system"
     fi
 
     ######### SET INTERNAL SDCARD ########
@@ -127,36 +127,34 @@ f_mount_fs() {
     $BUSYBOX sysctl -w kernel.shmmax=268435456
 
     ######### SET DNS ########
-    > $MNT/etc/resolv.conf # empty dns entries
+    : > "$MNT/etc/resolv.conf"
     for i in 1 2 3 4; do
-        if [ -z "$(getprop net.dns${i})" ]; then
-            # we go through 1-4 dns servers and break out of loop on empty
-            break
-        else
-            # add local/device dns server first
-            echo "nameserver $(getprop net.dns${i})" >> $MNT/etc/resolv.conf
-        fi
+        [ -z "$(getprop net.dns${i})" ] && break
+        echo "nameserver $(getprop net.dns${i})" >> "$MNT/etc/resolv.conf"
     done
-
-    chmod 644 $MNT/etc/resolv.conf
+    if [ ! -s "$MNT/etc/resolv.conf" ]; then
+        printf 'nameserver 8.8.8.8\nnameserver 8.8.4.4\n' > "$MNT/etc/resolv.conf"
+    fi
+    chmod 644 "$MNT/etc/resolv.conf"
 
     ######### SET NETWORK AND HOSTNAME ########
     $BUSYBOX sysctl -w net.ipv4.ip_forward=1
-    echo "127.0.0.1    localhost stryker"              > $MNT/etc/hosts
-    echo "::1    localhost ip6-localhost ip6-loopback" >> $MNT/etc/hosts
-    echo 'nameserver 8.8.8.8'                          > /data/local/stryker/release/etc/resolv.conf
-    echo 'nameserver 8.8.4.4'                          >> /data/local/stryker/release/etc/resolv.conf
+    echo "127.0.0.1    localhost stryker"              > "$MNT/etc/hosts"
+    echo "::1    localhost ip6-localhost ip6-loopback" >> "$MNT/etc/hosts"
+    echo "stryker"                                     > "$MNT/etc/hostname"
+
+    ######### APT IN A CHROOT #########
+    mkdir -p "$MNT/etc/apt/apt.conf.d"
+    printf 'APT::Sandbox::User "root";\nAcquire::Retries "3";\n' \
+        > "$MNT/etc/apt/apt.conf.d/99stryker"
+    mkdir -p "$MNT/var/lib/apt/lists/partial" "$MNT/var/cache/apt/archives/partial"
 
     ######### SET STRYKER SHELL PROMPT #########
-    # Deploy the cool interactive prompt + aliases into the chroot (idempotent),
-    # sourced from /etc/profile so the terminal's `ash -l` login shells use it
-    # instead of the bland default "localhost" prompt. Done on every mount so new
-    # AND existing installs pick it up.
-    if [ -f /data/data/$APP_PGK_NAME/files/stryker_profile.sh ]; then
-        cp -f /data/data/$APP_PGK_NAME/files/stryker_profile.sh $MNT/etc/stryker_profile.sh
-        chmod 644 $MNT/etc/stryker_profile.sh
-        if ! grep -q stryker_profile.sh $MNT/etc/profile 2> /dev/null; then
-            echo '. /etc/stryker_profile.sh' >> $MNT/etc/profile
+    if [ -f "/data/data/$APP_PGK_NAME/files/stryker_profile.sh" ]; then
+        cp -f "/data/data/$APP_PGK_NAME/files/stryker_profile.sh" "$MNT/etc/stryker_profile.sh"
+        chmod 644 "$MNT/etc/stryker_profile.sh"
+        if ! grep -q stryker_profile.sh "$MNT/etc/profile" 2> /dev/null; then
+            echo '. /etc/stryker_profile.sh' >> "$MNT/etc/profile"
         fi
     fi
 
@@ -170,17 +168,13 @@ f_mount_fs() {
 
 ######### First to check if chroot directory exists #########
 echo "[!] Checking chroot environment."
-f_chk_chroot
-RES=$?
-if [ $RES -eq 1 ]; then
+if ! f_chk_chroot; then
     echo "[-] Please check again. Aborted."
     exit 1
 fi
 
 ## Lastly check if all Filesystems are mounted.
-f_isAllReady
-RES=$?
-if [ $RES -eq 1 ]; then
+if ! f_isAllReady; then
     echo "[!] Mounting fs to chroot."
     f_mount_fs
 fi

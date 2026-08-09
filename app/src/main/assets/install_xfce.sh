@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 function error {
     echo "Stryker VNC setup helper <<"
@@ -14,17 +14,24 @@ function scripts_writing_error() {
     exit 1
 }
 
-apk update || error
-# xfce4-session + panel + desktop + wm + xfconf are the actual moving parts
-# behind `startxfce4`; the bare `xfce4` metapackage is sometimes incomplete in
-# Alpine. mesa-dri-gallium gives a software GL driver so xfwm4's compositor
-# can render inside a chroot without GPU access (otherwise xfwm dies and you
-# get a bare X with default cursor). ttf-dejavu prevents the "no fonts" blank.
-apk add --no-cache ca-certificates curl openssl xvfb x11vnc xfce4 xfce4-session \
-    xfce4-panel xfdesktop xfwm4 xfconf xfce4-terminal faenza-icon-theme \
-    dbus dbus-x11 ttf-dejavu mesa-dri-gallium mesa-gl xset xrdb \
-    xinit setxkbmap || error
+export DEBIAN_FRONTEND=noninteractive
 
+echo "×Refreshing package index"
+apt-get update || error
+# xfce4-session + panel + desktop + wm + xfconf are the actual moving parts
+# behind `startxfce4`; we pull them explicitly so --no-install-recommends can
+# never leave the metapackage half-assembled. libgl1-mesa-dri gives a software
+# GL driver so xfwm4's compositor can render inside a chroot without GPU access
+# (otherwise xfwm dies and you get a bare X with default cursor). fonts-dejavu
+# prevents the "no fonts" blank; procps supplies the pkill/pgrep the generated
+# helper scripts rely on.
+echo "×Installing XFCE and x11vnc"
+apt-get install -y --no-install-recommends ca-certificates curl openssl xvfb \
+    x11vnc xfce4 xfce4-session xfce4-panel xfdesktop4 xfwm4 xfconf \
+    xfce4-terminal elementary-xfce-icon-theme dbus dbus-x11 fonts-dejavu \
+    libgl1-mesa-dri libgl1 x11-xserver-utils x11-xkb-utils xinit procps || error
+
+echo "×Preparing the VNC password"
 PASS=stryker
 
 [ ! -f /root/.vnc/passwd ] && echo "No previous VNC password found. Setting $PASS as default password!" && mkdir -p /root/.vnc && x11vnc -storepasswd $PASS /root/.vnc/passwd || echo "Previously generated password found. Keeping your old password!"
@@ -35,6 +42,7 @@ PASS=stryker
 mkdir -p /var/lib/dbus
 [ ! -s /var/lib/dbus/machine-id ] && cp /etc/machine-id /var/lib/dbus/machine-id
 
+echo "×Writing helper scripts"
 echo "#!/bin/bash
 
 function usage () {
@@ -78,10 +86,8 @@ if [ -n \$PULSE_PORT ]; then
     export PULSE_SERVER=tcp:0.0.0.0:\$PULSE_PORT
 fi
 
-# IMPORTANT: env leaks through chroot_exec from the parent Android process.
-# Without this, HOME points at /data/user/0/com.zalexdev.stryker and xfce4
-# tries to write its session files into a path that doesn't exist inside
-# the chroot — symptom is a dark screen with the default X cursor.
+# Belt and braces: chroot_exec already enters with env -i, but this script is also
+# run by hand from a terminal session that may carry an Android environment.
 unset DBUS_SESSION_BUS_ADDRESS XAUTHORITY ICEAUTHORITY SESSION_MANAGER
 unset ANDROID_ROOT ANDROID_DATA ANDROID_STORAGE EXTERNAL_STORAGE
 unset GTK_PATH GIO_LAUNCHED_DESKTOP_FILE_PID GIO_LAUNCHED_DESKTOP_FILE
@@ -136,9 +142,9 @@ xset -display \$DISPLAY s off s noblank 2>/dev/null
 xset -display \$DISPLAY -dpms 2>/dev/null
 
 # dbus-run-session creates a fresh session bus, runs xfce4-session inside it,
-# and tears the bus down on exit. This is the supported way since Alpine 3.18.
-# Calling xfce4-session directly skips startxfce4's shell-script wrapper that
-# was forking and detaching, leaving the session bus dangling.
+# and tears the bus down on exit. Calling xfce4-session directly skips
+# startxfce4's shell-script wrapper that was forking and detaching, leaving
+# the session bus dangling.
 dbus-run-session -- xfce4-session >/tmp/xfce.log 2>&1 &
 sleep 5
 
@@ -179,5 +185,8 @@ echo '===== ps ====='; ps aux | grep -E 'Xvfb|xfce|x11vnc|dbus|xfwm' | grep -v g
 chmod +x /usr/local/bin/vncserver-st* || scripts_writing_error
 chmod +x /usr/local/bin/vncpasswd* || scripts_writing_error
 chmod +x /usr/local/bin/vnc-diag || scripts_writing_error
+echo "×Verifying the installation"
+command -v x11vnc >/dev/null 2>&1 && command -v Xvfb >/dev/null 2>&1 \
+    && echo "×Done" || error
 echo "[!] Use the helper scripts vncserver-start and vncserver-stop to start and stop Stryker XFCE."
 echo "[!] Run vnc-diag if you get a dark screen — it dumps all VNC logs."

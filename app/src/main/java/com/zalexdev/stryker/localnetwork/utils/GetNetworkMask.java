@@ -1,6 +1,9 @@
 package com.zalexdev.stryker.localnetwork.utils;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
+import android.net.DhcpInfo;
+import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 
 import com.zalexdev.stryker.utils.Core;
@@ -33,6 +36,9 @@ public class GetNetworkMask extends AsyncTask<Void, String, String> {
         String line;
         String gw = "0.0.0.0";
 
+        if (core.isRootless()) {
+            return getWifiNetworkCidr();
+        }
 
         try {
 
@@ -69,6 +75,37 @@ public class GetNetworkMask extends AsyncTask<Void, String, String> {
         }
 
         return gw;
+    }
+
+    private String getWifiNetworkCidr() {
+        try {
+            Context ctx = core.getContext();
+            WifiManager wm = (WifiManager) ctx.getApplicationContext()
+                    .getSystemService(Context.WIFI_SERVICE);
+            if (wm == null) return "0.0.0.0";
+            DhcpInfo dhcp = wm.getDhcpInfo();
+            if (dhcp == null || dhcp.ipAddress == 0) return "0.0.0.0";
+
+            int ip = dhcp.ipAddress;
+            int mask = dhcp.netmask;
+            int net;
+            int prefix;
+            if (mask == 0) {
+                net = ip & 0x00FFFFFF;
+                prefix = 24;
+            } else {
+                net = ip & mask;
+                prefix = Integer.bitCount(mask);
+            }
+            return intToDottedLE(net) + "/" + prefix;
+        } catch (Exception e) {
+            return "0.0.0.0";
+        }
+    }
+
+    private String intToDottedLE(int v) {
+        return (v & 0xff) + "." + ((v >> 8) & 0xff) + "."
+                + ((v >> 16) & 0xff) + "." + ((v >> 24) & 0xff);
     }
 
     @Override

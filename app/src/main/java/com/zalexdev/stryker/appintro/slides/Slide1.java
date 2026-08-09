@@ -14,9 +14,7 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.checkbox.MaterialCheckBox;
-import com.race604.drawable.wave.WaveDrawable;
 import com.zalexdev.stryker.R;
-import com.zalexdev.stryker.appintro.AppIntroActivity;
 import com.zalexdev.stryker.utils.Core;
 
 public class Slide1 extends Fragment {
@@ -49,11 +47,7 @@ public class Slide1 extends Fragment {
         row2.setOnClickListener(v -> { checkBox2.setChecked(!checkBox2.isChecked()); sync.run(); });
         row3.setOnClickListener(v -> { checkBox3.setChecked(!checkBox3.isChecked()); sync.run(); });
 
-        button.setOnClickListener(view1 -> {
-            WaveDrawable mWaveDrawable = ((AppIntroActivity) activity).getWaveDrawable();
-            core.setSmoothLevel(mWaveDrawable, 3000);
-            core.moveNext(mPager);
-        });
+        button.setOnClickListener(view1 -> core.moveNext(mPager));
         return view;
     }
 }

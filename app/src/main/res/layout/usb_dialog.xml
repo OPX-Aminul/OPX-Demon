@@ -63,27 +63,6 @@
                 android:text="Plug in a USB-OTG Wi-Fi adapter or USB Ethernet dongle to begin."
                 android:textColor="@color/grey"
                 android:textSize="13sp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/usb_refresh_btn"
-                android:layout_width="wrap_content"
-                android:layout_height="42dp"
-                android:layout_marginTop="20dp"
-                android:backgroundTint="@android:color/transparent"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:minWidth="0dp"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp"
-                android:stateListAnimator="@null"
-                android:text="Re-scan"
-                android:textColor="@color/stryker_accent"
-                android:textSize="13sp"
-                app:cornerRadius="12dp"
-                app:elevation="0dp"
-                app:rippleColor="#1A3949AB"
-                app:strokeColor="@color/light_lite_contrast"
-                app:strokeWidth="1dp" />
         </LinearLayout>
 
         <LinearLayout
@@ -197,6 +176,65 @@
                     android:textStyle="bold"
                     android:visibility="gone" />
             </LinearLayout>
+
+            <!-- Rootless: live "attaching dongle to the VM" status. Driven from MainActivity. -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/usb_attach_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="#1A1565C0"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="12dp">
+
+                    <ProgressBar
+                        android:id="@+id/usb_attach_spinner"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        style="?android:attr/progressBarStyleSmall" />
+
+                    <ImageView
+                        android:id="@+id/usb_attach_icon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/done"
+                        android:visibility="gone"
+                        app:tint="@color/green" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/usb_attach_text"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:text="Attaching adapter to the VM…"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="13sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/usb_attach_action"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minWidth="0dp"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp"
+                        android:text="Grant"
+                        android:textSize="12sp"
+                        android:visibility="gone"
+                        app:cornerRadius="10dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/usb_caps_card"
@@ -437,5 +475,27 @@
                 app:strokeColor="@color/light_lite_contrast"
                 app:strokeWidth="1dp" />
         </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/usb_refresh_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="42dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="20dp"
+            android:backgroundTint="@android:color/transparent"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:stateListAnimator="@null"
+            android:text="Re-scan"
+            android:textColor="@color/stryker_accent"
+            android:textSize="13sp"
+            app:cornerRadius="12dp"
+            app:elevation="0dp"
+            app:rippleColor="#1A3949AB"
+            app:strokeColor="@color/light_lite_contrast"
+            app:strokeWidth="1dp" />
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

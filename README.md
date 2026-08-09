@@ -2,10 +2,10 @@
 
 > A free and open-source mobile pentest suite for Android. Authorized testing only.
 
-StrykerOSS bundles a curated set of network, wireless and web security tools into a single rooted-Android application, exposing them through a unified, modern UI. It runs an Alpine `chroot` under `/data/local/stryker/release` so heavyweight tools (Nmap, Metasploit, Nuclei, Hydra, SearchSploit, etc.) execute natively on the device. A built-in terminal (drawer → **Terminal**, or the **Stryker Terminal** launcher icon) drops straight into that chroot — no external shell app required.
+StrykerOSS bundles a curated set of network, wireless and web security tools into a single rooted-Android application, exposing them through a unified, modern UI. It runs a Debian trixie (arm64) `chroot` under `/data/local/stryker/release` so heavyweight tools (Nmap, Metasploit, Nuclei, Hydra, SearchSploit, etc.) execute natively on the device — the same rootfs the rootless QEMU VM boots when root is unavailable. A built-in terminal (drawer → **Terminal**, or the **Stryker Terminal** launcher icon) drops straight into that chroot — no external shell app required.
 
 - **Package**: `com.zalexdev.stryker`
-- **Version**: 4.5R
+- **Version**: 6.0
 - **Min SDK**: 24 (Android 7.0) · **Target SDK**: 28
 - **License**: [GNU GPL v3.0](LICENSE) (bundled third-party components keep their own licenses — see in-app *About → Open-source licenses*)
 - **Project site**: [zalexdev.com](https://zalexdev.com)
@@ -21,7 +21,6 @@ StrykerOSS bundles a curated set of network, wireless and web security tools int
 | **WiFi networks** | Scan, deauth, handshake capture, WPS attacks (Pixie Dust, common pins, custom pins) via external monitor-mode adapters. |
 | **Handshakes** | Local handshake storage with rename, share, export to OnlineHashCrack and on-device cracking via Hashcat. |
 | **MAC changer** | Inline + dedicated MAC randomizer with persistent profiles. |
-| **Router scan** | Bulk router enumeration and credential discovery (RouterScan v2, Hydra, custom auth lists). |
 | **WhisperPair (BLE)** | Fast Pair device discovery, CVE-2025-36911 vulnerability check and full exploit chain (RAW/RETROACTIVE/EXTENDED_RESPONSE), post-pair account-key write and HFP audio capture/passthrough. |
 | **Local network** | Nmap host discovery, port scans, OS fingerprinting, per-device exploit dispatch with a live terminal. |
 | **Nmap** | Direct Nmap interface with custom scripts, NSE, and exported reports. |
@@ -88,11 +87,11 @@ If the variables are not set, the release build is left unsigned so CI / contrib
 
 ## Installation (end users)
 
-1. Install the APK on a **rooted** device (`adb install StrykerOSS-4.5R.apk` or sideload).
+1. Install the APK on a **rooted** device (`adb install StrykerOSS-6.0.apk` or sideload).
 2. On first launch the in-app installer (`AppIntroActivity`) will:
    - Request root (`su`).
    - Request runtime permissions (storage, location, notifications, Bluetooth, audio).
-   - Download and unpack the Alpine `chroot` core (`core.tar.gz`).
+   - Download and unpack the Debian trixie arm64 `chroot` core (`chroot64-debian.tar.gz`).
    - Mount the chroot at `/data/local/stryker/release`.
    - Install optional components (Metasploit, Nuclei, Hydra, SearchSploit).
 3. Open the built-in terminal (drawer → **Terminal**) for a shell straight into the chroot.
@@ -121,7 +120,6 @@ app/
 │   ├── metasploit/                  # MSF integration
 │   ├── nmap/                        # Nmap UI
 │   ├── nuclei/                      # Web vuln scanner
-│   ├── routerscan/                  # Router enumeration
 │   ├── searchsploit/                # ExploitDB browser
 │   ├── settings/                    # User settings
 │   ├── usbarsenal/                  # USB Arsenal: gadget profiles, configfs orchestration

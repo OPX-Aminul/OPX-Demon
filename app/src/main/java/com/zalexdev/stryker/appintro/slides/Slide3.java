@@ -8,11 +8,10 @@ import android.content.Context;
 import android.graphics.PorterDuff;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -29,20 +28,21 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
-import com.race604.drawable.wave.WaveDrawable;
 import com.zalexdev.stryker.BuildConfig;
 import com.zalexdev.stryker.R;
-import com.zalexdev.stryker.appintro.AppIntroActivity;
 import com.zalexdev.stryker.appintro.install.InstallStage;
 import com.zalexdev.stryker.appintro.install.LogAdapter;
 import com.zalexdev.stryker.appintro.install.LogLevel;
 import com.zalexdev.stryker.appintro.install.LogLine;
+import com.zalexdev.stryker.engine.Apt;
+import com.zalexdev.stryker.engine.GuestCore;
 import com.zalexdev.stryker.ota.CoreDownloader;
 import com.zalexdev.stryker.ota.RemoteManifest;
 import com.zalexdev.stryker.ota.VerifiedDownloader;
 import com.zalexdev.stryker.utils.Core;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.Locale;
 
@@ -50,7 +50,7 @@ public class Slide3 extends Fragment {
 
     @SuppressLint("SdCardPath")
     private static final String DOWNLOADED_CHROOT_PATH =
-            "/data/data/com.zalexdev.stryker/files/core.tar.gz";
+            "/data/data/com.zalexdev.stryker/files/chroot64-debian.tar.gz";
 
     private static final int NOTIFICATION_ID = 34;
 
@@ -137,8 +137,13 @@ public class Slide3 extends Fragment {
         logRecycler.setVisibility(View.VISIBLE);
         resetStages();
         setStatus(StatusKind.RUNNING, "Stryker chroot", "Starting...");
-        log(LogLevel.INFO, "Architecture: " + (core.is64Bit() ? "64-bit (arm64-v8a)" : "32-bit (armeabi-v7a)"));
+        log(LogLevel.INFO, "Architecture: arm64-v8a");
         log(LogLevel.INFO, "Stryker " + BuildConfig.VERSION_NAME + " · build " + BuildConfig.VERSION_CODE);
+        if (activity instanceof com.zalexdev.stryker.appintro.AppIntroActivity
+                && ((com.zalexdev.stryker.appintro.AppIntroActivity) activity).isMigration()) {
+            log(LogLevel.WARN, "An older Linux system is installed. It will be unmounted and "
+                    + "replaced with the Debian rootfs; installed packages are not carried over.");
+        }
 
         new Thread(() -> {
             markStage(InstallStage.PREPARING, RowState.ACTIVE);
@@ -147,9 +152,12 @@ public class Slide3 extends Fragment {
             markStage(InstallStage.PREPARING, RowState.DONE);
             log(LogLevel.SUCCESS, "Storage layout ready");
 
-            RemoteManifest.Asset chrootAsset = CoreDownloader.resolve(context, core.is64Bit());
+            RemoteManifest.Asset chrootAsset = CoreDownloader.resolve(context);
             markStage(InstallStage.DOWNLOADING, RowState.ACTIVE);
             log(LogLevel.CMD, "GET " + chrootAsset.url);
+            if (chrootAsset.size > 0) {
+                log(LogLevel.INFO, "Debian rootfs archive · " + formatMb(chrootAsset.size));
+            }
 
             if (downloadChroot(chrootAsset)) {
                 markStage(InstallStage.DOWNLOADING, RowState.DONE);
@@ -158,6 +166,7 @@ public class Slide3 extends Fragment {
 
                 markStage(InstallStage.UNPACKING, RowState.ACTIVE);
                 log(LogLevel.STEP, "Extracting archive into /data/local/stryker");
+                log(LogLevel.INFO, "Full Debian rootfs — extraction can take several minutes");
                 runOnUi(() -> progress.setIndeterminate(true));
 
                 if (unTarFile()) {
@@ -174,28 +183,31 @@ public class Slide3 extends Fragment {
                     log(LogLevel.SUCCESS, "Chroot mounted");
 
                     markStage(InstallStage.UPGRADING, RowState.ACTIVE);
-                    log(LogLevel.STEP, "Upgrading Alpine packages");
-                    log(LogLevel.CMD, "apk upgrade -U --no-cache");
-                    core.customChrootCommand("apk upgrade -U --no-cache");
+                    log(LogLevel.STEP, "Refreshing the package index");
+                    String aptEnv = TextUtils.join("; ", Apt.env());
+                    log(LogLevel.CMD, Apt.update());
+                    core.customChrootCommand(aptEnv + "; " + Apt.update());
                     markStage(InstallStage.UPGRADING, RowState.DONE);
-                    log(LogLevel.SUCCESS, "Alpine packages up to date");
+                    log(LogLevel.SUCCESS, "Package index ready");
 
                     markStage(InstallStage.DEPLOYING_EXPLOITS, RowState.ACTIVE);
                     log(LogLevel.STEP, "Deploying built-in exploits");
+                    if (GuestCore.ensure(core)) {
+                        log(LogLevel.SUCCESS, "Stryker payload unpacked — /CORE, /exploits");
+                    } else {
+                        log(LogLevel.WARN, "Stryker payload did not verify — /CORE tools may be missing");
+                    }
                     core.deleteFile("/sdcard/Stryker/exploits/");
                     core.copyFile("/data/data/com.zalexdev.stryker/files/checker.py",
                             "/data/local/stryker/release/exploits/checker.py");
                     core.copyFile("/data/local/stryker/release/exploits/", "/sdcard/Stryker/exploits");
                     core.chmodFolder("/data/data/com.zalexdev.stryker/files");
-                    int authCopied = deployAuthLists();
-                    log(LogLevel.INFO, "Copied " + authCopied + " auth_*.txt list"
-                            + (authCopied == 1 ? "" : "s") + " to /sdcard/Stryker/rs");
                     markStage(InstallStage.DEPLOYING_EXPLOITS, RowState.DONE);
                     log(LogLevel.SUCCESS, "Exploits deployed to /sdcard/Stryker/exploits");
 
                     markStage(InstallStage.FINALIZING, RowState.ACTIVE);
-                    log(LogLevel.CMD, "echo update > /data/local/stryker/release/4.0");
-                    core.customCommand("echo update > /data/local/stryker/release/4.0");
+                    log(LogLevel.CMD, "echo update > " + Core.CHROOT_MARKER);
+                    core.customCommand("echo update > " + Core.CHROOT_MARKER);
                     core.deleteFile("/sdcard/Stryker/exploits/checker.py");
                     markStage(InstallStage.FINALIZING, RowState.DONE);
                     log(LogLevel.SUCCESS, "Version marker written");
@@ -207,14 +219,13 @@ public class Slide3 extends Fragment {
 
                     runOnUi(() -> {
                         progress.setVisibility(View.INVISIBLE);
-                        WaveDrawable mWaveDrawable = ((AppIntroActivity) activity).getWaveDrawable();
-                        core.setSmoothLevel(mWaveDrawable, 7500);
                         core.moveNext(mPager);
                     });
                 } else {
                     markStage(InstallStage.UNPACKING, RowState.FAILED);
                     notificationManager.cancel(NOTIFICATION_ID);
-                    failWith("Failed to extract — archive may be corrupt or busybox not present");
+                    failWith("Failed to extract — "
+                            + (extractFailure != null ? extractFailure : "unknown error"));
                 }
             } else {
                 markStage(InstallStage.DOWNLOADING, RowState.FAILED);
@@ -333,10 +344,13 @@ public class Slide3 extends Fragment {
         core.chmodFolder("/data/data/com.zalexdev.stryker/files/");
         core.createFolder(core.getStorage() + "/Stryker/");
         core.createFolder("/data/local/stryker");
-        if (core.checkFolder("/data/local/stryker/release/sdcard/Stryker")) {
-            core.unmountCore();
+        if (core.isMounted() || core.checkFolder(Core.CHROOT_ROOT + "/bin")) {
+            log(LogLevel.STEP, "Removing the previous Linux system");
+            if (!core.purgeChroot()) {
+                log(LogLevel.WARN, "The previous chroot is still mounted — reboot and retry "
+                        + "if the install fails");
+            }
         }
-        core.deleteFile("/data/local/stryker/release");
         core.deleteFile(core.getStorage() + "Stryker/release");
         core.deleteFile(core.getStorage() + "Download/stryker.apk");
         core.createFolder(core.getStorage() + "Stryker");
@@ -348,16 +362,56 @@ public class Slide3 extends Fragment {
         core.createFolder(core.getStorage() + "Stryker/rs");
     }
 
-    private int deployAuthLists() {
-        return com.zalexdev.stryker.routerscan.utils.AuthLists.ensureDeployed(activity);
-    }
+    private static final String TAR_RC = "__STRYKER_TAR_RC__";
+
+    private volatile String extractFailure;
 
     private boolean unTarFile() {
         notification.setContentText(context.getResources().getString(R.string.installing_core));
         notification.setProgress(100, 0, true);
         notificationManager.notify(NOTIFICATION_ID, notification.build());
-        core.customCommand(Core.BUSYBOX + " tar -xzf " + DOWNLOADED_CHROOT_PATH + " -C /data/local/stryker/");
-        return core.checkFolder("/data/local/stryker/release/bin/");
+        extractFailure = null;
+
+        String tar = core.tarCommand();
+        if (tar == null) {
+            extractFailure = "no usable tar — busybox could not run and the system provides none";
+            return false;
+        }
+        log(LogLevel.CMD, tar + " -xzf " + DOWNLOADED_CHROOT_PATH + " -C /data/local/stryker/");
+        ArrayList<String> out = core.customCommand(
+                tar + " -xzf " + DOWNLOADED_CHROOT_PATH + " -C /data/local/stryker/ 2>&1"
+                        + "; echo " + TAR_RC + "$?", 0);
+
+        Integer rc = null;
+        for (String l : out) {
+            if (l != null && l.trim().startsWith(TAR_RC)) {
+                try { rc = Integer.parseInt(l.trim().substring(TAR_RC.length()).trim()); }
+                catch (NumberFormatException ignored) {}
+            }
+        }
+        boolean unpacked = rc != null && rc == 0
+                && (core.checkFolder(Core.CHROOT_ROOT + "/usr/bin/")
+                    || core.checkFolder(Core.CHROOT_ROOT + "/bin/"));
+        if (!unpacked) {
+            if (rc == null) {
+                extractFailure = "the extractor was killed before it finished";
+            } else if (rc != 0) {
+                extractFailure = "extractor exited with code " + rc;
+            }
+            for (int i = out.size() - 1; i >= 0; i--) {
+                String l = out.get(i);
+                if (l == null) continue;
+                String t = l.trim();
+                if (t.isEmpty() || t.startsWith(TAR_RC)) continue;
+                extractFailure = (extractFailure == null ? "" : extractFailure + " — ") + t;
+                break;
+            }
+            if (extractFailure == null) extractFailure = "the extractor reported nothing";
+        }
+        if (unpacked && !core.checkFile(Core.CHROOT_ROOT + "/bin/bash")) {
+            log(LogLevel.WARN, "bash not found in the rootfs — chroot commands will fail");
+        }
+        return unpacked;
     }
 
     private void createNotificationChannel() {

@@ -145,14 +145,14 @@ public class HandshakesAdapter extends RecyclerView.Adapter<HandshakesAdapter.Vi
     }
 
     private void startBrute(ViewHolder h, String path, String finalMac) {
-        ArrayList<String> get = core.getListFiles(core.getStorage() + "Stryker/wordlists");
+        ArrayList<String> get = core.getListFiles(core.getShareRoot() + "/wordlists");
         if (get.isEmpty()) {
             toaster(context.getString(R.string.hs_wordlist_empty));
             return;
         }
         String[] names = new String[get.size()];
         for (int i = 0; i < get.size(); i++) {
-            names[i] = get.get(i).replace(core.getStorage() + "Stryker/wordlists/", "");
+            names[i] = get.get(i).replace(core.getShareRoot() + "/wordlists/", "");
         }
         new MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.hs_wordlist_title)
@@ -175,8 +175,8 @@ public class HandshakesAdapter extends RecyclerView.Adapter<HandshakesAdapter.Vi
         new Thread(() -> {
             try {
                 id++;
-                String capRel = path.replace(core.getStorage(), "/sdcard/");
-                String wlRel = wordlistPath.replace(core.getStorage(), "/sdcard/");
+                String capRel = path.replace(core.getShareRoot(), "/sdcard/Stryker");
+                String wlRel = wordlistPath.replace(core.getShareRoot(), "/sdcard/Stryker");
                 BruteHandshake br = new BruteHandshake(capRel, wlRel, core, activity, context, h.progress, h.timeLeft, id);
                 activity.runOnUiThread(() -> h.cancel.setOnClickListener(v -> {
                     br.kill();
@@ -319,7 +319,7 @@ public class HandshakesAdapter extends RecyclerView.Adapter<HandshakesAdapter.Vi
 
     private File captureFile(String name) {
         if (name != null && name.startsWith("/")) return new File(name);
-        return new File(core.getStorage() + "Stryker/captured", name);
+        return new File(core.getShareRoot() + "/captured", name);
     }
 
     private void renameFile(int position, String path, String displayName) {

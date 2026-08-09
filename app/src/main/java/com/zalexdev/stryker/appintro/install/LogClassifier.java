@@ -53,7 +53,7 @@ public final class LogClassifier {
         if (c.contains("FATAL") || c.contains("ERROR") || c.contains("Errno")) {
             return true;
         }
-        if (lower.startsWith("fatal:") || lower.startsWith("apk: ")) {
+        if (lower.startsWith("fatal:") || c.startsWith("E: ") || lower.startsWith("dpkg: error")) {
             return true;
         }
         if (lower.contains("error: ") || lower.contains(": error") || lower.contains("error:")) {
@@ -93,6 +93,12 @@ public final class LogClassifier {
         return lower.startsWith("go: downloading")
                 || lower.startsWith("go: finding")
                 || lower.startsWith("go: extracting")
+                || lower.startsWith("get:")
+                || lower.startsWith("setting up ")
+                || lower.startsWith("preparing to unpack")
+                || lower.startsWith("selecting previously")
+                || lower.startsWith("reading package lists")
+                || lower.startsWith("building dependency tree")
                 || lower.startsWith("fetch ")
                 || lower.startsWith("fetching")
                 || lower.startsWith("cloning")

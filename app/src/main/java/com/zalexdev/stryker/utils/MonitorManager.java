@@ -9,6 +9,7 @@ import com.zalexdev.stryker.logger.Logger;
 import com.zalexdev.stryker.custom.UsbDev;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Locale;
 
 public class MonitorManager {
     public Context context;
@@ -26,58 +27,122 @@ public class MonitorManager {
     }
 
 
+    public static final String IW_PAIRS =
+            "iw dev 2>/dev/null | awk '$1==\"Interface\"{n=$2} $1==\"type\"{if(n!=\"\"){print n\",\"$2; n=\"\"}}'";
+
+    public ArrayList<String[]> listInterfaces(){
+        ArrayList<String[]> out = new ArrayList<>();
+        for (String t : core.customChrootCommand(IW_PAIRS, true)){
+            if (t == null) continue;
+            String line = t.trim();
+            int c = line.indexOf(',');
+            if (c <= 0 || c == line.length() - 1) continue;
+            out.add(new String[]{line.substring(0, c).trim(), line.substring(c + 1).trim()});
+        }
+        return out;
+    }
+
+    public static boolean isInternalRadio(String ifc){
+        return ifc != null && ifc.matches("(wlan0|swlan0)(mon)?");
+    }
+
     public boolean disableMonitorMode(String interfaceName){
-        core.customCommand("svc wifi disable");
+        if (core.isRootless()) {
+            return disableMonitorModeRootless(interfaceName);
+        }
         logger.writeLine("Disabling monitor mode on interface: " + interfaceName,1);
         core.customChrootCommand(getDisableCommand(interfaceName));
-        boolean ok = isMonitorModeEnabled(interfaceName);
-        if (!ok){
-            ok = isMonitorModeEnabled(interfaceName+"mon");
-            if (!ok && interfaceName.matches("(wlan0|swlan0)")) {
-                core.customCommand("svc wifi disable");
-                core.customCommand("ip link set " + interfaceName + " up; svc wifi enable");
-            }
+        boolean stillMon = isMonitorModeEnabled(interfaceName)
+                || isMonitorModeEnabled(interfaceName + "mon");
+        if (isInternalRadio(interfaceName)) {
+            String base = interfaceName.replace("mon", "");
+            core.customCommand("ip link set " + base + " up; svc wifi enable");
         }
-        return !ok;
+        return !stillMon;
     }
     public boolean enableMonitorMode(String interfaceName){
         logger.writeLine("Enabling monitor mode on interface: " + interfaceName,1);
-        if (isMonitorModeEnabled(interfaceName)){
-            logger.writeLine("Monitor mode is already enabled on interface: " + interfaceName,1);
-            return true;
+        if (core.isRootless()) {
+            return enableMonitorModeRootless(interfaceName, null);
         }
-        core.customChrootCommand(getMonitorCommand(interfaceName));
-        boolean ok = isMonitorModeEnabled(interfaceName);
-        if (!ok){
-            ok = isMonitorModeEnabled(interfaceName+"mon");
-            if (!ok && interfaceName.matches("(wlan0|swlan0)")) {
-                core.customCommand("svc wifi disable");
-            }
+        return enableMonitorModeRoot(interfaceName, null);
+    }
+
+    private boolean enableMonitorModeRoot(String ifc, String channel){
+        if (isMonitorModeEnabled(ifc)){
+            logger.writeLine("Monitor mode is already enabled on interface: " + ifc,1);
+            return lockChannel(ifc, channel);
         }
-        return ok;
+        if (isInternalRadio(ifc)) {
+            core.customCommand("svc wifi disable");
+        }
+        core.customChrootCommand(monitorCommandFor(ifc, channel));
+        if (!isMonitorModeEnabled(ifc) && !isMonitorModeEnabled(ifc + "mon")
+                && isInternalRadio(ifc)) {
+            core.customCommand("svc wifi disable");
+            core.customChrootCommand(monitorCommandFor(ifc, channel));
+        }
+        return lockChannel(ifc, channel);
+    }
+
+    private String monitorCommandFor(String ifc, String channel){
+        return (channel == null || channel.isEmpty() || "0".equals(channel))
+                ? getMonitorCommand(ifc)
+                : getMonitorCommand(ifc, channel);
+    }
+
+    private boolean enableMonitorModeRootless(String ifc, String channel){
+        if (!core.rootless().ensureUsbWifiAttached()) {
+            logger.writeLine("No USB Wi-Fi adapter attached to the VM — cannot enable monitor mode", 3);
+            return false;
+        }
+        if (!isMonitorModeEnabled(ifc)) {
+            StringBuilder cmd = new StringBuilder();
+            cmd.append("rfkill unblock all 2>/dev/null || for f in /sys/class/rfkill/*/state; do echo 1 > \"$f\" 2>/dev/null; done; ");
+            cmd.append("airmon-ng check kill >/dev/null 2>&1; ");
+            cmd.append("ip link set ").append(ifc).append(" down 2>/dev/null; ");
+            cmd.append("iw dev ").append(ifc).append(" set type monitor 2>/dev/null || airmon-ng start ").append(ifc).append("; ");
+            cmd.append("ip link set ").append(ifc).append(" up 2>/dev/null");
+            core.customChrootCommand(cmd.toString());
+        }
+        return lockChannel(ifc, channel);
+    }
+
+    private boolean lockChannel(String ifc, String channel){
+        String monIfc = null;
+        if (isMonitorModeEnabled(ifc)) monIfc = ifc;
+        else if (isMonitorModeEnabled(ifc + "mon")) monIfc = ifc + "mon";
+        if (monIfc == null) return false;
+        if (channel != null && !channel.isEmpty() && !"0".equals(channel)) {
+            core.customChrootCommand("iw dev " + monIfc + " set channel " + channel, true);
+        }
+        return true;
+    }
+
+    private boolean disableMonitorModeRootless(String ifc){
+        logger.writeLine("Disabling monitor mode (rootless) on interface: " + ifc, 1);
+        core.customChrootCommand("airmon-ng stop " + ifc + " 2>/dev/null; "
+                + "ip link set " + ifc + " down 2>/dev/null; "
+                + "iw dev " + ifc + " set type managed 2>/dev/null; "
+                + "ip link set " + ifc + " up 2>/dev/null");
+        boolean stillMon = isMonitorModeEnabled(ifc);
+        if (stillMon) stillMon = isMonitorModeEnabled(ifc + "mon");
+        return !stillMon;
     }
 
     public boolean isMonitorModeEnabled(String interfaceName){
-        ArrayList<String> temp = core.customChrootCommand("iw dev | grep 'Interface\\|type' | sed -r 's/type//g' | sed -r 's/Interface//g' | sed 'N;s/\\n/,/'",true);
-        for (String t :temp){
-            if (t.contains(interfaceName)){
-                String[] l = t.trim().replaceAll("\\s+", " ").split(",");
-                return l[1].contains("monitor");
-            }
+        if (interfaceName == null || interfaceName.isEmpty()) return false;
+        for (String[] p : listInterfaces()){
+            if (p[0].equals(interfaceName)) return p[1].contains("monitor");
         }
         return false;
-
     }
     public boolean enableMonitorMode(String interfaceName,String channel){
         logger.writeLine("Enabling monitor mode on interface: " + interfaceName+ " on channel "+channel,1);
-        if (isMonitorModeEnabled(interfaceName)){
-            logger.writeLine("Monitor mode is already enabled on interface: " + interfaceName,1);
-            return true;
+        if (core.isRootless()) {
+            return enableMonitorModeRootless(interfaceName, channel);
         }
-        core.customChrootCommand(getMonitorCommand(interfaceName,channel));
-        boolean ok = isMonitorModeEnabled(interfaceName);
-        if (!ok){ok = isMonitorModeEnabled(interfaceName);}
-        return ok;
+        return enableMonitorModeRoot(interfaceName, channel);
     }
 
     public String getHSInterface(){
@@ -123,6 +188,19 @@ public class MonitorManager {
         } catch (Exception e) {
             return "Unknown";
         }
+    }
+
+    public ArrayList<String> getPids(){
+        ArrayList<String> out = new ArrayList<>();
+        try {
+            UsbManager manager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
+            for (UsbDevice device : manager.getDeviceList().values()) {
+                if (device == null) continue;
+                out.add(String.format(Locale.ROOT, "%04x:%04x",
+                        device.getVendorId(), device.getProductId()));
+            }
+        } catch (Exception ignored) {}
+        return out;
     }
 
     public void addDevice(UsbDev usbDev){
@@ -175,6 +253,7 @@ public class MonitorManager {
     public boolean isDeviceAdded(String ifc){
         ArrayList<UsbDev> devices = getDevices();
         String pid = getPid();
+        ArrayList<String> pids = getPids();
         if (pid==null||pid.equals("Unknown")||pid.length()<4){
         for (UsbDev d : devices){
             if (d.getIfc().equals(ifc)){
@@ -182,7 +261,7 @@ public class MonitorManager {
             }
         }}else{
             for (UsbDev d : devices){
-                if (d.getIfc().equals(ifc)&&d.getPid().equals(pid)){
+                if (d.getIfc().equals(ifc)&&pids.contains(d.getPid())){
                     return true;
                 }
             }
@@ -192,6 +271,7 @@ public class MonitorManager {
     public String getMonitorCommand(String ifc){
         ArrayList<UsbDev> devices = getDevices();
         String pid = getPid();
+        ArrayList<String> pids = getPids();
         if (pid==null||pid.equals("Unknown")||pid.length()<6){
             for (UsbDev d : devices){
                 if (d.getIfc().equals(ifc)){
@@ -201,7 +281,7 @@ public class MonitorManager {
             }}
         else{
             for (UsbDev d : devices){
-                if (d.getIfc().equals(ifc)&&d.getPid().equals(pid)){
+                if (d.getIfc().equals(ifc)&&pids.contains(d.getPid())){
                     core.logger.writeLine("Found device: "+d.getIfc()+" with command: "+d.getCommandMon(),2);
                     return d.getCommandMon().replace("$ch","");
                 }
@@ -219,39 +299,57 @@ public class MonitorManager {
     }
 
     public String getMonitorCommand(String ifc, String channel){
+        String ch = channel == null ? "" : channel;
         ArrayList<UsbDev> devices = getDevices();
         String pid = getPid();
+        ArrayList<String> pids = getPids();
         if (pid==null||pid.equals("Unknown")||pid.length()<6){
             for (UsbDev d : devices){
                 if (d.getIfc().equals(ifc)){
-                    return d.getCommandMon().replace("$ch",channel);
+                    return d.getCommandMon().replace("$ch",ch);
                 }
             }
         }else{
             for (UsbDev d : devices){
-                if (d.getIfc().equals(ifc)&&d.getPid().equals(pid)){
-                    return d.getCommandMon().replace("$ch",channel);
+                if (d.getIfc().equals(ifc)&&pids.contains(d.getPid())){
+                    return d.getCommandMon().replace("$ch",ch);
                 }
             }
         }
-        return "airmon-ng start "+ifc + " " + channel;
+        if(ifc.equals("wlan0")){
+            return internalUsbDev.getCommandMon().replace("$ch",ch);
+        }
+        if(ifc.equals("swlan0")){
+            return internalUsbSamsung.getCommandMon().replace("$ch",ch);
+        }
+        return "airmon-ng start "+ifc + " " + ch;
     }
 
 
     public String getDisableCommand(String ifc){
+        if (ifc != null && ifc.endsWith("mon") && isInternalRadio(ifc)) {
+            ifc = ifc.substring(0, ifc.length() - 3);
+        }
         ArrayList<UsbDev> devices = getDevices();
         String pid = getPid();
-        if (pid==null||pid.equals("Unknown")||pid.length()<4){
+        ArrayList<String> pids = getPids();
+        if (pid==null||pid.equals("Unknown")||pid.length()<6){
             for (UsbDev d : devices){
                 if (d.getIfc().equals(ifc)){
                     return d.getCommandDis();
                 }
             }}else{
             for (UsbDev d : devices){
-                if (d.getIfc().equals(ifc)&&d.getPid().equals(pid)){
+                if (d.getIfc().equals(ifc)&&pids.contains(d.getPid())){
                     return d.getCommandDis();
                 }
             }
+        }
+        if(ifc.equals("wlan0")){
+            return internalUsbDev.getCommandDis();
+        }
+        if(ifc.equals("swlan0")){
+            return internalUsbSamsung.getCommandDis();
         }
         return "airmon-ng stop "+ifc;
     }

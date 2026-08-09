@@ -106,13 +106,19 @@ public class ArsenalFragment extends Fragment {
     }
 
     void refreshSubtitle() {
-        if (subtitle == null || core == null) return;
-        int count = core.getExploits().size();
-        boolean dbInstalled = core.checkFile("/data/local/stryker/release/exploitdb/searchsploit");
-        String installState = dbInstalled
-                ? getString(R.string.arsenal_subtitle_db_ready)
-                : getString(R.string.arsenal_subtitle_db_missing);
-        subtitle.setText(getString(R.string.arsenal_subtitle_format, count, installState));
+        if (subtitle == null || core == null || activity == null) return;
+        final int count = core.getExploits().size();
+        new Thread(() -> {
+            boolean dbInstalled = core.isToolInstalled("searchsploit");
+            if (activity == null || !isAdded()) return;
+            activity.runOnUiThread(() -> {
+                if (!isAdded() || subtitle == null) return;
+                String installState = dbInstalled
+                        ? getString(R.string.arsenal_subtitle_db_ready)
+                        : getString(R.string.arsenal_subtitle_db_missing);
+                subtitle.setText(getString(R.string.arsenal_subtitle_format, count, installState));
+            });
+        }).start();
     }
 
     private void showTab(String tab) {

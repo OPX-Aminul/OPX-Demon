@@ -116,14 +116,6 @@ public class GeoMac extends Fragment {
         restoreFilterState(view);
         refreshOverlay();
 
-        if (!core.checkFile("/data/local/stryker/release/modules/GeoMac/geomac")) {
-            Toast.makeText(context, R.string.geomac_not_installed, Toast.LENGTH_LONG).show();
-            getParentFragmentManager().beginTransaction()
-                    .replace(R.id.flContent, new Dashboard())
-                    .commit();
-            return;
-        }
-
         receiver.setTitle("GeoMac");
     }
 

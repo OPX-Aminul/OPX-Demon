@@ -27,7 +27,6 @@ import java.util.regex.Pattern;
 
 public class HandshakeStorage extends Fragment {
 
-    private static final String CAPTURE_DIR = "/storage/emulated/0/Stryker/captured";
     private static final Pattern MAC_PATTERN = Pattern.compile("((\\w{2}:){5}\\w{2})");
 
     private Core core;
@@ -56,7 +55,8 @@ public class HandshakeStorage extends Fragment {
         context = getContext();
         activity = getActivity();
         core = new Core(context);
-        core.customCommand("mkdir " + CAPTURE_DIR);
+        //noinspection ResultOfMethodCallIgnored
+        new File(captureDir()).mkdirs();
 
         recyclerView = view.findViewById(R.id.hs_list);
         emptyCard = view.findViewById(R.id.hs_empty_card);
@@ -77,8 +77,12 @@ public class HandshakeStorage extends Fragment {
         reload();
     }
 
+    private String captureDir() {
+        return core.getShareRoot() + "/captured";
+    }
+
     private void reload() {
-        ArrayList<String> files = core.getListFiles(CAPTURE_DIR);
+        ArrayList<String> files = core.getListFiles(captureDir());
         if (refresh != null) refresh.setRefreshing(false);
 
         if (files == null || files.isEmpty()) {
@@ -112,7 +116,7 @@ public class HandshakeStorage extends Fragment {
             if (m.find()) mac = m.group(0);
             String stored = core.getString(mac);
             if (stored != null && !stored.isEmpty()) cracked++;
-            File f = path.startsWith("/") ? new File(path) : new File(CAPTURE_DIR, path);
+            File f = path.startsWith("/") ? new File(path) : new File(captureDir(), path);
             if (f.exists()) bytes += f.length();
         }
         statusTitle.setText(getString(R.string.hs_status_count, total));

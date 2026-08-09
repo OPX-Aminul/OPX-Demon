@@ -3,16 +3,12 @@
 
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.USB_PERMISSION" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
-    <uses-feature android:name="android.hardware.usb.host" />
-
-    <uses-permission android:name="android.permission.CAMERA" />
-
-    <uses-feature android:name="android.hardware.camera" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -23,6 +19,9 @@
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- Rootless engine: optional all-files access so captures land in the visible /sdcard/Stryker.
+         If not granted, the engine falls back to the app-private external dir (no permission). -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <uses-permission android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
@@ -32,6 +31,7 @@
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
@@ -108,11 +108,11 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
         <service
-            android:name=".routerscan.RouterScanService"
+            android:name=".install.InstallService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
         <service
-            android:name=".install.InstallService"
+            android:name=".engine.RootlessService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
         <service

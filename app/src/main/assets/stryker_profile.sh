@@ -2,7 +2,7 @@
 #
 # Deployed into the chroot at /etc/stryker_profile.sh and sourced from
 # /etc/profile, so every interactive login shell the terminal opens (it enters
-# via `ash -l`) gets a cool, root-aware, blue two-line prompt instead of the
+# via `bash -l`) gets a cool, root-aware, blue two-line prompt instead of the
 # bland default. Also adds a few quality-of-life aliases.
 #
 # Note: \h is intentionally NOT used — the chroot shares the device UTS

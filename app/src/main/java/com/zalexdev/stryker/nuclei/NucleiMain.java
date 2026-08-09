@@ -140,17 +140,16 @@ public class NucleiMain extends Fragment implements TargetsAdapter.Listener {
 
     private void sweepStaleRunning() {
         new Thread(() -> {
-            ArrayList<String> procs = core.customCommand("ps", false);
             ArrayList<Site> sites = core.getSites();
             boolean changed = false;
             for (int i = 0; i < sites.size(); i++) {
                 Site s = sites.get(i);
-                if ("Running".equals(s.status) && !Core.contains(procs, s.pid)) {
-                    s.status = "Failed";
-                    s.progress = "100";
-                    core.changeSiteByPosition(s, i);
-                    changed = true;
-                }
+                if (!"Running".equals(s.status) && !"Scheduled".equals(s.status)) continue;
+                if (NucleiScanService.isScanActive(i)) continue;
+                s.status = "Failed";
+                s.progress = "100";
+                core.changeSiteByPosition(s, i);
+                changed = true;
             }
             if (changed && getActivity() != null) {
                 getActivity().runOnUiThread(this::reload);

@@ -73,6 +73,7 @@
                     android:orientation="vertical">
 
                     <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/success_title"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Chroot mounted"
@@ -81,10 +82,11 @@
                         android:textStyle="bold" />
 
                     <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/success_subtitle"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="Alpine toolset live at /data/local/stryker/release"
+                        android:text="Debian toolset live at /data/local/stryker/release"
                         android:textColor="@color/grey"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -277,6 +279,7 @@
                         app:tint="#5E35B1" />
 
                     <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/cap_shell_text"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"

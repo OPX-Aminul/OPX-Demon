@@ -32,7 +32,7 @@
             android:layout_marginStart="4dp"
             android:layout_marginTop="4dp"
             android:layout_marginBottom="14dp"
-            android:text="Pulls and unpacks the Alpine-based tooling chroot Stryker runs on."
+            android:text="Pulls and unpacks the Debian-based tooling chroot Stryker runs on."
             android:textColor="@color/grey"
             android:textSize="13sp" />
 

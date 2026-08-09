@@ -15,9 +15,10 @@ public class StrykerApp extends com.stryker.terminal.App {
         LogStore store = LogStore.init(this);
         store.add(LogEntry.INFO, "session", "==== Stryker " + BuildConfig.VERSION_NAME
                 + " session start ====");
+        String abi = Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "unknown";
         store.add(LogEntry.INFO, "session", "Device: " + Build.MANUFACTURER + " " + Build.MODEL
                 + " · Android " + Build.VERSION.RELEASE
-                + (Build.SUPPORTED_64_BIT_ABIS.length > 0 ? " (64-bit)" : " (32-bit)"));
+                + " (" + abi + ")");
         NotificationCenter.ensureChannel(this);
         UpdateScheduler.schedule(this);
     }

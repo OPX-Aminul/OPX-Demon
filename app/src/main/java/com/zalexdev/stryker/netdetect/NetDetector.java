@@ -102,7 +102,6 @@ public final class NetDetector {
             ifaces = UsbProbe.probeInterfaces(usbDir);
         } else {
             ifaces = new UsbProbe.InterfaceProbe();
-            ifaces.state = DriverState.UNBOUND;
         }
 
         String port = usbDir != null ? usbDir.getName()

@@ -131,7 +131,7 @@ public class InstallMetasploit extends Fragment {
             renderFromService(status);
         } else {
             new Thread(() -> {
-                boolean msfcheck = core.checkFile("/data/local/stryker/release/metasploit-framework/msfconsole");
+                boolean msfcheck = core.isToolInstalled("metasploit");
                 runOnUi(() -> {
                     if (msfcheck) {
                         core.putBoolean("msf", true);
@@ -266,7 +266,8 @@ public class InstallMetasploit extends Fragment {
             return;
         }
         if (line.contains("OK:")) appendLog(LogLevel.SUCCESS, line);
-        else if (line.contains("ERROR") || line.contains("Errno") || line.contains("fatal:")) {
+        else if (line.startsWith("E: ") || line.contains("ERROR") || line.contains("Errno")
+                || line.contains("fatal:")) {
             appendLog(LogLevel.ERROR, line);
         } else if (line.contains("Cloning") || line.contains("Receiving")) {
             if (stageRows.get(MsfInstallStage.CLONE) != null

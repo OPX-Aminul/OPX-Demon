@@ -21,6 +21,10 @@ public final class UsbDialogRenderer {
     private final TextView capMonitor, capInject, capBand, warningsText;
     private final View emptyState, detectedState, capsCard, warningsCard;
 
+    private boolean rootless = false;
+
+    public void setRootless(boolean rootless) { this.rootless = rootless; }
+
     public UsbDialogRenderer(@NonNull View root) {
         this(root::findViewById);
     }
@@ -67,6 +71,10 @@ public final class UsbDialogRenderer {
     }
 
     private void bindStatusPill(UsbDeviceReport r) {
+        if (rootless) {
+            setPill(statusPill, "PASSTHROUGH", COLOR_NEUTRAL);
+            return;
+        }
         switch (r.driverState()) {
             case BOUND_WITH_NETDEV:
                 setPill(statusPill,
@@ -77,6 +85,9 @@ public final class UsbDialogRenderer {
                 break;
             case BOUND_NO_NETDEV:
                 setPill(statusPill, "BOUND · NO NETDEV", COLOR_WARN);
+                break;
+            case UNKNOWN:
+                setPill(statusPill, "DRIVER UNKNOWN", COLOR_NEUTRAL);
                 break;
             case UNBOUND:
             default:
@@ -143,7 +154,7 @@ public final class UsbDialogRenderer {
     }
 
     private void bindWarnings(UsbDeviceReport r) {
-        if (r.warnings.isEmpty()) {
+        if (rootless || r.warnings.isEmpty()) {
             warningsCard.setVisibility(View.GONE);
             return;
         }

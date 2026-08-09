@@ -39,6 +39,10 @@ public class CutNetwork extends AsyncTask<Void, Void, Void> {
     protected Void doInBackground(Void... command) {
         String line;
 
+        if (core.isRootless()) {
+            core.getLogger().writeLine("Netcut needs an adapter on the LAN (root engine)", 3);
+            return null;
+        }
 
         try {
 

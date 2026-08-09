@@ -47,6 +47,11 @@ public class ScanLocalNetwork extends AsyncTask<Void, String, ArrayList<Device>>
     protected ArrayList<Device> doInBackground(Void... command) {
         String line;
         ArrayList<Device> d = new ArrayList<>();
+        if (core.isRootless()) {
+            onProgressUpdate("Local host discovery needs an adapter on the LAN (root engine)");
+            finished = true;
+            return d;
+        }
         try {
 
             Process process = Runtime.getRuntime().exec("su");
@@ -112,7 +117,7 @@ public class ScanLocalNetwork extends AsyncTask<Void, String, ArrayList<Device>>
                 if (mac.find()) {
                     device.setMac(Objects.requireNonNull(mac.group(0)).toUpperCase(Locale.ROOT));
                 }
-                String vendor = temp.replace("MAC Address: ", "").replace(mac + " ", "").replace("(", "").replace(")", "").replace(mac.group() + " ", "");
+                String vendor = com.zalexdev.stryker.localnetwork.utils.MacLine.vendorOf(temp);
                 device.setVendor(vendor);
                 result.add(device);
                 device = new Device();

@@ -5,16 +5,16 @@ import android.content.Context;
 
 public  abstract class AdvancedThread {
 
-    public static Activity activity;
-    public static Context context;
-    public static Core core;
-    public boolean canceled = false;
+    public Activity activity;
+    public Context context;
+    public Core core;
+    public volatile boolean canceled = false;
     public boolean success = false;
     public Thread mainThread;
 
     public AdvancedThread(Activity activity, Context context) {
-        AdvancedThread.activity = activity;
-        AdvancedThread.context = context;
+        this.activity = activity;
+        this.context = context;
         core = new Core(context);
         execute();
     }

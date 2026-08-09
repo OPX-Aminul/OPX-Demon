@@ -36,6 +36,7 @@ import com.zalexdev.stryker.R;
 import com.zalexdev.stryker.appintro.install.LogAdapter;
 import com.zalexdev.stryker.appintro.install.LogLine;
 import com.zalexdev.stryker.custom.Sploit;
+import com.zalexdev.stryker.engine.Apt;
 import com.zalexdev.stryker.utils.Core;
 
 import org.json.JSONObject;
@@ -47,8 +48,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ArsenalDatabaseTab extends Fragment {
 
-    private static final String SEARCHSPLOIT_PATH =
-            "/data/local/stryker/release/exploitdb/searchsploit";
+    public static final String EXPLOITDB_ROOT = "/opt/exploitdb";
+
+    static final String HUB_EXPLOITS_DIR = "/sdcard/Stryker/exploits";
 
     private static final String PREF_LAST_QUERY = "arsenal_db_last_query";
 
@@ -161,9 +163,11 @@ public class ArsenalDatabaseTab extends Fragment {
         if (last.isEmpty()) return;
         queryInput.setText(last);
         queryInput.setSelection(last.length());
-        if (core.checkFile(SEARCHSPLOIT_PATH)) {
-            runQuery();
-        }
+        new Thread(() -> {
+            boolean installed = core.isToolInstalled("searchsploit");
+            if (cancelled.get()) return;
+            runOnUi(() -> { if (installed) runQuery(); });
+        }).start();
     }
 
     private void bindSearch(View view) {
@@ -229,7 +233,8 @@ public class ArsenalDatabaseTab extends Fragment {
         if (statusCountChip == null) return;
         new Thread(() -> {
             ArrayList<String> raw = core.customChrootCommand(
-                    "wc -l /exploitdb/files_exploits.csv 2>/dev/null | awk '{print $1}'", true);
+                    "wc -l " + EXPLOITDB_ROOT + "/files_exploits.csv 2>/dev/null | awk '{print $1}'",
+                    true);
             if (cancelled.get()) return;
             String count = null;
             for (String line : raw) {
@@ -281,7 +286,7 @@ public class ArsenalDatabaseTab extends Fragment {
 
     private void evaluateState() {
         new Thread(() -> {
-            boolean installed = core.checkFile(SEARCHSPLOIT_PATH);
+            boolean installed = core.isToolInstalled("searchsploit");
             if (cancelled.get()) return;
             runOnUi(() -> {
                 ExploitDbInstaller inst = ExploitDbInstaller.get();
@@ -318,7 +323,7 @@ public class ArsenalDatabaseTab extends Fragment {
 
         new Thread(() -> {
             ArrayList<String> out = core.customChrootCommand(
-                    "/exploitdb/searchsploit " + escape(q) + "  --json");
+                    "searchsploit " + escape(q) + " --json");
             if (cancelled.get()) return;
             List<Sploit> parsed = parseAll(out);
             runOnUi(() -> {
@@ -342,6 +347,23 @@ public class ArsenalDatabaseTab extends Fragment {
 
     private static String escape(String q) {
         return q.replace("'", "").replace("`", "").replace("$", "");
+    }
+
+    public static String guestSploitPath(String sploitPath) {
+        if (sploitPath == null) return EXPLOITDB_ROOT;
+        String p = sploitPath.trim();
+        if (p.isEmpty()) return EXPLOITDB_ROOT;
+        if (p.equals(EXPLOITDB_ROOT) || p.startsWith(EXPLOITDB_ROOT + "/")) return p;
+        return EXPLOITDB_ROOT + (p.startsWith("/") ? p : "/" + p);
+    }
+
+    static boolean copyToHub(Core core, String guestSource) {
+        String fileName = guestSource.substring(guestSource.lastIndexOf('/') + 1);
+        if (fileName.isEmpty()) return false;
+        String target = HUB_EXPLOITS_DIR + "/" + fileName;
+        core.customChrootCommand("mkdir -p " + Apt.shellQuote(HUB_EXPLOITS_DIR)
+                + "; cp -f " + Apt.shellQuote(guestSource) + " " + Apt.shellQuote(target), true);
+        return core.guestFileExists(target);
     }
 
     private static List<Sploit> parseAll(List<String> lines) {
@@ -379,14 +401,12 @@ public class ArsenalDatabaseTab extends Fragment {
     }
 
     private void addToHub(Sploit sploit) {
-        String chrootPath = sploit.getPath();
-        if (chrootPath == null || chrootPath.isEmpty()) {
+        if (sploit.getPath() == null || sploit.getPath().isEmpty()) {
             core.toaster(getString(R.string.arsenal_db_missing_path));
             return;
         }
-        if (!chrootPath.startsWith("/")) chrootPath = "/" + chrootPath;
-        String fileName = chrootPath.substring(chrootPath.lastIndexOf('/') + 1);
-        final String chrootPathFinal = chrootPath;
+        final String source = guestSploitPath(sploit.getPath());
+        String fileName = source.substring(source.lastIndexOf('/') + 1);
 
         com.zalexdev.stryker.custom.Exploit prefill = new com.zalexdev.stryker.custom.Exploit();
         prefill.setPath(fileName);
@@ -394,10 +414,13 @@ public class ArsenalDatabaseTab extends Fragment {
         AddExploitSheet sheet = AddExploitSheet.newInstance(prefill, () -> {
             core.toaster(getString(R.string.arsenal_db_copying));
             new Thread(() -> {
-                core.copyFile("/data/local/stryker/release/exploitdb" + chrootPathFinal,
-                        core.getStorage() + "Stryker/exploits/");
+                boolean copied = copyToHub(core, source);
                 if (cancelled.get()) return;
                 runOnUi(() -> {
+                    if (!copied) {
+                        core.toaster(getString(R.string.error));
+                        return;
+                    }
                     Fragment parent = getParentFragment();
                     if (parent instanceof ArsenalFragment) {
                         ((ArsenalFragment) parent).refreshSubtitle();

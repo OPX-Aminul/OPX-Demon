@@ -46,6 +46,20 @@ public class ScanLocalDevice extends AsyncTask<Void, String, Device> {
     protected Device doInBackground(Void... command) {
         String line;
         Device d = new Device();
+        if (core != null && core.isRootless()) {
+            String guestCmd;
+            if (core.getBoolean("fast_scan")) {
+                guestCmd = "nmap " + ip + " -F --top 100 -n -Pn -sT";
+            } else {
+                guestCmd = "nmap " + ip + " -n -Pn -sT";
+            }
+            ArrayList<String> nmapoutput = core.customChrootCommand(guestCmd, true);
+            if (nmapoutput == null) nmapoutput = new ArrayList<>();
+            try {
+                d = localdevices(nmapoutput);
+            } catch (IOException e) {
+            }
+        } else {
         try {
             Process process = Runtime.getRuntime().exec("su");
             OutputStream stdin = process.getOutputStream();
@@ -74,13 +88,14 @@ public class ScanLocalDevice extends AsyncTask<Void, String, Device> {
                 outerror.add(line);
             }
             if (core != null){
-            
+
             }
             br.close();
             process.waitFor();
             process.destroy();
 
         } catch (IOException | InterruptedException e) {
+        }
         }
         try {
             NbtAddress[] nbts = NbtAddress.getAllByAddress(ip);
@@ -145,7 +160,7 @@ public class ScanLocalDevice extends AsyncTask<Void, String, Device> {
                 if (mac.find()) {
                     device.setMac(Objects.requireNonNull(mac.group(0)).toUpperCase(Locale.ROOT));
                 }
-                String vendor = temp.replace("MAC Address: ", "").replace(mac + " ", "").replace("(", "").replace(")", "").replace(mac.group() + " ", "");
+                String vendor = com.zalexdev.stryker.localnetwork.utils.MacLine.vendorOf(temp);
                 device.setVendor(vendor);
             }else if (temp.contains("Running:")){
                 device.setOs(temp.replace("Running: ","").replace("Microsoft",""));

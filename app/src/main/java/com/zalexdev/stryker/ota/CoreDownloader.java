@@ -7,17 +7,11 @@ public final class CoreDownloader {
     private CoreDownloader() {
     }
 
-    public static RemoteManifest.Asset resolve(Context context, boolean is64Bit) {
+    public static RemoteManifest.Asset resolve(Context context) {
         RemoteManifest manifest = ManifestService.fetch(context);
-        if (manifest != null) {
-            RemoteManifest.Asset asset = is64Bit ? manifest.chroot64 : manifest.chroot32;
-            if (asset != null && asset.isUsable()) {
-                return asset;
-            }
+        if (manifest != null && manifest.chroot64 != null && manifest.chroot64.isUsable()) {
+            return manifest.chroot64;
         }
-        String fallback = is64Bit
-                ? StrykerEndpoints.FALLBACK_CHROOT_64
-                : StrykerEndpoints.FALLBACK_CHROOT_32;
-        return new RemoteManifest.Asset(fallback, "", 0);
+        return new RemoteManifest.Asset(StrykerEndpoints.FALLBACK_CHROOT_64, "", 0);
     }
 }

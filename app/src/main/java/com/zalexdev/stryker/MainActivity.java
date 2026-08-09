@@ -9,6 +9,7 @@ import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.os.Build;
@@ -48,7 +49,6 @@ import com.zalexdev.stryker.metasploit.utils.MetasploitUtils;
 import com.zalexdev.stryker.nmap.NmapScanner;
 import com.zalexdev.stryker.nuclei.InstallNuclei;
 import com.zalexdev.stryker.ota.UpdateManager;
-import com.zalexdev.stryker.routerscan.RouterScanMain;
 import com.zalexdev.stryker.settings.SettingsNew;
 import com.zalexdev.stryker.utils.Core;
 import com.zalexdev.stryker.utils.PromoDialogs;
@@ -82,19 +82,35 @@ public class MainActivity extends AppCompatActivity {
     private static FragmentManager fragmentManager;
     private TempFragment tempFragment;
     private static final HashMap<Integer, View> drawerRows = new HashMap<>();
+    private static volatile boolean rootlessEngine;
+    private static volatile boolean vmReady;
+    private boolean engineWatchPending;
+    private View engineStatusView;
+    private DrawerLayout engineStatusDrawer;
     private static final java.util.LinkedHashMap<Integer, DrawerSpec> DRAWER_SPECS = buildDrawerSpecs();
+    private static final java.util.Set<Integer> ROOT_ONLY_IDS = new java.util.HashSet<>(java.util.Arrays.asList(
+            R.id.hid_item, R.id.usb_arsenal_item, R.id.macchanger_item));
+    private static final java.util.Set<Integer> VM_INDEPENDENT_IDS = new java.util.HashSet<>(java.util.Arrays.asList(
+            R.id.dasboard_item, R.id.logs_item, R.id.about_item,
+            R.id.wpair_item, R.id.geomac_item));
     private MetasploitUtils metasploitUtils;
     private ArrayList<WiFINetwork> networks;
     private ArrayList<Device> devices = new ArrayList<>();
     private boolean usbState = false;
     private BottomSheetDialog usbDialog;
+    private com.zalexdev.stryker.netdetect.UsbDialogRenderer usbRenderer;
     private final Receiver receiver = new Receiver();
+
+    private volatile boolean landed;
+    private volatile boolean launchRunning;
+    private boolean firstResume = true;
 
     @SuppressLint({"NonConstantResourceId", "UseCompatLoadingForDrawables", "SetTextI18n", "SdCardPath"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         core = new Core(this);
+        com.zalexdev.stryker.logger.LogStore.from(getApplicationContext());
         setContentView(R.layout.activity_main);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             String NOTIFICATION_PERMISSION = Manifest.permission.POST_NOTIFICATIONS;
@@ -110,6 +126,7 @@ public class MainActivity extends AppCompatActivity {
         settings.setOnClickListener(view -> {
             Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.flContent);
             if (currentFragment instanceof SettingsNew) {
+                if (((SettingsNew) currentFragment).popChild()) return;
                 closeSettings();
             } else {
                 openSettings();
@@ -122,53 +139,7 @@ public class MainActivity extends AppCompatActivity {
             core.remove("clean_after_update");
         }
 
-        if (core != null) {
-            if (!core.getBoolean("first_open") || !core.checkFile("/data/local/stryker/release/4.0")) {
-                core.putString("username", "User");
-                Intent install = new Intent(this, AppIntroActivity.class);
-                startActivity(install);
-            } else {
-                new Thread(() -> {
-                    if (!core.checkFolder("/data/local/stryker/release/usr")) {
-                        Intent install = new Intent(this, AppIntroActivity.class);
-                        install.putExtra("update", false);
-                        startActivity(install);
-                    } else {
-                        if (core.isMounted()) {
-                            fragmentManager.beginTransaction().replace(R.id.flContent, new Dashboard()).commit();
-                            schedulePromo();
-                            checkForUsb();
-                            if (!isConnected()) {
-                                new Thread(() -> core.getInterfacesList()).start();
-                            }
-                            new Thread(() -> {
-                                if (core != null && core.getBoolean("msf")) {
-                                    metasploitUtils = new MetasploitUtils(MainActivity.this, MainActivity.this);
-                                }
-                                assert core != null;
-                                core.chmodFolder("/data/data/com.zalexdev.stryker/files");
-                            }).start();
-                        } else {
-                            if (!core.mountCore()) {
-                                fragmentManager.beginTransaction().replace(R.id.flContent, new Error()).commit();
-                            } else {
-                                fragmentManager.beginTransaction().replace(R.id.flContent, new Dashboard()).commit();
-                                schedulePromo();
-                                checkForUsb();
-                                new Thread(() -> {
-                                    if (core != null && core.getBoolean("msf")) {
-                                        metasploitUtils = new MetasploitUtils(MainActivity.this, MainActivity.this);
-                                    }
-                                }).start();
-                                if (!isConnected()) {
-                                    new Thread(() -> core.getInterfacesList()).start();
-                                }
-                            }
-                        }
-                    }
-                }).start();
-            }
-        }
+        runLaunchFlow();
 
         DrawerLayout drawer = findViewById(R.id.drawerLayout);
 
@@ -198,16 +169,17 @@ public class MainActivity extends AppCompatActivity {
         });
 
         TextView arch = navView.findViewById(R.id.drawer_arch_badge);
-        if (arch != null) arch.setText(core != null && core.is64Bit() ? "arm64" : "arm32");
-        TextView chrootStatus = navView.findViewById(R.id.drawer_chroot_status);
-        new Thread(() -> {
-            boolean mounted = core != null && core.isMounted();
-            runOnUiThread(() -> {
-                if (chrootStatus != null) {
-                    chrootStatus.setText(mounted ? "Chroot mounted" : "Chroot detached");
-                }
-            });
-        }).start();
+        if (arch != null) arch.setText("arm64");
+        engineStatusView = navView;
+        engineStatusDrawer = drawer;
+        drawer.addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
+            @Override
+            public void onDrawerOpened(View drawerView) {
+                refreshEngineStatus();
+                wireDrawerRows(navView, drawer);
+            }
+        });
+        refreshEngineStatus();
 
         TextView versionTv = navView.findViewById(R.id.drawer_version);
         if (versionTv != null) versionTv.setText("v" + BuildConfig.VERSION_NAME);
@@ -221,8 +193,64 @@ public class MainActivity extends AppCompatActivity {
         UpdateManager.checkAndPrompt(this, openUpdate);
     }
 
+    private void refreshEngineStatus() {
+        View navView = engineStatusView;
+        if (navView == null || core == null) return;
+        TextView chrootStatus = navView.findViewById(R.id.drawer_chroot_status);
+        View statusDot = navView.findViewById(R.id.drawer_status_dot);
+        if (chrootStatus == null && statusDot == null) return;
+        if (!com.zalexdev.stryker.engine.EngineType.isChosen(core)) {
+            vmReady = false;
+            if (chrootStatus != null) chrootStatus.setText(R.string.engine_not_chosen);
+            if (statusDot != null) {
+                try {
+                    statusDot.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                            ContextCompat.getColor(this, R.color.status_offline)));
+                } catch (Exception ignored) {}
+            }
+            return;
+        }
+        new Thread(() -> {
+            boolean rootless = core.isRootless();
+            boolean mounted = !rootless && core.isMounted();
+            com.zalexdev.stryker.engine.EngineStatus es =
+                    com.zalexdev.stryker.engine.EngineStatus.current(core, mounted, rootless);
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (chrootStatus != null) chrootStatus.setText(es.label);
+                if (statusDot != null) {
+                    try {
+                        statusDot.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                                ContextCompat.getColor(this, es.colorRes)));
+                    } catch (Exception ignored) {}
+                }
+                boolean changed = vmReady != es.ready;
+                vmReady = es.ready;
+                if (changed && engineStatusDrawer != null) {
+                    wireDrawerRows(navView, engineStatusDrawer);
+                }
+                // While the VM is still coming up every tool stays locked, so keep re-checking
+                // until the guest answers — otherwise the rows only unlock when the drawer is
+                // reopened by hand.
+                if (rootless && !es.ready && !engineWatchPending) {
+                    engineWatchPending = true;
+                    navView.postDelayed(() -> {
+                        engineWatchPending = false;
+                        refreshEngineStatus();
+                    }, 3000);
+                }
+            });
+        }, "drawer-engine-status").start();
+    }
+
     private void wireDrawerRows(View navView, DrawerLayout drawer) {
         drawerRows.clear();
+        boolean rootless = core != null && core.isRootless();
+        rootlessEngine = rootless;
+
+        View rootNote = navView.findViewById(R.id.root_section_note);
+        if (rootNote != null) rootNote.setVisibility(rootless ? View.VISIBLE : View.GONE);
+
         for (java.util.Map.Entry<Integer, DrawerSpec> e : DRAWER_SPECS.entrySet()) {
             int rowId = e.getKey();
             DrawerSpec spec = e.getValue();
@@ -230,18 +258,42 @@ public class MainActivity extends AppCompatActivity {
             if (row == null) continue;
             TextView title = row.findViewById(R.id.row_title);
             ImageView icon = row.findViewById(R.id.row_icon);
+            TextView badge = row.findViewById(R.id.row_badge);
             if (title != null) title.setText(spec.title);
             if (icon != null) {
                 icon.setImageResource(spec.iconRes);
                 icon.setColorFilter(ContextCompat.getColor(this, R.color.grey));
             }
             drawerRows.put(rowId, row);
-            row.setOnClickListener(v -> {
-                if (drawer.isDrawerOpen(GravityCompat.START)) drawer.closeDrawers();
-                settings.setImageDrawable(ContextCompat.getDrawable(getApplicationContext(), R.drawable.settings));
-                receiver.changeFragment(rowId);
-            });
+
+            boolean rootOnly = ROOT_ONLY_IDS.contains(rowId);
+            boolean needsVm = rootless && !vmReady && !VM_INDEPENDENT_IDS.contains(rowId);
+            boolean locked = rootless && (rootOnly || needsVm);
+
+            if (badge != null && rootOnly) {
+                badge.setText("ROOT");
+                badge.setTextColor(ContextCompat.getColor(this,
+                        locked ? R.color.grey : R.color.red));
+                badge.setVisibility(View.VISIBLE);
+            }
+
+            if (locked) {
+                final String why = rootOnly
+                        ? spec.title + " needs root hardware — unavailable on the rootless VM"
+                        : spec.title + " needs the VM — start it from the dashboard first";
+                row.setAlpha(0.45f);
+                row.setOnClickListener(v -> android.widget.Toast.makeText(this, why,
+                        android.widget.Toast.LENGTH_SHORT).show());
+            } else {
+                row.setAlpha(1f);
+                row.setOnClickListener(v -> {
+                    if (drawer.isDrawerOpen(GravityCompat.START)) drawer.closeDrawers();
+                    settings.setImageDrawable(ContextCompat.getDrawable(getApplicationContext(), R.drawable.settings));
+                    receiver.changeFragment(rowId);
+                });
+            }
         }
+        if (lastSelectedItemId != 0) receiver.changeFragmentQuiet(lastSelectedItemId);
     }
 
     public MetasploitUtils getMetasploitUtils() {
@@ -270,19 +322,26 @@ public class MainActivity extends AppCompatActivity {
 
     private void usbDialog() {
         if (usbDialog != null && usbDialog.isShowing()) {
+            if (usbRenderer != null) scanUsb(usbRenderer);
             return;
         }
         usbDialog = new BottomSheetDialog(this, R.style.ThemeOverlay_Stryker_BottomSheetDialog);
         usbDialog.setDismissWithAnimation(true);
         usbDialog.setContentView(R.layout.usb_dialog);
 
+        boolean rootless = core != null && core.isRootless();
+
         com.zalexdev.stryker.netdetect.UsbDialogRenderer renderer =
                 new com.zalexdev.stryker.netdetect.UsbDialogRenderer(usbDialog);
+        usbRenderer = renderer;
+        renderer.setRootless(rootless);
         renderer.renderEmpty();
 
         View changeListen = usbDialog.findViewById(R.id.change_listen);
         View changeDeauth = usbDialog.findViewById(R.id.change_deauth);
         View refresh      = usbDialog.findViewById(R.id.usb_refresh_btn);
+        View attachCard   = usbDialog.findViewById(R.id.usb_attach_card);
+        if (!rootless && attachCard != null) attachCard.setVisibility(View.GONE);
         if (changeListen != null) changeListen.setOnClickListener(v -> changeInterface(true));
         if (changeDeauth != null) changeDeauth.setOnClickListener(v -> changeInterface(false));
         if (refresh != null) refresh.setOnClickListener(v -> scanUsb(renderer));
@@ -298,9 +357,91 @@ public class MainActivity extends AppCompatActivity {
             com.zalexdev.stryker.netdetect.UsbDeviceReport pick = devs.isEmpty() ? null : devs.get(0);
             runOnUiThread(() -> {
                 if (pick == null) renderer.renderEmpty();
-                else renderer.render(pick);
+                else {
+                    renderer.render(pick);
+                    if (core != null && core.isRootless()) autoAttachToVm(pick);
+                }
             });
         }).start();
+    }
+
+    private void autoAttachToVm(com.zalexdev.stryker.netdetect.UsbDeviceReport report) {
+        if (usbDialog == null || !usbDialog.isShowing()) return;
+        View card = usbDialog.findViewById(R.id.usb_attach_card);
+        if (card == null || report == null) return;
+        card.setVisibility(View.VISIBLE);
+
+        com.zalexdev.stryker.engine.RootlessEngine engine = core.rootless();
+        com.zalexdev.stryker.engine.UsbPassthroughManager usb = engine == null ? null : engine.usb();
+        if (usb == null) {
+            showAttachState(2, "Start the VM first, then re-scan", "Start VM", v -> {
+                com.zalexdev.stryker.engine.RootlessService.start(this);
+            });
+            return;
+        }
+        UsbDevice dev = usb.findByVidPid(report.vidPid);
+        if (dev == null || !usb.isWifiCandidate(dev)) {
+            card.setVisibility(View.GONE);
+            return;
+        }
+        showAttachState(0, "Attaching adapter to the VM…", null, null);
+        new Thread(() -> {
+            int candidates = usb.pickWifiDevices().size();
+            if (usb.isAttached(dev)) {
+                String label = attachedLabel(usb.attachedCount(), candidates);
+                runOnUiThread(() -> {
+                    if (usbDialog != null && usbDialog.isShowing()) {
+                        showAttachState(1, label, null, null);
+                    }
+                });
+                return;
+            }
+            usb.attachAsync(dev, (ok, d) -> {
+                String label = ok ? attachedLabel(usb.attachedCount(), candidates) : null;
+                runOnUiThread(() -> {
+                    if (usbDialog == null || !usbDialog.isShowing()) return;
+                    if (ok) {
+                        showAttachState(1, label, null, null);
+                    } else {
+                        showAttachState(2, "Couldn't attach — grant USB access, then retry", "Retry",
+                                v -> autoAttachToVm(report));
+                    }
+                });
+            });
+        }, "usb-attach").start();
+    }
+
+    private static String attachedLabel(int attachedCount, int candidates) {
+        if (candidates <= 1) return "Attached to the VM";
+        return "Attached to the VM — " + attachedCount + " of " + candidates + " adapters";
+    }
+
+    private void showAttachState(int mode, String msg, String actionLabel, View.OnClickListener action) {
+        if (usbDialog == null) return;
+        android.widget.ProgressBar spinner = usbDialog.findViewById(R.id.usb_attach_spinner);
+        ImageView icon = usbDialog.findViewById(R.id.usb_attach_icon);
+        TextView text = usbDialog.findViewById(R.id.usb_attach_text);
+        MaterialButton actionBtn = usbDialog.findViewById(R.id.usb_attach_action);
+        if (text != null) text.setText(msg);
+        if (spinner != null) spinner.setVisibility(mode == 0 ? View.VISIBLE : View.GONE);
+        if (icon != null) {
+            if (mode == 1) {
+                icon.setVisibility(View.VISIBLE);
+                icon.setImageResource(R.drawable.done);
+                icon.setColorFilter(ContextCompat.getColor(this, R.color.green));
+            } else if (mode == 2) {
+                icon.setVisibility(View.VISIBLE);
+                icon.setImageResource(R.drawable.warning);
+                icon.setColorFilter(ContextCompat.getColor(this, R.color.yellow));
+            } else {
+                icon.setVisibility(View.GONE);
+            }
+        }
+        if (actionBtn != null) {
+            actionBtn.setVisibility(actionLabel == null ? View.GONE : View.VISIBLE);
+            if (actionLabel != null) actionBtn.setText(actionLabel);
+            actionBtn.setOnClickListener(action);
+        }
     }
 
     private void changeInterface(boolean isScan) {
@@ -363,12 +504,106 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean isConnected() {
-        return getConnectedUSBDevices().size() > 0;
+        UsbManager manager = (UsbManager) getSystemService(Context.USB_SERVICE);
+        if (manager == null) return false;
+        for (UsbDevice d : manager.getDeviceList().values()) {
+            if (d.getDeviceClass() != UsbConstants.USB_CLASS_HUB) return true;
+        }
+        return false;
+    }
+
+    public void openUsbSheet() {
+        runOnUiThread(this::usbDialog);
     }
 
     private void schedulePromo() {
         new android.os.Handler(getMainLooper()).postDelayed(
                 () -> PromoDialogs.maybeShow(MainActivity.this), 1500);
+    }
+
+    private void startRootlessLaunch() {
+        if (!core.getBoolean("first_open")
+                || !com.zalexdev.stryker.engine.RootlessEngine.get(this).isInstalled()) {
+            core.putString("username", "User");
+            launchRunning = false;
+            startActivity(new Intent(this, AppIntroActivity.class));
+            return;
+        }
+        com.zalexdev.stryker.engine.RootlessService.start(this);
+        landOn(new Dashboard());
+        schedulePromo();
+        checkForUsb();
+        if (!isConnected()) {
+            new Thread(() -> core.getInterfacesList()).start();
+        }
+    }
+
+    private void runLaunchFlow() {
+        if (core == null || landed || launchRunning) return;
+        launchRunning = true;
+        if (core.isRootless()) {
+            startRootlessLaunch();
+            return;
+        }
+        if (!core.getBoolean("first_open") || !core.checkFile(Core.CHROOT_MARKER)) {
+            // A pre-6 install leaves the old Alpine tree behind with its own marker. It cannot run
+            // the Debian toolset, so route straight into the installer, which unmounts and wipes it
+            // before fetching the rootfs the manifest offers this build.
+            core.putString("username", "User");
+            launchRunning = false;
+            Intent intro = new Intent(this, AppIntroActivity.class);
+            if (core.hasLegacyChroot()) intro.putExtra(AppIntroActivity.EXTRA_MIGRATE, true);
+            startActivity(intro);
+            return;
+        }
+        new Thread(() -> {
+            if (!core.checkFolder("/data/local/stryker/release/usr")) {
+                launchRunning = false;
+                Intent install = new Intent(this, AppIntroActivity.class);
+                install.putExtra("update", false);
+                startActivity(install);
+                return;
+            }
+            boolean mounted = core.isMounted() || core.mountCore();
+            if (!mounted) {
+                landOn(new Error());
+                return;
+            }
+            landOn(new Dashboard());
+            runOnUiThread(() -> {
+                schedulePromo();
+                checkForUsb();
+            });
+            if (!isConnected()) {
+                new Thread(() -> core.getInterfacesList()).start();
+            }
+            new Thread(() -> {
+                if (core != null && core.getBoolean("msf")) {
+                    metasploitUtils = new MetasploitUtils(MainActivity.this, MainActivity.this);
+                }
+                if (core != null) core.chmodFolder("/data/data/com.zalexdev.stryker/files");
+            }).start();
+        }).start();
+    }
+
+    private void landOn(Fragment fragment) {
+        runOnUiThread(() -> {
+            if (isFinishing() || isDestroyed()) return;
+            landed = true;
+            launchRunning = false;
+            fragmentManager.beginTransaction().replace(R.id.flContent, fragment).commitAllowingStateLoss();
+        });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshEngineStatus();
+        if (firstResume) {
+            firstResume = false;
+            return;
+        }
+        runLaunchFlow();
     }
 
     @SuppressLint("SdCardPath")
@@ -380,7 +615,8 @@ public class MainActivity extends AppCompatActivity {
         } catch (IOException e) {
         }
         if (files != null) for (String filename : files) {
-            if (filename.equals("busybox32") || filename.equals("busybox64")) continue;
+            if (filename.equals(Core.BUSYBOX_ASSET)) continue;
+            if (filename.equals("rootless")) continue;
             InputStream in = null;
             OutputStream out = null;
             try {
@@ -388,6 +624,9 @@ public class MainActivity extends AppCompatActivity {
                 File outFile = new File("/data/data/com.zalexdev.stryker/files/", filename);
                 out = new FileOutputStream(outFile);
                 copyFile(in, out);
+                out.close();
+                out = null;
+                outFile.setExecutable(true, false);
             } catch (IOException ignored) {
             } finally {
                 if (in != null) {
@@ -405,41 +644,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         Core.extractBusybox(this);
-        copyAssets2();
-    }
-
-    @SuppressLint("SdCardPath")
-    private void copyAssets2() {
-        AssetManager assetManager = getAssets();
-        String[] files = null;
-        try {
-            files = assetManager.list("imgs_adapters");
-        } catch (IOException e) {
-        }
-        if (files != null) for (String filename : files) {
-            InputStream in = null;
-            OutputStream out = null;
-            try {
-                in = assetManager.open(filename);
-                File outFile = new File("/data/data/com.zalexdev.stryker/files/imgs_adapters", filename);
-                out = new FileOutputStream(outFile);
-                copyFile(in, out);
-            } catch (IOException ignored) {
-            } finally {
-                if (in != null) {
-                    try {
-                        in.close();
-                    } catch (IOException ignored) {
-                    }
-                }
-                if (out != null) {
-                    try {
-                        out.close();
-                    } catch (IOException ignored) {
-                    }
-                }
-            }
-        }
     }
 
     private void copyFile(InputStream in, OutputStream out) throws IOException {
@@ -463,7 +667,7 @@ public class MainActivity extends AppCompatActivity {
                 usbState = isConnected();
                 if (temp != usbState && usbState) {
                     runOnUiThread(() -> usbDialog());
-                } else if (!usbState) {
+                } else if (temp != usbState) {
                     runOnUiThread(() -> {
                         if (usbDialog != null) {
                             usbDialog.dismiss();
@@ -472,16 +676,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }, 0, 300);
-    }
-
-    private ArrayList<UsbDevice> getConnectedUSBDevices() {
-        ArrayList<UsbDevice> devices = new ArrayList<>();
-        UsbManager manager = (UsbManager) MainActivity.this.getSystemService(Context.USB_SERVICE);
-        HashMap<String, UsbDevice> connectedDevices = manager.getDeviceList();
-        for (String deviceName : connectedDevices.keySet()) {
-            devices.add(connectedDevices.get(deviceName));
-        }
-        return devices;
     }
 
     private void openSettings() {
@@ -626,6 +820,22 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void changeFragment(int itemId, int enterAnim, int exitAnim) {
+            if (rootlessEngine && settings != null) {
+                DrawerSpec spec = DRAWER_SPECS.get(itemId);
+                String name = spec == null ? "This tool" : spec.title;
+                if (ROOT_ONLY_IDS.contains(itemId)) {
+                    android.widget.Toast.makeText(settings.getContext(),
+                            name + " needs root hardware — unavailable on the rootless VM",
+                            android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!vmReady && !VM_INDEPENDENT_IDS.contains(itemId)) {
+                    android.widget.Toast.makeText(settings.getContext(),
+                            name + " needs the VM — start it from the dashboard first",
+                            android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
             if (settings != null) {
                 settings.setImageDrawable(settings.getContext().getDrawable(R.drawable.settings));
             }
@@ -634,6 +844,7 @@ public class MainActivity extends AppCompatActivity {
                 Intent terminal = new Intent(settings.getContext(),
                         com.stryker.terminal.ui.term.NeoTermActivity.class);
                 terminal.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                terminal.putExtra(com.stryker.terminal.ui.term.NeoTermActivity.EXTRA_NEW_SESSION, true);
                 settings.getContext().startActivity(terminal);
                 return;
             }
@@ -661,9 +872,9 @@ public class MainActivity extends AppCompatActivity {
             if (itemId == R.id.metasploit_item) return new InstallMetasploit();
             if (itemId == R.id.geomac_item) return new GeoMac();
             if (itemId == R.id.nmap_item) return new NmapScanner();
-            if (itemId == R.id.router_scan_item) return new RouterScanMain();
             if (itemId == R.id.wpair_item) return new WpairFragment();
             if (itemId == R.id.about_item) return new AboutFragment();
+            if (itemId == R.id.logs_item) return new com.zalexdev.stryker.logger.LoggerFragment();
             if (itemId == R.id.vnc_item) return new VNCFragment();
             if (itemId == R.id.hid_item) return new HidFragment();
             if (itemId == R.id.usb_arsenal_item) return new UsbArsenalFragment();
@@ -705,10 +916,10 @@ public class MainActivity extends AppCompatActivity {
         java.util.LinkedHashMap<Integer, DrawerSpec> m = new java.util.LinkedHashMap<>();
         m.put(R.id.dasboard_item,     new DrawerSpec("Dashboard",        R.drawable.home,        0xFF1565C0));
         m.put(R.id.terminal_item,     new DrawerSpec("Terminal",         R.drawable.terminal,    0xFF1565C0));
+        m.put(R.id.logs_item,         new DrawerSpec("Logs",             R.drawable.bug_report,  0xFF1565C0));
         m.put(R.id.wifi_item,         new DrawerSpec("WiFi networks",    R.drawable.wifi,        0xFF1565C0));
         m.put(R.id.hs_item,           new DrawerSpec("Handshakes",       R.drawable.storage,     0xFF00897B));
         m.put(R.id.macchanger_item,   new DrawerSpec("MAC changer",      R.drawable.password,    0xFF1565C0));
-        m.put(R.id.router_scan_item,  new DrawerSpec("Router scan",      R.drawable.router,      0xFF2E7D32));
         m.put(R.id.wpair_item,        new DrawerSpec("WhisperPair (BLE)", R.drawable.wpair,      0xFF3949AB));
         m.put(R.id.lan_item,          new DrawerSpec("Local network",    R.drawable.lan,         0xFFAB47BC));
         m.put(R.id.nmap_item,         new DrawerSpec("Nmap",             R.drawable.scanner,     0xFFAB47BC));

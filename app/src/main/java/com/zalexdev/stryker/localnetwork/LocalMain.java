@@ -202,6 +202,12 @@ public class LocalMain extends Fragment {
             showNoWifi();
             return;
         }
+        if (scanner != null) {
+            try {
+                scanner.stopScan();
+            } catch (Exception ignored) {
+            }
+        }
         devicesmain.clear();
         mAdapter.notifyDataSetChanged();
         if (mainActivity != null) {
@@ -211,6 +217,15 @@ public class LocalMain extends Fragment {
     }
 
     public void startScan() {
+        if (core != null && !core.hasLocationPermission()) {
+            core.requestLocationPermission(activity);
+        }
+        if (scanner != null) {
+            try {
+                scanner.stopScan();
+            } catch (Exception ignored) {
+            }
+        }
         scanning = true;
         core.putBoolean(KEY_SCANNING, true);
         updateScanningUi();
@@ -346,7 +361,7 @@ public class LocalMain extends Fragment {
 
         String override = core.getString("local_scan_target");
         int accent = 0xFFAB47BC;
-        int defaultText = getResources().getColor(android.R.color.primary_text_light);
+        int defaultText = themeTextColor();
         if (override != null && !override.isEmpty() && override.contains("/")) {
             String[] parts = override.split("/");
             networkGateway.setText(parts[0]);
@@ -362,6 +377,20 @@ public class LocalMain extends Fragment {
             networkSubnet.setText(intToIP(dhcp.netmask));
             networkGateway.setTextColor(defaultText);
             networkSubnet.setTextColor(defaultText);
+        }
+    }
+
+    private int themeTextColor() {
+        Context ctx = context != null ? context : getContext();
+        if (ctx == null) return 0xFFFFFFFF;
+        android.content.res.TypedArray a = ctx.getTheme().obtainStyledAttributes(
+                new int[]{android.R.attr.textColorPrimary});
+        try {
+            android.content.res.ColorStateList csl = a.getColorStateList(0);
+            if (csl != null) return csl.getDefaultColor();
+            return a.getColor(0, 0xFFFFFFFF);
+        } finally {
+            a.recycle();
         }
     }
 
@@ -555,9 +584,7 @@ public class LocalMain extends Fragment {
             } catch (Exception ignored) {
             }
             try {
-                if (scanner.mainThread != null) {
-                    scanner.mainThread.interrupt();
-                }
+                scanner.stopScan();
             } catch (Exception ignored) {
             }
             scanner = null;

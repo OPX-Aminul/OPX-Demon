@@ -23,7 +23,6 @@ import androidx.core.view.ViewCompat
 import androidx.preference.PreferenceManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.stryker.terminal.App
-import com.stryker.terminal.BuildConfig
 import com.stryker.terminal.R
 import com.stryker.terminal.backend.TerminalSession
 import com.stryker.terminal.component.ComponentManager
@@ -32,7 +31,6 @@ import com.stryker.terminal.component.config.NeoTermPath
 import com.stryker.terminal.component.profile.ProfileComponent
 import com.stryker.terminal.component.session.ShellParameter
 import com.stryker.terminal.component.session.ShellProfile
-import com.stryker.terminal.component.session.XParameter
 import com.stryker.terminal.component.session.XSession
 import com.stryker.terminal.frontend.floating.TerminalDialog
 import com.stryker.terminal.frontend.session.terminal.*
@@ -53,6 +51,7 @@ class NeoTermActivity : AppCompatActivity(), ServiceConnection, SharedPreference
   companion object {
     const val KEY_NO_RESTORE = "no_restore"
     const val REQUEST_SETUP = 22313
+    const val EXTRA_NEW_SESSION = "com.stryker.terminal.NEW_SESSION"
   }
 
   lateinit var tabSwitcher: TabSwitcher
@@ -102,6 +101,17 @@ class NeoTermActivity : AppCompatActivity(), ServiceConnection, SharedPreference
     val serviceIntent = Intent(this, NeoTermService::class.java)
     startService(serviceIntent)
     bindService(serviceIntent, this, 0)
+  }
+
+  private fun wantsFreshSession(): Boolean =
+    intent?.getBooleanExtra(EXTRA_NEW_SESSION, false) == true
+
+  override fun onNewIntent(newIntent: Intent?) {
+    super.onNewIntent(newIntent)
+    setIntent(newIntent)
+    if (newIntent?.getBooleanExtra(EXTRA_NEW_SESSION, false) != true) return
+    if (termService == null) return
+    addNewSession(null, false, createRevealAnimation())
   }
 
   private fun toggleToolbar(toolbar: Toolbar?, visible: Boolean) {
@@ -374,7 +384,7 @@ class NeoTermActivity : AppCompatActivity(), ServiceConnection, SharedPreference
         addXSession(session)
       }
 
-      if (intent?.action == Intent.ACTION_RUN) {
+      if (intent?.action == Intent.ACTION_RUN || wantsFreshSession()) {
         addNewSession(
           null,
           false, createRevealAnimation(),
@@ -514,10 +524,15 @@ class NeoTermActivity : AppCompatActivity(), ServiceConnection, SharedPreference
     val sessionCallback = TermSessionCallback()
     val viewClient = TermViewClient(this)
 
-    val parameter = ShellParameter()
-      .callback(sessionCallback)
-      .executablePath("${NeoTermPath.BIN_PATH}/stryker-ch")
-      .initialCommand("clear")
+    val rootless = java.io.File(filesDir, "rootless/.active").exists()
+    val parameter = ShellParameter().callback(sessionCallback)
+    if (rootless) {
+      parameter.executablePath("pty:127.0.0.1:1051")
+    } else {
+      parameter
+        .executablePath("${NeoTermPath.BIN_PATH}/stryker-ch")
+        .initialCommand("clear")
+    }
     val session = termService!!.createTermSession(parameter)
 
     session.mSessionName = sessionName ?: generateSessionName("Stryker")
@@ -568,31 +583,6 @@ class NeoTermActivity : AppCompatActivity(), ServiceConnection, SharedPreference
 
     val tab = createTab(session.title) as TermTab
     tab.termData.initializeSessionWith(session, sessionCallback, viewClient)
-
-    addNewTab(tab, createRevealAnimation())
-    switchToSession(tab)
-  }
-
-  private fun addXSession() {
-    if (!BuildConfig.DEBUG) {
-      MaterialAlertDialogBuilder(this)
-        .setTitle(R.string.error)
-        .setMessage(R.string.sorry_for_development)
-        .setPositiveButton(android.R.string.yes, null)
-        .show()
-      return
-    }
-
-    if (!tabSwitcher.isSwitcherShown) {
-      toggleSwitcher(showSwitcher = true, easterEgg = false)
-    }
-
-    val parameter = XParameter()
-    val session = termService!!.createXSession(this, parameter)
-
-    session.mSessionName = generateXSessionName("X")
-    val tab = createXTab(session.mSessionName) as XSessionTab
-    tab.session = session
 
     addNewTab(tab, createRevealAnimation())
     switchToSession(tab)

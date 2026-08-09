@@ -20,7 +20,6 @@ import com.stryker.terminal.ui.term.NeoTermActivity
 import com.stryker.terminal.utils.NLog
 import com.stryker.terminal.utils.Terminals
 import com.stryker.terminal.utils.extractAssetsDir
-import com.topjohnwu.superuser.Shell
 import java.io.File
 
 class NeoTermService : Service() {
@@ -37,8 +36,9 @@ class NeoTermService : Service() {
   override fun onCreate() {
     super.onCreate()
 
-    if (checkPrefix()) {
+    if (checkPrefix() || assetsStale()) {
       resetApp()
+      stampAssets()
     }
 
     createNotificationChannel()
@@ -50,17 +50,33 @@ class NeoTermService : Service() {
     return !PREFIX_FILE.isDirectory
   }
 
+  private fun assetsStale(): Boolean {
+    return try {
+      val marker = File(NeoTermPath.BIN_PATH, ".assets_version")
+      val cur = packageManager.getPackageInfo(packageName, 0).lastUpdateTime.toString()
+      !marker.isFile || marker.readText().trim() != cur
+    } catch (e: Exception) {
+      true
+    }
+  }
+
+  private fun stampAssets() {
+    try {
+      val cur = packageManager.getPackageInfo(packageName, 0).lastUpdateTime.toString()
+      File(NeoTermPath.BIN_PATH, ".assets_version").writeText(cur)
+    } catch (_: Exception) {
+    }
+  }
+
   fun resetApp() {
     val usr = NeoTermPath.USR_PATH
     val bin = NeoTermPath.BIN_PATH
-    Runtime.getRuntime().exec("mkdir -p $usr/").waitFor()
-    Shell.cmd("/system/bin/rm -rf $bin").exec()
-    Thread.sleep(1200)
+    File(usr).mkdirs()
+    File(bin).deleteRecursively()
     extractAssetsDir("bin", "$bin/")
-    Thread.sleep(800)
-    Shell.cmd("/system/bin/chmod +x $bin/bash").exec()
-    Shell.cmd("/system/bin/chmod +x $bin/stryker-ch").exec()
-    Shell.cmd("/system/bin/chmod +x $bin/android-su").exec()
+    for (name in listOf("bash", "stryker-ch", "android-su")) {
+      try { File(bin, name).setExecutable(true, false) } catch (_: Exception) {}
+    }
   }
 
   override fun onBind(intent: Intent): IBinder? {

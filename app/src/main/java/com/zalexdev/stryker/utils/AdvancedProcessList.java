@@ -3,6 +3,7 @@ package com.zalexdev.stryker.utils;
 import android.app.Activity;
 import android.content.Context;
 
+import com.zalexdev.stryker.engine.GuestExec;
 import com.zalexdev.stryker.logger.LogEntry;
 import com.zalexdev.stryker.logger.LogStore;
 import com.zalexdev.stryker.logger.LogTool;
@@ -32,24 +33,64 @@ public abstract class AdvancedProcessList {
 
     public boolean running = true;
 
+    private final boolean rootless;
+    private GuestExec.Session guestSession;
+
     public AdvancedProcessList(Activity activity, Context context, ArrayList<String> commands, boolean chroot) {
         AdvancedProcessList.activity = activity;
         AdvancedProcessList.context = context;
         core = new Core(context);
-        process = core.generateSuProcess();
         this.cmd = commands;
         this.tool = classifyBatch(commands);
         this.chroot = chroot;
-        output = process.getInputStream();
-        error = process.getErrorStream();
-        input = process.getOutputStream();
+        this.rootless = core.isRootless();
+        if (!rootless) {
+            process = core.generateSuProcess();
+            output = process.getInputStream();
+            error = process.getErrorStream();
+            input = process.getOutputStream();
+        }
         execute();
+    }
+
+    private void startRootlessBatch() {
+        final LogStore store = context != null ? LogStore.from(context) : null;
+        new Thread(() -> {
+            StringBuilder script = new StringBuilder();
+            for (String command : cmd) {
+                if (store != null) store.add(LogEntry.CMD, tool, command);
+                script.append(command).append('\n');
+            }
+            try {
+                guestSession = core.rootless().openStream(script.toString());
+                String line;
+                while ((line = guestSession.reader.readLine()) != null) {
+                    if (line.startsWith(GuestExec.Session.SENTINEL)) break;
+                    line = line.trim();
+                    outputList.add(line);
+                    Pattern p = Pattern.compile("((\\w{2}:){5}\\w{2})");
+                    Matcher m = p.matcher(line);
+                    if (m.find()) {
+                        line = line.replace(m.group(), Core.HIDDEN_MAC);
+                    }
+                    if (store != null) store.add(LogEntry.OUT, tool, line);
+                    String finalLine = line;
+                    activity.runOnUiThread(() -> onNewLine(finalLine));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                if (guestSession != null) guestSession.close();
+            }
+            activity.runOnUiThread(() -> onFinished(outputList));
+            running = false;
+        }).start();
     }
 
     private void startBackground() {
         final LogStore store = context != null ? LogStore.from(context) : null;
         new Thread(() -> {
-            sendCommand(Core.EXECUTE + " " + "ash");
+            sendCommand(Core.EXECUTE + "'" + Core.SHELL + "'");
             for (String command : cmd) {
                 if (store != null) store.add(LogEntry.CMD, tool, command);
                 sendCommand(command);
@@ -110,7 +151,8 @@ public abstract class AdvancedProcessList {
     }
 
     public void execute() {
-        startBackground();
+        if (rootless) startRootlessBatch();
+        else startBackground();
     }
 
     private static String classifyBatch(ArrayList<String> commands) {
@@ -138,7 +180,11 @@ public abstract class AdvancedProcessList {
 
     public void kill() {
         try {
-            process.destroy();
+            if (rootless) {
+                if (guestSession != null) guestSession.close();
+            } else {
+                process.destroy();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }

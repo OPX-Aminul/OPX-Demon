@@ -3,6 +3,7 @@ package com.zalexdev.stryker.coremanger;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,6 +16,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.zalexdev.stryker.R;
 import com.zalexdev.stryker.custom.Package;
+import com.zalexdev.stryker.engine.Apt;
 import com.zalexdev.stryker.utils.Core;
 
 import java.util.ArrayList;
@@ -24,8 +26,13 @@ public class CoreAdapter extends RecyclerView.Adapter<CoreAdapter.ViewHolder> {
     private final Activity activity;
     private final Context context;
     private final Core core;
-    private final ArrayList<Package> packages;
+    private ArrayList<Package> packages;
     private final Runnable onChange;
+
+    public void submit(ArrayList<Package> list) {
+        this.packages = list;
+        notifyDataSetChanged();
+    }
 
     public CoreAdapter(Context context, Activity activity, ArrayList<Package> packages, Runnable onChange) {
         this.context = context;
@@ -81,7 +88,9 @@ public class CoreAdapter extends RecyclerView.Adapter<CoreAdapter.ViewHolder> {
             if (temp.isPythonPackage()) {
                 ok = Core.contains(core.customChrootCommand("pip install --break-system-packages " + temp.getName()), "Successfully installed");
             } else {
-                ok = Core.contains(core.customChrootCommand("apk add " + temp.getName()), "OK:");
+                core.customChrootCommand(TextUtils.join("; ", Apt.env()) + "; " + Apt.update()
+                        + "; " + Apt.install(Apt.shellQuote(temp.getName())));
+                ok = core.hasPackage(temp.getName());
             }
             final boolean okFinal = ok;
             activity.runOnUiThread(() -> {
@@ -108,7 +117,9 @@ public class CoreAdapter extends RecyclerView.Adapter<CoreAdapter.ViewHolder> {
             if (temp.isPythonPackage()) {
                 ok = Core.contains(core.customChrootCommand("pip uninstall " + temp.getName() + " -y"), "Successfully uninstalled");
             } else {
-                ok = Core.contains(core.customChrootCommand("apk del " + temp.getName()), "OK:");
+                core.customChrootCommand(TextUtils.join("; ", Apt.env()) + "; "
+                        + Apt.remove(Apt.shellQuote(temp.getName())));
+                ok = !core.hasPackage(temp.getName());
             }
             final boolean okFinal = ok;
             activity.runOnUiThread(() -> {
