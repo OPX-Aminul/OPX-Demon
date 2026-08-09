@@ -54,15 +54,30 @@
     }
   },
   "app": {
-    "versionCode": 450,
-    "versionName": "4.5",
+    "versionCode": 600,
+    "versionName": "6.0",
     "url": "https://github.com/zalexdev/strykerapp/releases/download/v6.0/StrykerOSS-6.0.apk",
-    "sha256": "",
-    "size": 0,
+    "sha256": "a39882bb859171cb33a8462bd6d8fa7e56939d21d6969b7bff59dd3d0ff3b6c9",
+    "size": 20887298,
     "mandatory": false,
-    "changelog": ""
+    "changelog": "Added\n- Rootless QEMU engine: the full toolset without root. The app boots an arm64 VM (SLIRP networking, USB passthrough) and routes tools into the guest.\n- Root-free network scanner: mDNS, SSDP, NetBIOS, SNMP, rDNS and TCP-connect probes with device classification.\n- Cameradar for RTSP camera discovery.\n- Reworked dashboard, VM settings screen and engine selection in the intro.\n\nChanged\n- Chroot moved from Alpine to Debian trixie, the same rootfs the rootless VM boots.\n- arm64-v8a only.\n- Terminal reflows full-screen programs on rotate.\n\nRemoved\n- RouterScan module."
   },
   "news": [
+    {
+      "id": 2,
+      "title": "Stryker 6.0 — Rootless engine & Debian",
+      "description": "The full toolset now runs without root: Stryker boots an arm64 QEMU virtual machine and routes tools into the guest. The chroot moved from Alpine to Debian trixie, the same rootfs the VM boots. Also new: a root-free network scanner (mDNS, SSDP, NetBIOS, SNMP), Cameradar RTSP discovery, a reworked dashboard and VM settings. RouterScan has been removed. arm64-v8a only.",
+      "newsDate": "2026-08-09",
+      "newsUrl": "https://github.com/zalexdev/strykerapp/releases/tag/v6.0",
+      "imageUrl": "",
+      "pinned": true,
+      "actionbutton1": true,
+      "actionbutton1text": "Open release",
+      "actionbutton1url": "https://github.com/zalexdev/strykerapp/releases/tag/v6.0",
+      "actionbutton2": false,
+      "actionbutton2text": "",
+      "actionbutton2url": ""
+    },
     {
       "id": 1,
       "title": "StrykerOSS is open source",
