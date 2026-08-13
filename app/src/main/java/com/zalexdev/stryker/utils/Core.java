@@ -304,15 +304,39 @@ public class Core {
         }
     }
 
+    /**
+     * The path the app process can use to reach {@code path}, or null when it is not somewhere
+     * the app can read directly.
+     *
+     * Three spellings of the same directory are in use across the codebase: the guest/chroot
+     * path (/sdcard/Stryker/...), the host path (getStorage() + "Stryker/..."), and getShareRoot().
+     * Under root the last two are the same directory, but when rootless the share lives somewhere
+     * else entirely, so both of the first two have to be redirected onto the share root.
+     */
+    public String hostPath(String path) {
+        if (path == null || path.isEmpty()) return null;
+        final String guestRoot = "/sdcard/Stryker";
+        if (path.startsWith(guestRoot)) return getShareRoot() + path.substring(guestRoot.length());
+        String legacyRoot = getStorage() + "Stryker";
+        if (path.startsWith(legacyRoot)) return getShareRoot() + path.substring(legacyRoot.length());
+        if (path.startsWith(getStorage())) return path;
+        return null;
+    }
+
+    /**
+     * Names of the files in {@code parentDir}.
+     *
+     * Shared storage is listed through the app process in every mode, deliberately. A root shell
+     * does not necessarily see /storage/emulated/0 the way the app does — each app gets its own
+     * mount namespace and plain `su` stays outside it, so `ls` can come back empty for a folder
+     * the user is looking at in a file manager. Listing through the app is what makes the UI
+     * agree with the user; only paths the app genuinely cannot read fall through to the shell.
+     */
     public ArrayList<String> getListFiles(String parentDir) {
-        if (isRootless()) {
+        String host = hostPath(parentDir);
+        if (host != null) {
             ArrayList<String> names = new ArrayList<>();
-            String host = parentDir;
-            if (parentDir != null && parentDir.startsWith("/sdcard/Stryker")) {
-                host = getShareRoot() + parentDir.substring("/sdcard/Stryker".length());
-            }
-            File dir = new File(host == null ? "" : host);
-            File[] fs = dir.listFiles();
+            File[] fs = new File(host).listFiles();
             if (fs != null) for (File f : fs) names.add(f.getName());
             return names;
         }

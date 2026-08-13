@@ -83,7 +83,14 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
     private static final Pattern MAC_TOKEN = Pattern.compile("(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}");
 
     private String archiveCapture(String captureDir, String filename) {
-        java.io.File[] caps = new java.io.File(core.getShareRoot() + "/hs")
+        String safe = filename.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (safe.length() > 120) safe = safe.substring(safe.length() - 120);
+        String dest = captureDir + "/" + safe;
+        String hsDir = core.getShareRoot() + "/hs";
+        //noinspection ResultOfMethodCallIgnored
+        new java.io.File(captureDir).mkdirs();
+
+        java.io.File[] caps = new java.io.File(hsDir)
                 .listFiles((d, n) -> n.startsWith("handshake-") && n.endsWith(".cap"));
         java.io.File newest = null;
         if (caps != null) {
@@ -91,13 +98,19 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                 if (newest == null || f.lastModified() > newest.lastModified()) newest = f;
             }
         }
-        if (newest == null) return null;
-        //noinspection ResultOfMethodCallIgnored
-        new java.io.File(captureDir).mkdirs();
-        String safe = filename.replaceAll("[^A-Za-z0-9._-]", "_");
-        if (safe.length() > 120) safe = safe.substring(safe.length() - 120);
-        String dest = captureDir + "/" + safe;
-        core.moveFile(newest.getAbsolutePath(), dest);
+        if (newest != null) {
+            core.moveFile(newest.getAbsolutePath(), dest);
+            if (new java.io.File(dest).isFile()) return dest;
+        }
+        if (core.isRootless()) return null;
+
+        // airodump wrote the capture as root from inside the chroot, and a root process does not
+        // always share the app's view of shared storage: listFiles() above can come back empty
+        // for a file that is really there. Retry the whole pick-and-move inside a mount-master
+        // root shell, which joins the same namespace the app sees.
+        core.customMegaCommand("mkdir -p '" + captureDir + "'; "
+                + "src=$(ls -1t '" + hsDir + "'/handshake-*.cap 2>/dev/null | head -n 1); "
+                + "if [ -n \"$src\" ]; then mv -f \"$src\" '" + dest + "'; fi");
         return new java.io.File(dest).isFile() ? dest : null;
     }
 
@@ -514,11 +527,11 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
         else if (type == 2){
             AtomicBoolean selected = new AtomicBoolean(false);
             WiFINetwork result = new WiFINetwork();
-            ArrayList<String> get = core.getListFiles(core.getStorage() + "Stryker/wordlists/");
+            ArrayList<String> get = core.getListFiles(core.getShareRoot() + "/wordlists");
             if (!get.isEmpty()){
                 String[] w2 = new String[get.size()];
                 for (int i = 0; i < get.size(); i++) {
-                    w2[i] = get.get(i).replace(core.getStorage() + "Stryker/wordlists/", "");
+                    w2[i] = get.get(i).replace(core.getShareRoot() + "/wordlists/", "");
                 }
                 new MaterialAlertDialogBuilder(context)
                         .setTitle(R.string.select_word2)
@@ -572,7 +585,7 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
 
                                 @Override
                                 public void doOnBackground() {
-                                    try (BufferedReader br = new BufferedReader(new FileReader(core.getStorage() + "Stryker/wordlists/"+wordlistpath))) {
+                                    try (BufferedReader br = new BufferedReader(new FileReader(core.getShareRoot() + "/wordlists/"+wordlistpath))) {
                                         String psk;
                                         while ((psk = br.readLine()) != null) {
                                             if (this.canceled){break;}

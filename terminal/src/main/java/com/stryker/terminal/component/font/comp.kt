@@ -55,7 +55,7 @@ class FontComponent : NeoComponent {
     fonts.put("Sans Serif", NeoFont(Typeface.SANS_SERIF))
     fonts.put("Serif", NeoFont(Typeface.SERIF))
     val fontDir = File(NeoTermPath.FONT_PATH)
-    for (file in fontDir.listFiles({ pathname -> pathname.name.endsWith(".ttf") })) {
+    for (file in fontDir.listFiles({ pathname -> pathname.name.endsWith(".ttf") }).orEmpty()) {
       val fontName = fontName(file)
       val font = NeoFont(file)
       fonts.put(fontName, font)

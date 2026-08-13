@@ -37,7 +37,7 @@ class ProfileComponent : ConfigFileBasedComponent<NeoProfile>(NeoTermPath.PROFIL
   fun reloadProfiles() {
     profileList.clear()
     File(baseDir)
-      .listFiles(NEOLANG_FILTER)
+      .listFiles(NEOLANG_FILTER).orEmpty()
       .mapNotNull {
         this.loadConfigure(it)
       }

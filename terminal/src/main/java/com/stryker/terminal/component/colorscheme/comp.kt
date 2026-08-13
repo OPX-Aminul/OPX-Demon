@@ -52,7 +52,7 @@ class ColorSchemeComponent : ConfigFileBasedComponent<NeoColorScheme>(NeoTermPat
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       File(baseDir)
-        .listFiles(NEOLANG_FILTER)
+        .listFiles(NEOLANG_FILTER).orEmpty()
         .mapNotNull { this.loadConfigure(it) }
         .forEach {
           colors.put(it.colorName, it)

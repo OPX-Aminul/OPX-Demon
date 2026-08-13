@@ -60,7 +60,7 @@ class ExtraKeyComponent : ConfigFileBasedComponent<NeoExtraKey>(NeoTermPath.EKS_
     extraKeys.clear()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       File(baseDir)
-        .listFiles(NEOLANG_FILTER)
+        .listFiles(NEOLANG_FILTER).orEmpty()
         .filter { it.absolutePath != NeoTermPath.EKS_DEFAULT_FILE }
         .mapNotNull { this.loadConfigure(it) }
         .forEach {
