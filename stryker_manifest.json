@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 600,
-    "versionName": "6.0",
-    "url": "https://github.com/zalexdev/strykerapp/releases/download/v6.0/StrykerOSS-6.0.apk",
-    "sha256": "a39882bb859171cb33a8462bd6d8fa7e56939d21d6969b7bff59dd3d0ff3b6c9",
-    "size": 20887298,
+    "versionCode": 601,
+    "versionName": "6.0.1",
+    "url": "https://github.com/zalexdev/strykerapp/releases/download/6.0.1/StrykerOSS-6.0.1.apk",
+    "sha256": "26c63b1d9b6c3369cf61674d0797ad97b4d3b4bcec5c2b86c3d78906dc67f972",
+    "size": 20888762,
     "mandatory": false,
-    "changelog": "Added\n- Rootless QEMU engine: the full toolset without root. The app boots an arm64 VM (SLIRP networking, USB passthrough) and routes tools into the guest.\n- Root-free network scanner: mDNS, SSDP, NetBIOS, SNMP, rDNS and TCP-connect probes with device classification.\n- Cameradar for RTSP camera discovery.\n- Reworked dashboard, VM settings screen and engine selection in the intro.\n\nChanged\n- Chroot moved from Alpine to Debian trixie, the same rootfs the rootless VM boots.\n- arm64-v8a only.\n- Terminal reflows full-screen programs on rotate.\n\nRemoved\n- RouterScan module."
+    "changelog": "Hotfix over 6.0.\n\nFixed\n- Data loss when upgrading from installs older than 4.5R: the check before deleting the old chroot could miss a still-attached bind and delete through it into internal storage. Detection now covers every layout, and no recursive delete runs while anything is mounted.\n- The install no longer continues after a failed cleanup.\n- Devices without root reported \"no usable tar\" instead of naming the real cause. The pre-check now offers the rootless engine rather than starting an install that cannot finish.\n- Captured handshakes were not moved into the captured folder.\n- Wordlists were not listed in the pickers.\n- The terminal could crash on launch with \"Cannot create component config directory\"."
   },
   "news": [
     {
