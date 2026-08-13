@@ -37,7 +37,7 @@ object SourceHelper {
         .filter { it.isNotEmpty() }
 
       File(NeoTermPath.PACKAGE_LIST_DIR)
-        .listFiles()
+        .listFiles().orEmpty()
         .filterTo(sourceFiles) { file ->
           prefixes.filter { file.name.startsWith(it) }
             .count() > 0
