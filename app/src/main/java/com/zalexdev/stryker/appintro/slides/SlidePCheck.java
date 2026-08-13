@@ -24,6 +24,8 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.zalexdev.stryker.R;
+import com.zalexdev.stryker.appintro.AppIntroActivity;
+import com.zalexdev.stryker.engine.EngineType;
 import com.zalexdev.stryker.utils.Core;
 
 import java.util.Locale;
@@ -58,6 +60,7 @@ public class SlidePCheck extends Fragment {
     private TextView spaceSub, spaceBadge;
 
     private boolean checked = false;
+    private boolean switchToRootless = false;
 
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
 
@@ -95,6 +98,12 @@ public class SlidePCheck extends Fragment {
         spaceBadge = view.findViewById(R.id.isSpaceBadge);
 
         button.setOnClickListener(view12 -> {
+            if (switchToRootless) {
+                EngineType.persist(core, EngineType.ROOTLESS);
+                ((AppIntroActivity) activity).applyEngineFlow(EngineType.ROOTLESS);
+                mPager.post(() -> core.moveNext(mPager));
+                return;
+            }
             if (checked) {
                 core.moveNext(mPager);
                 return;
@@ -129,9 +138,35 @@ public class SlidePCheck extends Fragment {
         renderRows(rootOk, monFinal, usbOk, manufactOk, spaceOk, freeGb);
 
         checked = true;
-        button.setEnabled(true);
-        button.setText(context.getResources().getString(R.string.next));
-        button.setIconResource(R.drawable.bolt);
+        applyGate(rootOk);
+    }
+
+    /**
+     * Decides what the button does once the checks are in.
+     *
+     * Everything past this slide — unpacking, mounting, apt — runs through a root shell, so
+     * without su the chroot install cannot get anywhere: it used to run anyway and die deep in
+     * the process with a reason invented from empty command output. The rootless VM engine needs
+     * no root, so offer that instead of a dead end; only when it is unsupported too is there
+     * genuinely nothing to continue to.
+     */
+    private void applyGate(boolean rootOk) {
+        switchToRootless = false;
+        if (rootOk) {
+            button.setEnabled(true);
+            button.setText(context.getResources().getString(R.string.next));
+            button.setIconResource(R.drawable.bolt);
+            return;
+        }
+        if (EngineType.rootlessSupported(context)) {
+            switchToRootless = true;
+            button.setEnabled(true);
+            button.setText(context.getResources().getString(R.string.pcheck_switch_rootless));
+            button.setIconResource(R.drawable.bolt);
+        } else {
+            button.setEnabled(false);
+            button.setText(context.getResources().getString(R.string.pcheck_no_root));
+        }
     }
 
     @SuppressLint("SetTextI18n")
@@ -211,9 +246,7 @@ public class SlidePCheck extends Fragment {
                 renderRows(rootOk, monFinal, usbOk, manufactOk, spaceOk, freeGb);
 
                 checked = true;
-                button.setEnabled(true);
-                button.setText(context.getResources().getString(R.string.next));
-                button.setIconResource(R.drawable.bolt);
+                applyGate(rootOk);
             });
         }).start();
     }

@@ -134,6 +134,8 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
     <string name="installing">Installing...</string>
     <string name="loading">Loading...</string>
     <string name="next">Next</string>
+    <string name="pcheck_switch_rootless">Use the rootless engine instead</string>
+    <string name="pcheck_no_root">Root required — cannot continue</string>
     <string name="not">❌</string>
     <string name="done">Done</string>
     <string name="unhandled_exception">An unhandled exception!</string>

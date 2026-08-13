@@ -148,7 +148,12 @@ public class Slide3 extends Fragment {
         new Thread(() -> {
             markStage(InstallStage.PREPARING, RowState.ACTIVE);
             log(LogLevel.STEP, "Preparing storage layout");
-            clear();
+            if (!clear()) {
+                markStage(InstallStage.PREPARING, RowState.FAILED);
+                failWith("The previous Linux system is still mounted and could not be detached — "
+                        + "reboot the device and run the install again");
+                return;
+            }
             markStage(InstallStage.PREPARING, RowState.DONE);
             log(LogLevel.SUCCESS, "Storage layout ready");
 
@@ -340,15 +345,20 @@ public class Slide3 extends Fragment {
     }
 
     @SuppressLint("SdCardPath")
-    private void clear() {
+    private boolean clear() {
         core.chmodFolder("/data/data/com.zalexdev.stryker/files/");
         core.createFolder(core.getStorage() + "/Stryker/");
         core.createFolder("/data/local/stryker");
-        if (core.isMounted() || core.checkFolder(Core.CHROOT_ROOT + "/bin")) {
+        // Any live mount under the chroot root counts, not just a fully assembled one: a chroot
+        // from before 4.5R binds the whole /sdcard inside itself, and both the extract below and
+        // purgeChroot would otherwise run straight across it into the user's real storage.
+        boolean anyMount = !core.mountsUnder(Core.CHROOT_ROOT).isEmpty();
+        if (anyMount || core.isMounted() || core.checkFolder(Core.CHROOT_ROOT + "/bin")) {
             log(LogLevel.STEP, "Removing the previous Linux system");
             if (!core.purgeChroot()) {
-                log(LogLevel.WARN, "The previous chroot is still mounted — reboot and retry "
-                        + "if the install fails");
+                log(LogLevel.ERROR, "The previous chroot is still mounted — refusing to install "
+                        + "over it. Reboot the device and try again.");
+                return false;
             }
         }
         core.deleteFile(core.getStorage() + "Stryker/release");
@@ -360,6 +370,7 @@ public class Slide3 extends Fragment {
         core.createFolder(core.getStorage() + "Stryker/wordlists");
         core.createFolder(core.getStorage() + "Stryker/reports");
         core.createFolder(core.getStorage() + "Stryker/rs");
+        return true;
     }
 
     private static final String TAR_RC = "__STRYKER_TAR_RC__";
@@ -374,7 +385,7 @@ public class Slide3 extends Fragment {
 
         String tar = core.tarCommand();
         if (tar == null) {
-            extractFailure = "no usable tar — busybox could not run and the system provides none";
+            extractFailure = core.tarFailureReason();
             return false;
         }
         log(LogLevel.CMD, tar + " -xzf " + DOWNLOADED_CHROOT_PATH + " -C /data/local/stryker/");

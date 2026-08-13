@@ -85,6 +85,7 @@ f_dir_umount() {
     for i in dev/pts dev/shm dev proc sys system; do
         f_umount_fs "$i"
     done
+    f_umount_leftovers
 }
 
 ########## Check if chroot directory is a mountpoint ##########
@@ -97,22 +98,53 @@ f_is_mntpoint() {
 }
 
 ########## Unmount sdcard so it wont break internal storage ##########
-# Only /sdcard/Stryker is bind-mounted now (see bootroot f_mount_sdcard), so the
-# worst case here can never reach beyond our own folder. Prefer a real umount;
-# only remove the chroot-side mountpoint once it is genuinely detached, so we can
-# never rm THROUGH a still-attached bind. Removing the empty mountpoint on success
-# is what lets the app detect "unmounted" (checkFolder .../sdcard/Stryker == false).
+# Detach a single bind, and delete the chroot-side mountpoint ONLY after confirming it is
+# genuinely detached, so we can never rm THROUGH a still-attached bind. A path that is not
+# a mountpoint is left completely alone: under the pre-4.5R layout $MNT/sdcard/Stryker is a
+# plain directory sitting inside a live whole-/sdcard bind, and removing it there would
+# delete the user's real data.
+f_umount_one_bind() {
+    target="$1"
+    $BUSYBOX mountpoint -q "$target" || return 0
+    $BUSYBOX umount "$target" 2> /dev/null || $BUSYBOX umount -l "$target" 2> /dev/null
+    if $BUSYBOX mountpoint -q "$target"; then
+        echo "[-] $target still mounted; left in place"
+        isAllunmounted=1
+        return 1
+    fi
+    rm -rf "$target"
+    echo "[+] Umounted and cleared $target"
+    return 0
+}
+
+# Current releases bind only /sdcard/Stryker (see bootroot f_mount_sdcard), but a chroot
+# installed by Stryker before 4.5R bound the WHOLE /sdcard at $MNT/sdcard. On upgrade that
+# older bind is still attached, so both layouts have to be handled here - miss it and the
+# user's entire internal storage stays reachable through the chroot tree.
 f_umount_sdcard() {
-    if $BUSYBOX mountpoint -q "$MNT/sdcard/Stryker"; then
-        $BUSYBOX umount "$MNT/sdcard/Stryker" 2> /dev/null ||
-            $BUSYBOX umount -l "$MNT/sdcard/Stryker"
-    fi
-    if $BUSYBOX mountpoint -q "$MNT/sdcard/Stryker"; then
-        echo "[-] $MNT/sdcard/Stryker still mounted; left in place"
-    else
-        rm -rf "$MNT/sdcard/Stryker"
-        echo "[+] Umounted and cleared $MNT/sdcard/Stryker"
-    fi
+    # Deepest first: the legacy whole-/sdcard bind is the parent of the current one.
+    f_umount_one_bind "$MNT/sdcard/Stryker"
+    f_umount_one_bind "$MNT/sdcard"
+}
+
+########## Detach anything still attached under $MNT ##########
+# The fixed list above only covers layouts this release knows about. A chroot from an older
+# Stryker, or one left half torn down by a reboot, can carry mounts the list misses, and the
+# app refuses to delete the chroot while any of them are live. Sweep /proc/mounts and detach
+# whatever is left, deepest path first. Never deletes - umount only.
+f_umount_leftovers() {
+    n=0
+    while [ $n -lt 5 ]; do
+        left=$($BUSYBOX awk -v m="$MNT" '$2 == m || index($2, m "/") == 1 {print $2}' \
+            /proc/mounts | $BUSYBOX sort -r)
+        [ -z "$left" ] && return 0
+        for mp in $left; do
+            $BUSYBOX umount "$mp" 2> /dev/null || $BUSYBOX umount -l "$mp" 2> /dev/null
+        done
+        n=$((n + 1))
+    done
+    echo "[-] Some mounts under $MNT could not be detached"
+    isAllunmounted=1
 }
 
 #################
