@@ -688,40 +688,110 @@ public class Core {
     }
 
     /**
+     * Every mountpoint currently attached at or under {@code path}, read from /proc/mounts.
+     *
+     * This is the gate in front of every recursive delete under the chroot, and it is
+     * deliberately layout-agnostic. isMounted() answers a different question — "is the chroot
+     * fully assembled and usable" — and requires a specific set of mounts, so it reports false
+     * for a chroot that is only partly attached. A half-torn-down chroot is exactly the state
+     * where deleting is most destructive, and it is also what an upgrade from an older Stryker
+     * looks like: releases before 4.5R bound the WHOLE /sdcard at <root>/sdcard instead of
+     * <root>/sdcard/Stryker, so a readiness check that looks for the current layout sees
+     * "not mounted" while the user's entire internal storage is still attached underneath.
+     * Anything at or under the path counts here, whatever its shape.
+     */
+    public ArrayList<String> mountsUnder(String path) {
+        ArrayList<String> mounts = new ArrayList<>();
+        if (path == null || path.isEmpty()) return mounts;
+        String root = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+        for (String s : customCommand("cat /proc/mounts", true)) {
+            if (s == null) continue;
+            String[] parts = s.trim().split("\\s+");
+            if (parts.length < 2) continue;
+            // /proc/mounts escapes spaces in the target as \040.
+            String target = parts[1].replace("\\040", " ");
+            if (target.equals(root) || target.startsWith(root + "/")) mounts.add(target);
+        }
+        return mounts;
+    }
+
+    /**
+     * True only when /proc/mounts was actually read. Every caller here is about to delete
+     * something, so an unreadable mount table has to fail closed: no root, a dead su session or
+     * a truncated read would otherwise look identical to "nothing is mounted".
+     */
+    private boolean mountTableReadable() {
+        for (String s : customCommand("cat /proc/mounts", true)) {
+            if (s != null && s.contains(" / ")) return true;
+        }
+        return false;
+    }
+
+    /**
+     * rm -rf that refuses to run while anything is still mounted at or under the target.
+     * The chroot binds real storage inside itself, so deleting across a live bind walks
+     * straight through it and destroys the user's data instead of the chroot.
+     */
+    public boolean safeDeleteTree(String path) {
+        if (path == null || path.trim().isEmpty() || path.trim().equals("/")) {
+            logger.writeLine("Refusing to delete an empty or root path", 3);
+            return false;
+        }
+        if (!mountTableReadable()) {
+            logger.writeLine("Could not read /proc/mounts — refusing to delete " + path, 3);
+            return false;
+        }
+        ArrayList<String> live = mountsUnder(path);
+        if (!live.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (String m : live) {
+                if (sb.length() > 0) sb.append(", ");
+                sb.append(m);
+            }
+            logger.writeLine("Refusing to delete " + path + " — still mounted: " + sb, 3);
+            return false;
+        }
+        customCommand("rm -rf " + path);
+        return true;
+    }
+
+    /**
      * Unmount and delete the installed rootfs. Refuses to delete while anything is still mounted:
-     * the chroot bind-mounts /sdcard inside itself, so an rm -rf over a live mount would wipe the
-     * user's real storage.
+     * the chroot bind-mounts real storage inside itself, so an rm -rf over a live mount would
+     * wipe the user's data.
      */
     public boolean purgeChroot(){
         logger.writeLine("Removing the previous chroot", 1);
         unmountCore();
-        for (int i = 0; i < 10 && isMounted(); i++) {
+        for (int i = 0; i < 10 && !mountsUnder(CHROOT_ROOT).isEmpty(); i++) {
             try { Thread.sleep(500); } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
             }
         }
-        if (isMounted()) {
+        if (!safeDeleteTree(CHROOT_ROOT)) {
             logger.writeLine("Could not unmount the old chroot — refusing to delete it", 3);
             return false;
         }
-        customCommand("rm -rf " + CHROOT_ROOT);
         boolean gone = !checkFolder(CHROOT_ROOT + "/bin") && !checkFolder(CHROOT_ROOT + "/usr");
         logger.writeLine(gone ? "Previous chroot removed" : "Previous chroot could not be removed",
                 gone ? 2 : 3);
         return gone;
     }
 
+    /** Runs killroot and reports whether the chroot is genuinely detached afterwards. */
     public Boolean unmountCore(){
         customMegaCommand("/data/data/com.zalexdev.stryker/files/killroot");
-        return !checkFolder("/data/local/stryker/release/sdcard/Stryker");
+        return mountTableReadable() && mountsUnder(CHROOT_ROOT).isEmpty();
     }
+    /** True when the chroot is fully assembled and usable — not a safety check, see mountsUnder. */
     public Boolean isMounted(){
-        return isChrootMounted("/data/local/stryker/release");
+        return isChrootMounted(CHROOT_ROOT);
     }
     private boolean isChrootMounted(String root){
         boolean proc = false, sys = false, dev = false, sdcard = false;
         for (String s : customCommand("cat /proc/mounts", true)) {
+            if (s == null) continue;
             if (s.contains(" " + root + "/proc ")) proc = true;
             if (s.contains(" " + root + "/sys ")) sys = true;
             if (s.contains(" " + root + "/dev ")) dev = true;
@@ -795,20 +865,30 @@ public class Core {
         }
     }
 
-    public Process generateSuProcess(){
-        Process process = null;
-        try {
-            process = Runtime.getRuntime().exec("su");
-        } catch (IOException e) {
-            e.printStackTrace();
+    /** True when the last generateSuProcess() could not spawn su at all. See the note there. */
+    private volatile boolean suSpawnFailed = false;
 
+    public boolean suSpawnFailed() { return suSpawnFailed; }
+
+    public Process generateSuProcess(){
+        try {
+            Process process = Runtime.getRuntime().exec("su");
+            suSpawnFailed = false;
+            return process;
+        } catch (IOException e) {
+            // No su on this device. Most callers dereference the returned Process without a null
+            // check, so hand back an inert one instead of crashing them — but record the fact.
+            // Without that flag a missing su is indistinguishable from a command that simply
+            // printed nothing, and every failure downstream invents its own reason for the empty
+            // output: that is how "no root" used to surface as "no usable tar".
+            suSpawnFailed = true;
+            logger.writeLine("su is not available on this device", 3);
             try {
-                process = Runtime.getRuntime().exec("echo Device is not rooted");
+                return Runtime.getRuntime().exec(new String[]{"/system/bin/sh", "-c", "exit 1"});
             } catch (IOException ex) {
-                ex.printStackTrace();
+                return null;
             }
         }
-        return  process;
     }
 
 
@@ -1089,6 +1169,22 @@ public class Core {
             if (l != null && l.trim().startsWith("/")) return l.trim();
         }
         return null;
+    }
+
+    /**
+     * Why tarCommand() came back null, phrased for the user.
+     *
+     * Both probes it runs — the busybox smoke test and `command -v tar` — go through a root
+     * shell, so on a device with no usable su every one of them returns nothing and the chain
+     * reads as "busybox is broken and the system has no tar". That conclusion is wrong: Android
+     * has shipped a toybox tar since 6.0, and a working root shell would have found it. Empty
+     * output there means no shell ran, so say that instead of blaming tar.
+     */
+    public String tarFailureReason() {
+        if (suSpawnFailed() || !checkRoot()) {
+            return "no root access — su did not return a root shell";
+        }
+        return "no usable tar — busybox could not run and the system provides none";
     }
 
     public void moveFile(@NonNull String source, @NonNull String destination){

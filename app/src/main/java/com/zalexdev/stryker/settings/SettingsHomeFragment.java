@@ -274,9 +274,9 @@ public class SettingsHomeFragment extends Fragment {
         setStep(s1, i1, l1, STEP_ACTIVE);
 
         new Thread(() -> {
-            boolean mounted = core.unmountCore();
+            boolean detached = core.unmountCore();
             ui(() -> {
-                if (mounted) {
+                if (detached) {
                     setStep(s1, i1, l1, STEP_DONE);
                     setStep(s2, i2, l2, STEP_ACTIVE);
                 } else {
@@ -286,9 +286,20 @@ public class SettingsHomeFragment extends Fragment {
                     close.setVisibility(View.VISIBLE);
                 }
             });
-            if (!mounted) return;
+            if (!detached) return;
 
-            core.customCommand("rm -rf /data/local/stryker");
+            // Guarded: this deletes the parent of the chroot, so a bind left attached anywhere
+            // underneath would be followed into the user's real storage. Stop before uninstalling
+            // if it refuses — an uninstall would leave the mount live with no way to clear it.
+            if (!core.safeDeleteTree("/data/local/stryker")) {
+                ui(() -> {
+                    setStep(s2, i2, l2, STEP_FAIL);
+                    bar.setVisibility(View.GONE);
+                    err.setVisibility(View.VISIBLE);
+                    close.setVisibility(View.VISIBLE);
+                });
+                return;
+            }
             ui(() -> {
                 setStep(s2, i2, l2, STEP_DONE);
                 setStep(s3, i3, l3, STEP_ACTIVE);
