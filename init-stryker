@@ -1,0 +1,64 @@
+#!/bin/sh
+# StrykerOSS initramfs bootstrap — mounts overlay, switch_root to /sbin/init.
+set -e
+
+# Ensure mount points exist
+mkdir -p /proc /sys /dev /run
+
+echo "[stryker-init] mounting virtual filesystems" > /dev/console
+
+mount -t proc    -o noexec,nosuid,nodev     proc      /proc
+mount -t sysfs   -o noexec,nosuid,nodev     sysfs     /sys
+mount -t devtmpfs -o exec,nosuid,mode=0755  devtmpfs  /dev || true
+
+echo "Mounting storage..." > /dev/console
+
+# modprobe safety net (built-in drivers are already available)
+[ -d "/lib/modules/$(uname -r)" ] && { depmod -a 2>/dev/null; modprobe virtio_blk 2>/dev/null; }
+
+# /dev/vda = persistent ext4 (user data, pentest results)
+# /dev/vdb = read-only rootfs squashfs (system files)
+mkdir -p /mnt/persist /mnt/lower /mnt/overlay
+
+# Bounded wait for virtio block nodes
+for _i in $(seq 1 30); do
+    [ -b /dev/vda ] && [ -b /dev/vdb ] && break
+    sleep 0.1
+done
+
+# Persistent: format on first boot if needed
+if ! mount -t ext4 -o rw,noatime,commit=1,barrier=1 /dev/vda /mnt/persist 2>/dev/null; then
+    e2fsck -y /dev/vda >/dev/null 2>&1 || mkfs.ext4 -q -F /dev/vda
+    mount -t ext4 -o rw,noatime,commit=1,barrier=1 /dev/vda /mnt/persist \
+        || { echo "FATAL: persistent ext4 (/dev/vda) mount failed" > /dev/console; exec sh; }
+fi
+
+# Online resize (no-op if already correct size)
+resize2fs /dev/vda >/dev/null 2>&1 \
+    || echo "WARN: resize2fs /dev/vda failed" > /dev/console
+
+echo "Mounting system..." > /dev/console
+mount -t squashfs -o ro /dev/vdb /mnt/lower \
+    || { echo "FATAL: squashfs (/dev/vdb) mount failed" > /dev/console; exec sh; }
+
+mkdir -p /mnt/persist/upper /mnt/persist/work
+
+# Stack overlay
+mount -t overlay overlay \
+    -o lowerdir=/mnt/lower,upperdir=/mnt/persist/upper,workdir=/mnt/persist/work \
+    /mnt/overlay \
+    || { echo "FATAL: overlay mount failed" > /dev/console; exec sh; }
+
+echo "Switching root..." > /dev/console
+
+# Prepare for switch_root: move mounts into new root
+mkdir -p /mnt/overlay/run
+mkdir -p /mnt/overlay/proc
+mkdir -p /mnt/overlay/sys
+mkdir -p /mnt/overlay/dev
+
+mount --move /proc /mnt/overlay/proc 2>/dev/null || true
+mount --move /sys  /mnt/overlay/sys  2>/dev/null || true
+mount --move /dev  /mnt/overlay/dev  2>/dev/null || true
+
+exec switch_root /mnt/overlay /sbin/init
