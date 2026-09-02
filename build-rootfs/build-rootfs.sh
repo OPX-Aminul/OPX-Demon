@@ -266,4 +266,20 @@ mkdir -p "$ROOTFS/sdcard/Stryker/hs"
 mkdir -p "$ROOTFS/sdcard/Stryker/captured"
 mkdir -p "$ROOTFS/sdcard/Stryker/reports"
 
+# ── Extract guest core payload (pixie.py, checker.py, etc.) ───────────────
+if [ -f /work/stryker-guest-core.tar ]; then
+    echo "Extracting stryker-guest-core.tar into rootfs..."
+    tar xf /work/stryker-guest-core.tar -C "$ROOTFS" 2>/dev/null || true
+    # Make scripts executable
+    chmod -R 0755 "$ROOTFS/CORE" 2>/dev/null || true
+    chmod -R 0755 "$ROOTFS/exploits" 2>/dev/null || true
+    chmod 0755 "$ROOTFS/usr/local/sbin/stryker-agentd" 2>/dev/null || true
+    chmod 0755 "$ROOTFS/usr/local/sbin/stryker-ptyd" 2>/dev/null || true
+    echo "Guest core extracted:"
+    ls -la "$ROOTFS/CORE/PixieWps/" 2>/dev/null
+    ls -la "$ROOTFS/exploits/" 2>/dev/null
+else
+    echo "WARNING: stryker-guest-core.tar not found"
+fi
+
 echo "Rootfs build complete — exact match with original StrykerOSS."

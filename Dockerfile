@@ -22,6 +22,9 @@ WORKDIR /work
 RUN debootstrap --variant=minbase --arch=arm64 \
     trixie /work/rootfs http://deb.debian.org/debian
 
+# Copy guest core payload (pixie.py, checker.py, stryker-agentd, etc.)
+COPY rootless-assets/stryker-guest-core.tar /work/stryker-guest-core.tar
+
 # Install packages (exact match with original dpkg status)
 COPY build-rootfs/build-rootfs.sh /work/build-rootfs.sh
 RUN chmod +x /work/build-rootfs.sh && /work/build-rootfs.sh
