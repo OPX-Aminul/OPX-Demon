@@ -15,6 +15,7 @@ ENV DEBIAN_VERSION=trixie
 RUN apt-get update && apt-get install -y --no-install-recommends \
     debootstrap \
     squashfs-tools \
+    e2fsprogs \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /work

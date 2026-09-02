@@ -75,6 +75,7 @@ apt-get install -y --no-install-recommends \
     kmod \
     less \
     linux-base \
+    linux-image-arm64 \
     login \
     login.defs \
     logrotate \
