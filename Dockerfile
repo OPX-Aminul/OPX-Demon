@@ -1,6 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # StrykerOSS Unified Dockerfile — Exact Match with Original
 # Uses Debian Trixie stock kernel (NOT custom-compiled)
+# Docker Buildx GHA mode=max caches ALL layers for fast rebuilds
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ==============================================================================
@@ -20,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /work
 
-# Create minimal rootfs via debootstrap (exact match with original)
+# Create minimal rootfs via debootstrap
 RUN debootstrap --variant=minbase --arch=arm64 \
     trixie /work/rootfs http://deb.debian.org/debian
 
@@ -32,7 +33,6 @@ COPY build-rootfs/build-rootfs.sh /work/build-rootfs.sh
 RUN chmod +x /work/build-rootfs.sh && /work/build-rootfs.sh
 
 # Extract kernel and initrd from the installed rootfs
-# The kernel package (linux-image-6.12.94+deb13-arm64) is already installed by build-rootfs.sh
 RUN cp /work/rootfs/boot/vmlinuz-* /work/Image 2>/dev/null || \
     cp /work/rootfs/boot/vmlinuz /work/Image 2>/dev/null || \
     echo "Kernel not found in /boot — extracting from kernel package"
@@ -100,7 +100,7 @@ RUN wget -q https://github.com/libusb/libusb/releases/download/v1.0.27/libusb-1.
     && ./configure --host=aarch64-linux-android --prefix=${PREFIX} --enable-static --disable-shared --disable-udev CC="${CC}" \
     && make -j$(nproc) install
 
-# QEMU Build (exact match with original binary)
+# QEMU source + patches
 RUN wget -q https://download.qemu.org/${QEMU_DIR}.tar.xz && tar xf ${QEMU_DIR}.tar.xz
 RUN sed -i "s/rt = cc.find_library('rt', required: true)/rt = cc.find_library('rt', required: false)/" ${QEMU_DIR}/meson.build
 RUN printf '#undef st_atime_nsec\n#undef st_mtime_nsec\n#undef st_ctime_nsec\n' | cat - ${QEMU_DIR}/fsdev/9p-marshal.h > /tmp/9p-marshal.h && mv /tmp/9p-marshal.h ${QEMU_DIR}/fsdev/9p-marshal.h
@@ -109,7 +109,7 @@ RUN printf '# disabled for Android Bionic\n' > ${QEMU_DIR}/contrib/ivshmem-serve
 
 # shm_open/shm_unlink shim
 RUN printf '#ifndef OPX_SHM_SHIM_H\n#define OPX_SHM_SHIM_H\nextern int shm_open(const char *, int, unsigned);\nextern int shm_unlink(const char *);\n#endif\n' > /opt/shm_shim.h
-RUN printf '#include <sys/syscall.h>\n#include <unistd.h>\n#include <errno.h>\n#ifndef SYS_memfd_create\n#define SYS_memfd_create 279\n#endif\nint shm_open(const char *n, int f, unsigned m) {\n    (void)f; (void)m;\n    while (*n == '\''/'\'') n++;\n    long fd = syscall(SYS_memfd_create, n, 0);\n    if (fd < 0) { errno = (int)(-fd); return -1; }\n    return (int)fd;\n}\nint shm_unlink(const char *n) { (void)n; return 0; }\n' > /tmp/shm_stub.c \
+RUN printf '#include <sys/syscall.h>\n#include <unistd.h>\n#include <errno.h>\n#ifndef SYS_memfd_create\n#define SYS_memfd_create 279\n#endif\nint shm_open(const char *n, int f, unsigned m) {\n    (void)f; (void)m;\n    while (*n == '"'"'/'"'"') n++;\n    long fd = syscall(SYS_memfd_create, n, 0);\n    if (fd < 0) { errno = (int)(-fd); return -1; }\n    return (int)fd;\n}\nint shm_unlink(const char *n) { (void)n; return 0; }\n' > /tmp/shm_stub.c \
     && ${CC} --sysroot=${LLVM}/sysroot -target aarch64-linux-android26 -c /tmp/shm_stub.c -o /tmp/shm_stub.o \
     && ${AR} rcs ${PREFIX}/lib/libshm.a /tmp/shm_stub.o
 
@@ -129,7 +129,6 @@ RUN sed -i 's@^    rc = libusb_init(&ctx);@#if defined(__ANDROID__)\n    libusb_
     && grep -q LIBUSB_OPTION_NO_DEVICE_DISCOVERY ${QEMU_DIR}/hw/usb/host-libusb.c
 
 # Xiaomi/MIUI USB speed correction quirk (EXTRA improvement over original)
-# Original StrykerOSS does NOT have this — we add it for better compatibility
 COPY build-tools/xiaomi-usb-quirk.c /tmp/xiaomi-usb-quirk.c
 RUN cd ${QEMU_DIR}/hw/usb \
     && sed -i '/cbuf\[7\] = 64;/r /tmp/xiaomi-usb-quirk.c' host-libusb.c \
