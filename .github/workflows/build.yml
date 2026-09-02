@@ -2,6 +2,7 @@ name: Build & Update Release
 
 # Exact match with original StrykerOSS rootless-main release
 # Uses Debian Trixie stock kernel (NOT custom-compiled)
+# Docker Buildx GHA cache: mode=max caches ALL layers for fast rebuilds
 
 on:
   push:
@@ -10,6 +11,7 @@ on:
       - 'Dockerfile'
       - 'build-tools/**'
       - 'build-rootfs/**'
+      - 'rootless-assets/**'
       - '.github/workflows/build.yml'
   workflow_dispatch:
 
@@ -34,7 +36,6 @@ jobs:
 
       # ══════════════════════════════════════════════════════════════════════
       # ROOTFS: Debian Trixie + pentest tools + stryker-agentd
-      # Exact match with original rootfs.imgz (gzip-compressed ext4)
       # ══════════════════════════════════════════════════════════════════════
       - name: Build rootfs
         uses: docker/build-push-action@v6
@@ -58,7 +59,6 @@ jobs:
 
       # ══════════════════════════════════════════════════════════════════════
       # QEMU: Cross-compiled patched QEMU binary
-      # Exact match with original qemu-system-aarch64
       # ══════════════════════════════════════════════════════════════════════
       - name: Build QEMU
         uses: docker/build-push-action@v6
