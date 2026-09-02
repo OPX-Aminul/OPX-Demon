@@ -55,7 +55,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(grep 'versionCode' app/build.gradle | grep -oE '[0-9]+' | head -1)
+          VERSION=$(grep 'versionName' app/build.gradle | grep -oP '[\"\x27]\K[0-9][^"]*')
           TAG="v${VERSION}"
 
           # Create or update release

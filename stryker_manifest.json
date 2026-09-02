@@ -25,32 +25,32 @@
     }
   },
   "rootless": {
-    "version": "rootless-main",
+    "version": "all-core-file",
     "note": "Local dev ships these inside the APK under assets/rootless/. This block is the OTA fallback; arm64-v8a only.",
     "qemu": {
-      "url": "https://github.com/zalexdev/strykerapp/releases/download/rootless-main/qemu-system-aarch64",
-      "sha256": "2a87f531371b3f8d45141d48632e0dbe2c3d968fbcb385ba105d671479fb8c99",
-      "size": 43800304
+      "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/qemu-system-aarch64",
+      "sha256": "e84323d6bcb00f35a426a186d96af64e34a88e5e7fda1bb12d05ee918f46fbca",
+      "size": 128425936
     },
     "kernel": {
-      "url": "https://github.com/zalexdev/strykerapp/releases/download/rootless-main/Image",
+      "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/Image",
       "sha256": "cbe59a02e7ea979a150661032440c94e2c4db0b735af2416e11ae5cac15a58e4",
       "size": 37605312
     },
     "initrd": {
-      "url": "https://github.com/zalexdev/strykerapp/releases/download/rootless-main/initrd.img",
-      "sha256": "655f3ef013e7818e9ee874cf3b44a4c0bdc8a586c986cf237cb74c41862dfd02",
-      "size": 38301815
+      "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/initrd.img",
+      "sha256": "77223e4ad3d4d107f7cd7da41065c8e4fbdfcf662d3923b57d69c879de50bb87",
+      "size": 38228336
     },
     "libslirp": {
-      "url": "https://github.com/zalexdev/strykerapp/releases/download/rootless-main/libslirp.so",
-      "sha256": "226372426fda32c9fccd8e831d0901a86bfff3c3e6f7a60336d6dde149f756c4",
-      "size": 1145496
+      "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/libslirp.so",
+      "sha256": "0ffd8937e252d50a5ded386059856523d083769b7e49160bab41f32fb66376e7",
+      "size": 3371272
     },
     "rootfs": {
-      "url": "https://github.com/zalexdev/strykerapp/releases/download/rootless-main/rootfs.imgz",
-      "sha256": "f80c2b1e2433c3036aa745da2a5935cf5dd61b65b17bbeabae87b49bd68a12ef",
-      "size": 427974567
+      "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/rootfs.imgz",
+      "sha256": "d3ead6368d679e5acc1b55756b773c04b29b225d93d0d0a07ed09a39ca51d255",
+      "size": 379126383
     }
   },
   "app": {

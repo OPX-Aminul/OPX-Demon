@@ -18,7 +18,7 @@ import java.util.concurrent.Executors;
 public final class RootlessEngine {
 
     private static final String TAG = "RootlessEngine";
-    private static final int BOOT_TIMEOUT_MS = 150_000;
+    private static final int BOOT_TIMEOUT_MS = 600_000;
     private static final String PROMPT_MARK = "__STRYKER_ID__";
 
     private static volatile RootlessEngine instance;
