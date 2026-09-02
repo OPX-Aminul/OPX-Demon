@@ -10,6 +10,7 @@
 FROM debian:trixie AS rootfs-builder
 ARG SYSTEM_VERSION=0
 ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_VERSION=trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     debootstrap \
