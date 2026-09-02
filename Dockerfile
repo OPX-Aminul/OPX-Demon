@@ -156,8 +156,9 @@ RUN debootstrap --variant=minbase --arch=arm64 \
 COPY build-rootfs/build-rootfs.sh /work/build-rootfs.sh
 RUN chmod +x /work/build-rootfs.sh && /work/build-rootfs.sh
 
-RUN mksquashfs /work/rootfs /work/rootfs.imgz \
-    -comp zstd -Xcompression-level 19 -all-root -noappend
+RUN mkfs.ext4 -q -F -d /work/rootfs /work/rootfs.img \
+    && gzip -9 -c /work/rootfs.img > /work/rootfs.imgz \
+    && rm /work/rootfs.img
 
 # ==============================================================================
 # SECTION 3: QEMU & Bridge (Android ARM64) Build

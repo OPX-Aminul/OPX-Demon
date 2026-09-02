@@ -39,39 +39,41 @@ apt-get install -y --no-install-recommends \
     python3-pip \
     python3-dev \
     nmap \
-    masscan \
-    nikto \
-    sqlmap \
-    hydra \
-    john \
-    hashcat \
+    nmap-common \
     aircrack-ng \
+    mdk4 \
     reaver \
     pixiewps \
-    bully \
-    wifite2 \
-    hostapd \
-    dnsmasq \
+    macchanger \
     iw \
     wireless-tools \
-    wpa-supplicant \
+    wpasupplicant \
+    usbutils \
+    openssh-server \
+    openssh-client \
+    nftables \
+    squashfs-tools \
+    e2fsprogs \
     tcpdump \
     netcat-openbsd \
-    socat \
-    socat \
     net-tools \
     dnsutils \
     whois \
     traceroute \
-    mtr-tiny \
+    2>/dev/null || true
+
+# Install Python pentest libraries
+apt-get install -y --no-install-recommends \
+    python3-impacket \
+    python3-scapy \
+    python3-cryptography \
+    python3-openssl \
     2>/dev/null || true
 
 # Install WiFi firmware packages (non-free)
 apt-get install -y --no-install-recommends \
     firmware-realtek \
     firmware-atheros \
-    firmware-brcm80211 \
-    firmware-libertas \
     firmware-misc-nonfree \
     2>/dev/null || true
 
