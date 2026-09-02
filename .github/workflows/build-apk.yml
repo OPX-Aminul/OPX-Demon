@@ -1,0 +1,72 @@
+name: Build APK
+
+# Triggers only after build.yml completes successfully.
+# Downloads fresh binaries from all-core-file release, then builds the APK.
+
+on:
+  workflow_run:
+    workflows: ["Build & Update Release"]
+    types: [completed]
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Download fresh binaries from all-core-file release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Downloading latest binaries from all-core-file release..."
+          gh release download all-core-file \
+            --pattern "Image" \
+            --pattern "initrd.img" \
+            --pattern "qemu-system-aarch64" \
+            --pattern "libslirp.so" \
+            --pattern "rootfs.imgz" \
+            --dir app/src/main/assets/rootless/ \
+            --clobber
+
+          echo "✅ Binaries downloaded:"
+          ls -lh app/src/main/assets/rootless/
+
+      - name: Build APK (exact developer build)
+        run: |
+          chmod +x gradlew 2>/dev/null || true
+          ./gradlew assembleRelease
+
+      - name: Create release with APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(grep 'versionCode' app/build.gradle | grep -oE '[0-9]+' | head -1)
+          TAG="v${VERSION}"
+
+          # Create or update release
+          gh release create "$TAG" \
+            --title "StrykerOSS $TAG" \
+            --notes "Automated build from Build & Update Release" \
+            --latest \
+            app/build/outputs/apk/release/*.apk \
+            --clobber || \
+          gh release upload "$TAG" \
+            app/build/outputs/apk/release/*.apk \
+            --clobber
+
+          echo "✅ APK release created: $TAG"

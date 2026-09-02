@@ -1,0 +1,154 @@
+name: Build & Update Release
+
+# Builds everything the build scripts produce:
+#   - kernel + QEMU (main Dockerfile stages)
+#   - rootfs squashfs (rootfs-packer stage)
+#   - initramfs (packer stage)
+# All outputs go to the all-core-file release via gh release upload --clobber.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - 'kernel.config'
+      - 'build-tools/**'
+      - 'build-rootfs/**'
+      - 'init-stryker'
+      - 'opx-bridge.c'
+      - 'opx-launcher.c'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (for arm64 emulation)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ══════════════════════════════════════════════════════════════════════
+      # QEMU: Cross-compiled patched QEMU binary
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Build patched QEMU
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: qemu-builder
+          load: true
+          tags: stryker-qemu-patch
+          build-args: QEMU_VERSION=11.0.2
+          cache-from: type=gha,scope=qemu
+          cache-to: type=gha,scope=qemu,mode=max
+
+      - name: Extract QEMU binaries
+        run: |
+          docker create --name qemu-out stryker-qemu-patch /bin/true
+          docker cp qemu-out:/opt/qemu-out/qemu-system-aarch64 ./qemu-system-aarch64
+          docker cp qemu-out:/opt/qemu-out/libslirp.so ./libslirp.so
+          docker rm qemu-out
+          ls -lh ./qemu-system-aarch64 ./libslirp.so
+
+      # ══════════════════════════════════════════════════════════════════════
+      # KERNEL: Custom kernel with WiFi drivers + Xiaomi USB fix
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Build patched kernel
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: kernel-builder
+          load: true
+          tags: stryker-kernel-patch
+          build-args: KERNEL_VERSION=7.1.5
+          cache-from: type=gha,scope=kernel
+          cache-to: type=gha,scope=kernel,mode=max
+
+      - name: Extract kernel image
+        run: |
+          docker create --name kernel-out stryker-kernel-patch
+          docker cp kernel-out:/output/Image ./Image
+          docker rm kernel-out
+          ls -lh ./Image
+
+      # ══════════════════════════════════════════════════════════════════════
+      # ROOTFS: Debian Trixie with pentest tools (rootfs.imgz)
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Build rootfs squashfs
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: rootfs-packer
+          load: true
+          tags: stryker-rootfs
+          cache-from: type=gha,scope=rootfs
+          cache-to: type=gha,scope=rootfs,mode=max
+
+      - name: Extract rootfs squashfs
+        run: |
+          docker create --name rootfs-out stryker-rootfs
+          docker cp rootfs-out:/work/rootfs.imgz ./rootfs.imgz
+          docker rm rootfs-out
+          echo "✅ rootfs squashfs:"
+          ls -lh ./rootfs.imgz
+
+      # ══════════════════════════════════════════════════════════════════════
+      # INITRAMFS: kernel + minimal initramfs (initrd.img)
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Build initramfs (packer stage)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: packer
+          load: true
+          tags: stryker-packer
+          build-args: KERNEL_VERSION=7.1.5
+          cache-from: |
+            type=gha,scope=kernel
+            type=gha,scope=packer
+          cache-to: type=gha,scope=packer,mode=max
+
+      - name: Extract initramfs
+        run: |
+          docker create --name packer-out stryker-packer
+          docker cp packer-out:/output/initrd.img ./initrd.img
+          docker rm packer-out
+          echo "✅ initramfs:"
+          ls -lh ./initrd.img
+
+      # ══════════════════════════════════════════════════════════════════════
+      # UPLOAD: Replace ALL files in the all-core-file release
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Upload all binaries to all-core-file release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Replacing all files in all-core-file release..."
+
+          gh release upload all-core-file \
+            ./Image \
+            ./initrd.img \
+            ./rootfs.imgz \
+            ./qemu-system-aarch64 \
+            ./libslirp.so \
+            --clobber
+
+          echo ""
+          echo "✅ Done. Release now has:"
+          gh release view all-core-file --json assets \
+            --jq '.assets[] | "  \(.name) (\(.size / 1048576 * 100 | round / 100) MB)"'
+
+      - name: Cleanup
+        if: always()
+        run: docker rmi stryker-qemu-patch stryker-kernel-patch stryker-rootfs stryker-packer 2>/dev/null || true
