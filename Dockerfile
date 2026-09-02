@@ -126,11 +126,8 @@ RUN sed -i '1i#include "/opt/qemu_jmp.h"' ${QEMU_DIR}/util/coroutine-ucontext.c 
 RUN sed -i 's@^    rc = libusb_init(&ctx);@#if defined(__ANDROID__)\n    libusb_set_option(NULL, LIBUSB_OPTION_NO_DEVICE_DISCOVERY);\n#endif\n    rc = libusb_init(\&ctx);@' ${QEMU_DIR}/hw/usb/host-libusb.c \
     && grep -q LIBUSB_OPTION_NO_DEVICE_DISCOVERY ${QEMU_DIR}/hw/usb/host-libusb.c
 
-# Xiaomi/MIUI USB speed correction quirk
-COPY build-tools/xiaomi-usb-quirk.c /tmp/xiaomi-usb-quirk.c
-RUN cd ${QEMU_DIR}/hw/usb \
-    && sed -i '/cbuf\[7\] = 64;/r /tmp/xiaomi-usb-quirk.c' host-libusb.c \
-    && grep -q 'USB_SPEED_LOW.*USB_SPEED_FULL' host-libusb.c
+# NOTE: Xiaomi/MIUI USB fix is in the Debian stock kernel, NOT in QEMU
+# The original StrykerOSS does NOT patch QEMU for this
 
 # Configure and build QEMU (exact flags matching original)
 RUN cd ${QEMU_DIR} && ./configure \
