@@ -46,13 +46,15 @@ jobs:
           cache-from: type=gha,scope=rootfs
           cache-to: type=gha,scope=rootfs,mode=max
 
-      - name: Extract rootfs
+      - name: Extract rootfs + kernel + initrd
         run: |
           docker create --name rootfs-out stryker-rootfs
           docker cp rootfs-out:/work/rootfs.imgz ./rootfs.imgz
+          docker cp rootfs-out:/work/Image ./Image
+          docker cp rootfs-out:/work/initrd.img ./initrd.img
           docker rm rootfs-out
-          echo "✅ rootfs (gzip-compressed ext4):"
-          ls -lh ./rootfs.imgz
+          echo "✅ All rootfs artifacts:"
+          ls -lh ./rootfs.imgz ./Image ./initrd.img
 
       # ══════════════════════════════════════════════════════════════════════
       # QEMU: Cross-compiled patched QEMU binary
@@ -86,6 +88,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload all-core-file \
+            ./Image \
+            ./initrd.img \
             ./rootfs.imgz \
             ./qemu-system-aarch64 \
             ./libslirp.so \

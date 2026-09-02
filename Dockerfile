@@ -26,6 +26,16 @@ RUN debootstrap --variant=minbase --arch=arm64 \
 COPY build-rootfs/build-rootfs.sh /work/build-rootfs.sh
 RUN chmod +x /work/build-rootfs.sh && /work/build-rootfs.sh
 
+# Extract kernel and initrd from the installed rootfs
+# The kernel package (linux-image-6.12.94+deb13-arm64) is already installed by build-rootfs.sh
+RUN cp /work/rootfs/boot/vmlinuz-* /work/Image 2>/dev/null || \
+    cp /work/rootfs/boot/vmlinuz /work/Image 2>/dev/null || \
+    echo "Kernel not found in /boot — extracting from kernel package"
+RUN cp /work/rootfs/boot/initrd.img* /work/initrd.img 2>/dev/null || \
+    cp /work/rootfs/boot/initrd /work/initrd.img 2>/dev/null || \
+    echo "initrd not found in /boot — will be created from rootfs"
+RUN ls -lh /work/Image /work/initrd.img 2>/dev/null || true
+
 # Create gzip-compressed ext4 image (exact format match with original rootfs.imgz)
 RUN dd if=/dev/zero of=/work/rootfs.img bs=1M count=1500 \
     && mkfs.ext4 -q -F -d /work/rootfs /work/rootfs.img \
@@ -151,6 +161,10 @@ RUN cp /opt/qemu-out/bin/qemu-system-aarch64 /opt/qemu-out/qemu-system-aarch64 \
 # ==============================================================================
 
 FROM scratch AS final
+# Kernel (Debian stock — exact match)
+COPY --from=rootfs-builder /work/Image /Image
+# Initramfs (Debian stock — exact match)
+COPY --from=rootfs-builder /work/initrd.img /initrd.img
 # Rootfs (gzip-compressed ext4 — exact format match)
 COPY --from=rootfs-builder /work/rootfs.imgz /rootfs.imgz
 # QEMU binary + networking library
