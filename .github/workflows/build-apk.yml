@@ -64,8 +64,7 @@ jobs:
             --title "StrykerOSS $TAG" \
             --notes "Automated build from Build & Update Release" \
             --latest \
-            app/build/outputs/apk/release/*.apk \
-            --clobber || \
+            app/build/outputs/apk/release/*.apk || \
           gh release upload "$TAG" \
             app/build/outputs/apk/release/*.apk \
             --clobber
