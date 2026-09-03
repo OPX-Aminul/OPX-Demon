@@ -1,7 +1,7 @@
 name: Build APK
 
-# Triggers only after build.yml completes successfully.
-# Downloads fresh binaries from all-core-file release, then builds the APK.
+# Builds a lightweight APK (without rootless binaries).
+# Binaries are downloaded at runtime from the all-core-file release.
 
 on:
   workflow_run:
@@ -30,24 +30,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Download fresh binaries from all-core-file release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Downloading latest binaries from all-core-file release..."
-          gh release download all-core-file \
-            --pattern "Image" \
-            --pattern "initrd.img" \
-            --pattern "qemu-system-aarch64" \
-            --pattern "libslirp.so" \
-            --pattern "rootfs.imgz" \
-            --dir app/src/main/assets/rootless/ \
-            --clobber
-
-          echo "✅ Binaries downloaded:"
-          ls -lh app/src/main/assets/rootless/
-
-      - name: Build APK (exact developer build)
+      - name: Build APK (lightweight — no bundled binaries)
         run: |
           chmod +x gradlew 2>/dev/null || true
           ./gradlew assembleRelease
