@@ -30,10 +30,25 @@ public final class QemuDownloader {
             return new Bundle(r.qemu, r.kernel, r.initrd, r.libslirp, r.rootfs);
         }
         return new Bundle(
-                new RemoteManifest.Asset(StrykerEndpoints.FALLBACK_ROOTLESS_QEMU, "", 0),
-                new RemoteManifest.Asset(StrykerEndpoints.FALLBACK_ROOTLESS_KERNEL, "", 0),
-                new RemoteManifest.Asset(StrykerEndpoints.FALLBACK_ROOTLESS_INITRD, "", 0),
-                new RemoteManifest.Asset(StrykerEndpoints.FALLBACK_ROOTLESS_LIBSLIRP, "", 0),
-                new RemoteManifest.Asset(StrykerEndpoints.FALLBACK_ROOTLESS_ROOTFS, "", 0));
+                new RemoteManifest.Asset(
+                        StrykerEndpoints.FALLBACK_ROOTLESS_QEMU,
+                        StrykerEndpoints.FALLBACK_ROOTLESS_QEMU_SHA256,
+                        StrykerEndpoints.FALLBACK_ROOTLESS_QEMU_SIZE),
+                new RemoteManifest.Asset(
+                        StrykerEndpoints.FALLBACK_ROOTLESS_KERNEL,
+                        StrykerEndpoints.FALLBACK_ROOTLESS_KERNEL_SHA256,
+                        StrykerEndpoints.FALLBACK_ROOTLESS_KERNEL_SIZE),
+                new RemoteManifest.Asset(
+                        StrykerEndpoints.FALLBACK_ROOTLESS_INITRD,
+                        StrykerEndpoints.FALLBACK_ROOTLESS_INITRD_SHA256,
+                        StrykerEndpoints.FALLBACK_ROOTLESS_INITRD_SIZE),
+                new RemoteManifest.Asset(
+                        StrykerEndpoints.FALLBACK_ROOTLESS_LIBSLIRP,
+                        StrykerEndpoints.FALLBACK_ROOTLESS_LIBSLIRP_SHA256,
+                        StrykerEndpoints.FALLBACK_ROOTLESS_LIBSLIRP_SIZE),
+                new RemoteManifest.Asset(
+                        StrykerEndpoints.FALLBACK_ROOTLESS_ROOTFS,
+                        StrykerEndpoints.FALLBACK_ROOTLESS_ROOTFS_SHA256,
+                        StrykerEndpoints.FALLBACK_ROOTLESS_ROOTFS_SIZE));
     }
 }

@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 601,
-    "versionName": "6.0.1",
-    "url": "https://github.com/zalexdev/strykerapp/releases/download/6.0.1/StrykerOSS-6.0.1.apk",
-    "sha256": "d57a4c36d8efb24ba51f4ec4d6459097061dea93a383fef02a2dd89368573752",
-    "size": 20892858,
+    "versionCode": 100,
+    "versionName": "1.0.0",
+    "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/v1.0.0/StrykerOSS-1.0.0.apk",
+    "sha256": "982e7d9c9044ce06593d42c10253c1a37454f12d6a7581a78fc05ee6b50262c3",
+    "size": 20985211,
     "mandatory": false,
-    "changelog": "Hotfix over 6.0.\n\nFixed\n- Data loss when upgrading from installs older than 4.5R: the check before deleting the old chroot could miss a still-attached bind and delete through it into internal storage. Detection now covers every layout, and no recursive delete runs while anything is mounted.\n- The install no longer continues after a failed cleanup.\n- Devices without root reported \"no usable tar\" instead of naming the real cause. The pre-check now offers the rootless engine rather than starting an install that cannot finish.\n- Captured handshakes were not moved into the captured folder.\n- Wordlists were not listed in the pickers.\n- The terminal could crash on launch with \"Cannot create component config directory\"."
+    "changelog": "StrykerOSS 1.0.0 signed release.\n\n- Fully signed APK (v1 JAR + v2 + v3 + v4).\n- Rootless engine downloads qemu, kernel, initrd, libslirp and rootfs from the all-core-file release.\n- SHA-256 and file-size verification on every core binary so a mismatch fails the install."
   },
   "news": [
     {
