@@ -127,7 +127,15 @@ public class SlideQemuInstall extends Fragment {
             if (QemuInstaller.assetsPresent(context)) {
                 log(LogLevel.INFO, "Artifacts bundled in the APK — installing offline");
             } else {
-                log(LogLevel.INFO, "Artifacts not bundled — downloading (~550 MB)");
+                int missing = QemuInstaller.countMissing(context);
+                if (missing <= 0) {
+                    log(LogLevel.INFO, "Artifacts not bundled but all files are already on device — verifying");
+                } else if (missing == 5) {
+                    log(LogLevel.INFO, "Artifacts not bundled — downloading the engine (5 files, ~550 MB)");
+                } else {
+                    log(LogLevel.INFO, "Resuming — " + missing + " of 5 files still missing, "
+                            + "already downloaded files are reused");
+                }
             }
 
             boolean ok = QemuInstaller.install(context, new QemuInstaller.Progress() {

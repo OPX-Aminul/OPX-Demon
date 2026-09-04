@@ -39,6 +39,24 @@ public final class QemuInstaller {
 
     private QemuInstaller() {}
 
+    /**
+     * How many of the five engine files are missing from the device. Lets the install screen
+     * tell a re-run apart from a first run instead of always announcing a full download.
+     */
+    public static int countMissing(Context context) {
+        int missing = 0;
+        File[] required = new File[]{
+                RootlessPaths.qemuBin(context),
+                RootlessPaths.kernel(context),
+                RootlessPaths.initrd(context),
+                RootlessPaths.libslirp(context),
+                RootlessPaths.rootfs(context)};
+        for (File f : required) {
+            if (!f.exists()) missing++;
+        }
+        return missing;
+    }
+
     private static String rootfsAssetName(Context c) {
         try {
             String[] files = c.getAssets().list(ASSET_DIR);
@@ -162,21 +180,28 @@ public final class QemuInstaller {
 
             stage(p, Stage.DECOMPRESSING_ROOTFS);
             File rootfs = RootlessPaths.rootfs(context);
-            boolean compressed = b.rootfs != null && b.rootfs.url != null
-                    && (b.rootfs.url.endsWith(".imgz") || b.rootfs.url.endsWith(".gz"));
-            if (!compressed) {
-                if (!fetch(b.rootfs, rootfs, "rootfs.img", p)) return false;
+            // rootfs.img is grown to the VM disk size after install, so it can never be matched
+            // against the manifest by length. Existence is the resume check: a retry after a
+            // partial run must not re-download 379 MB of archive just to decompress it again.
+            if (rootfs.exists()) {
+                log(p, 2, "rootfs.img already on device — skipping download");
             } else {
-                File archive = new File(base, "rootfs.download");
-                if (!fetch(b.rootfs, archive, "rootfs", p)) return false;
-                log(p, 1, "Decompressing rootfs (this can take a minute)");
-                if (!gunzipFile(archive, rootfs, p)) {
+                boolean compressed = b.rootfs != null && b.rootfs.url != null
+                        && (b.rootfs.url.endsWith(".imgz") || b.rootfs.url.endsWith(".gz"));
+                if (!compressed) {
+                    if (!fetch(b.rootfs, rootfs, "rootfs.img", p)) return false;
+                } else {
+                    File archive = new File(base, "rootfs.download");
+                    if (!fetch(b.rootfs, archive, "rootfs", p)) return false;
+                    log(p, 1, "Decompressing rootfs (this can take a minute)");
+                    if (!gunzipFile(archive, rootfs, p)) {
+                        //noinspection ResultOfMethodCallIgnored
+                        archive.delete();
+                        return false;
+                    }
                     //noinspection ResultOfMethodCallIgnored
                     archive.delete();
-                    return false;
                 }
-                //noinspection ResultOfMethodCallIgnored
-                archive.delete();
             }
 
             stage(p, Stage.FINALIZING);
@@ -203,6 +228,22 @@ public final class QemuInstaller {
             log(p, 3, label + ": no download URL in the manifest");
             return false;
         }
+        // Reuse files that are already on disk and match the manifest instead of pulling the
+        // same bytes again. Retries and re-opened installers otherwise restart from the first
+        // file every time: the run stops partway, the next attempt downloads QEMU afresh even
+        // though it is already complete and valid, and the user sees the same binary download
+        // over and over with no way to get past it.
+        if (dest.exists() && asset.size > 0 && dest.length() == asset.size
+                && asset.sha256 != null && !asset.sha256.isEmpty()) {
+            String onDisk = sha256(dest);
+            if (asset.sha256.equalsIgnoreCase(onDisk)) {
+                log(p, 2, label + " already verified on device — skipping download");
+                return true;
+            }
+            log(p, 3, label + " on device does not match the manifest — downloading a fresh copy");
+            //noinspection ResultOfMethodCallIgnored
+            dest.delete();
+        }
         log(p, 1, "GET " + asset.url);
         com.zalexdev.stryker.ota.VerifiedDownloader.Result r =
                 com.zalexdev.stryker.ota.VerifiedDownloader.download(
@@ -217,6 +258,23 @@ public final class QemuInstaller {
         }
         log(p, 2, label + " ready (" + mb(dest.length()) + ")");
         return true;
+    }
+
+    private static String sha256(File file) {
+        try (InputStream in = new java.io.FileInputStream(file)) {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] buf = new byte[1 << 16];
+            int n;
+            while ((n = in.read(buf)) != -1) md.update(buf, 0, n);
+            StringBuilder sb = new StringBuilder(md.getDigestLength() * 2);
+            for (byte b : md.digest()) {
+                sb.append(Character.forDigit((b >> 4) & 0xF, 16));
+                sb.append(Character.forDigit(b & 0xF, 16));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static boolean gunzipFile(File src, File dest, Progress p) {
