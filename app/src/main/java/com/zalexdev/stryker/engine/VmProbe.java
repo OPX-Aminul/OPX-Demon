@@ -110,6 +110,7 @@ public final class VmProbe {
     private static Result run(Context ctx, File qemu, List<String> cmd, String okDetail, String failDetail) {
         Process process = null;
         try {
+            RootlessPaths.ensureLibslirpNames(ctx);
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.directory(RootlessPaths.base(ctx));
             pb.environment().put("LD_LIBRARY_PATH",

@@ -151,6 +151,7 @@ public final class RootlessEngine {
             killAndAwait(12_000);
             clearStaleSockets();
             ensureExecutable();
+            RootlessPaths.ensureLibslirpNames(app);
             autoGrowDisk();
             VmProbe.ensureCpuProfileVerified(app, prefs());
             List<String> cmd = buildCommand();

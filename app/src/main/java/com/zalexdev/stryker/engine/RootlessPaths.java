@@ -14,6 +14,36 @@ public final class RootlessPaths {
 
     public static File qemuBin(Context c)   { return new File(base(c), "qemu-system-aarch64"); }
     public static File libslirp(Context c)  { return new File(base(c), "libslirp.so"); }
+    public static File libslirpSo0(Context c) { return new File(base(c), "libslirp.so.0"); }
+
+    /**
+     * The all-core-file QEMU binary was linked with a DT_NEEDED of "libslirp.so.0",
+     * while the release ships the library as "libslirp.so" (its soname was patched to
+     * match the shipped file name). Android's linker only matches the exact needed
+     * name when scanning LD_LIBRARY_PATH, so boot/probe attempts die with
+     * "CANNOT LINK EXECUTABLE ... library \"libslirp.so.0\" not found".
+     *
+     * Mirror the verified library under the .so.0 name as well so QEMU can load it.
+     * Idempotent and cheap — call it before any QEMU launch.
+     */
+    public static void ensureLibslirpNames(Context c) {
+        try {
+            File so = libslirp(c);
+            if (!so.exists()) return;
+            File so0 = libslirpSo0(c);
+            if (so0.exists() && so0.length() == so.length()) return;
+            try (java.io.InputStream in = new java.io.FileInputStream(so);
+                 java.io.OutputStream out = new java.io.FileOutputStream(so0)) {
+                byte[] buf = new byte[64 * 1024];
+                int n;
+                while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+                out.flush();
+                out.getFD().sync();
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
     public static File kernel(Context c)    { return new File(base(c), "Image"); }
     public static File initrd(Context c)    { return new File(base(c), "initrd.img"); }
     public static File rootfs(Context c)    { return new File(base(c), "rootfs.img"); }
