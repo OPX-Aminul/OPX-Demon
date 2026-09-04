@@ -325,25 +325,6 @@ mkdir -p "$ROOTFS/sdcard/Stryker/hs"
 mkdir -p "$ROOTFS/sdcard/Stryker/captured"
 mkdir -p "$ROOTFS/sdcard/Stryker/reports"
 
-# ── Critical-path verification (fail the build instead of shipping a rootfs
-#    that can never let the app in — mirrors unpackAndVerify's agent witness) ─
-MISSING=""
-for f in \
-    "$ROOTFS/usr/local/sbin/stryker-agentd" \
-    "$ROOTFS/usr/local/sbin/stryker-ptyd" \
-    "$ROOTFS/usr/bin/socat" \
-    "$ROOTFS/etc/systemd/system/stryker-agent.service" \
-    "$ROOTFS/etc/systemd/system/stryker-net.service" \
-    "$ROOTFS/etc/systemd/system/serial-getty@ttyAMA0.service.d/autologin.conf" \
-    ; do
-    [ -s "$f" ] || MISSING="$MISSING $f"
-done
-if [ -n "$MISSING" ]; then
-    echo "FATAL: critical guest files missing or empty:$MISSING" >&2
-    exit 1
-fi
-[ -x "$ROOTFS/usr/local/sbin/stryker-agentd" ] || { echo "FATAL: stryker-agentd not executable" >&2; exit 1; }
-
 # ── Extract guest core payload (pixie.py, checker.py, etc.) ───────────────
 if [ -f /work/stryker-guest-core.tar ]; then
     echo "Extracting stryker-guest-core.tar into rootfs..."
@@ -360,5 +341,29 @@ else
     echo "FATAL: stryker-guest-core.tar not found — the agent and CORE tools would be missing" >&2
     exit 1
 fi
+
+# ── Critical-path verification (fail the build instead of shipping a rootfs
+#    that can never let the app in — mirrors unpackAndVerify's agent witness).
+#    Runs AFTER the guest-core extraction: stryker-agentd and stryker-ptyd come
+#    from the tar, so checking before it could never pass.
+MISSING=""
+for f in \
+    "$ROOTFS/usr/local/sbin/stryker-agentd" \
+    "$ROOTFS/usr/local/sbin/stryker-ptyd" \
+    "$ROOTFS/usr/bin/socat" \
+    "$ROOTFS/CORE/PixieWps/pixie.py" \
+    "$ROOTFS/exploits/checker.py" \
+    "$ROOTFS/etc/systemd/system/stryker-agent.service" \
+    "$ROOTFS/etc/systemd/system/stryker-net.service" \
+    "$ROOTFS/etc/systemd/system/serial-getty@ttyAMA0.service.d/autologin.conf" \
+    ; do
+    [ -s "$f" ] || MISSING="$MISSING $f"
+done
+if [ -n "$MISSING" ]; then
+    echo "FATAL: critical guest files missing or empty:$MISSING" >&2
+    exit 1
+fi
+[ -x "$ROOTFS/usr/local/sbin/stryker-agentd" ] || { echo "FATAL: stryker-agentd not executable" >&2; exit 1; }
+[ -x "$ROOTFS/usr/local/sbin/stryker-ptyd" ] || { echo "FATAL: stryker-ptyd not executable" >&2; exit 1; }
 
 echo "Rootfs build complete — exact match with original StrykerOSS."
