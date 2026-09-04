@@ -19,6 +19,11 @@ public final class RootlessEngine {
 
     private static final String TAG = "RootlessEngine";
     private static final int BOOT_TIMEOUT_MS = 600_000;
+    /** Minimum spacing between console-bootstrap attempts inside one boot. */
+    private static final long CONSOLE_RETRY_MS = 30_000;
+    private volatile long lastConsoleBootstrapMs;
+    /** Set when the last boot timed out with the guest alive but the agent never answering. */
+    private volatile boolean lastBootAgentTimeout;
     private static final String PROMPT_MARK = "__STRYKER_ID__";
 
     private static volatile RootlessEngine instance;
@@ -114,8 +119,21 @@ public final class RootlessEngine {
         }
         lastBootUsedFallback = false;
         stopRequested = false;
+        lastBootAgentTimeout = false;
         String reason = attemptBoot(listener);
         if (reason == null) { lastError = ""; return true; }
+
+        // The safe profile only changes QEMU I/O options (aio, cache, share, rng, USB).
+        // It cannot bring a guest agent up, so a boot that failed with the guest alive but
+        // stryker-agentd silent would burn another 600s on the same outcome while killing
+        // the VM the user could still recover. Leave it running and report the real cause.
+        if (lastBootAgentTimeout) {
+            lastError = reason;
+            GuestExec.logToStore("VM stays running — the guest is up, only stryker-agentd is "
+                    + "missing. Restart the VM from the dashboard to retry the bootstrap.");
+            if (listener != null) listener.onFailed(reason);
+            return false;
+        }
 
         Core prefs = prefs();
         if (autoFallback && prefs != null && !VmSpecs.safeBoot(prefs)) {
@@ -170,7 +188,15 @@ public final class RootlessEngine {
             new Thread(() -> pumpBootLog(proc, listener), "stryker-qemu-log").start();
 
             long deadline = System.currentTimeMillis() + BOOT_TIMEOUT_MS;
-            boolean consoleTried = false;
+            // The guest can be fully up with no agent listening — Debian boots, the console
+            // sits at a login prompt, and port 1050 stays silent because nothing serves it.
+            // Waiting longer never fixes that, so once the console shows the guest is alive,
+            // bootstrap the agent through it instead of running out the clock. The bootstrap
+            // is retried periodically (not once): the first attempt can land while systemd is
+            // still coming up, before the serial getty — and therefore the console login —
+            // even exists, and giving up after it wastes the rest of the 600 s budget on a
+            // failure one more try would have fixed.
+            int bootstraps = 0;
             while (System.currentTimeMillis() < deadline) {
                 if (stopRequested) return "stopped";
                 if (!isAlive(proc)) {
@@ -181,19 +207,25 @@ public final class RootlessEngine {
                     if (listener != null) listener.onBooted();
                     return null;
                 }
-                // The guest can be fully up with no agent listening — Debian boots, the console
-                // sits at a root prompt, and port 1050 stays silent because nothing serves it.
-                // Waiting longer never fixes that, so once the console shows the guest is alive,
-                // bootstrap the agent through it instead of running out the clock.
-                if (!consoleTried && VmBootStage.detect(tailLog(120)) >= VmBootStage.AGENT) {
-                    consoleTried = true;
-                    note(listener, "Guest is up but the agent is not answering — starting it");
+                if (VmBootStage.detect(tailLog(120)) >= VmBootStage.AGENT
+                        && (bootstraps == 0 || lastConsoleBootstrapMs + CONSOLE_RETRY_MS
+                                <= System.currentTimeMillis())) {
+                    bootstraps++;
+                    lastConsoleBootstrapMs = System.currentTimeMillis();
+                    note(listener, bootstraps == 1
+                            ? "Guest is up but the agent is not answering — starting it"
+                            : "Agent still not answering — retrying the console bootstrap ("
+                              + bootstraps + ")");
                     bootstrapAgentOverConsole();
                 }
                 sleep(1000);
             }
+            // Remember WHY this boot timed out: startBlocking uses it to skip the safe-profile
+            // retry, which cannot fix a missing agent and would only kill a recoverable VM.
+            lastBootAgentTimeout = bootstraps > 0;
             return "Boot timed out after " + (BOOT_TIMEOUT_MS / 1000) + "s"
-                    + (consoleTried ? " — the guest booted but stryker-agentd never came up" : "");
+                    + (bootstraps > 0 ? " — the guest booted but stryker-agentd never came up"
+                                      : " — console bootstrap never had a guest to talk to");
         } catch (Exception e) {
             Log.e(TAG, "start failed", e);
             return e.getMessage() == null ? e.toString() : e.getMessage();
