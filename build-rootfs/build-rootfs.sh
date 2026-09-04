@@ -190,6 +190,47 @@ sed -i "s|^root:[^:]*:|root:\$y\$j9T\$zm4PGDwVGyQUURgnce.do0\$dcGRwd7TaU1tZivI0v
 # ── Set hostname (exact match) ───────────────────────────────────────────────
 echo "stryker" > "$ROOTFS/etc/hostname"
 
+# ── Networking (CRITICAL: QEMU user-net expects 10.0.2.15) ──────────────────
+# Without this the guest boots with NO IP address: port 1050 never becomes
+# reachable through the slirp hostfwd, the app sees "stryker-agentd never came
+# up", and every boot burns the full timeout before failing.
+if [ -f "$ROOTFS/usr/sbin/ifup" ]; then
+    mkdir -p "$ROOTFS/etc/network"
+    cat > "$ROOTFS/etc/network/interfaces" <<'NETEOF'
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+    address 10.0.2.15
+    netmask 255.255.255.0
+    gateway 10.0.2.2
+    dns-nameservers 10.0.2.3
+NETEOF
+fi
+
+# Slirp's built-in DNS lives at 10.0.2.3 — a resolv.conf copied from the build host
+# points at nameservers that do not exist inside the VM and every apt call would hang.
+printf 'nameserver 10.0.2.3\n' > "$ROOTFS/etc/resolv.conf"
+
+# Belt and braces: a dedicated oneshot unit configures eth0 no matter what the
+# distro ifupdown state is. Only its marker file says it already succeeded.
+mkdir -p "$ROOTFS/etc/systemd/system"
+cat > "$ROOTFS/etc/systemd/system/stryker-net.service" <<'NETEOF'
+[Unit]
+Description=Stryker VM network (static 10.0.2.15 for slirp user-net)
+DefaultDependencies=no
+After=systemd-modules-load.service
+Before=network-pre.target
+Wants=network-pre.target
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'ip link set eth0 up 2>/dev/null; ip addr flush dev eth0 2>/dev/null; ip addr add 10.0.2.15/24 dev eth0 2>/dev/null; ip route add default via 10.0.2.2 dev eth0 2>/dev/null; mkdir -p /run/stryker; touch /run/stryker/net-ok'
+[Install]
+WantedBy=multi-user.target
+NETEOF
+
 # ── SSH config (exact match with original) ───────────────────────────────────
 mkdir -p "$ROOTFS/etc/ssh/sshd_config.d"
 cat > "$ROOTFS/etc/ssh/sshd_config" <<'EOF'
@@ -226,7 +267,8 @@ mkdir -p "$ROOTFS/etc/systemd/system"
 cat > "$ROOTFS/etc/systemd/system/stryker-agent.service" <<'SVCEOF'
 [Unit]
 Description=Stryker guest agent (command + terminal servers)
-After=network.target
+Wants=stryker-net.service
+After=stryker-net.service network.target
 [Service]
 ExecStartPre=/bin/sh -c 'mkdir -p /sdcard/Stryker/hs /sdcard/Stryker/captured'
 ExecStart=/usr/local/sbin/stryker-agentd
@@ -253,6 +295,7 @@ SSHEOF
 mkdir -p "$ROOTFS/etc/systemd/system/multi-user.target.wants"
 ln -sf /etc/systemd/system/stryker-agent.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/stryker-agent.service"
 ln -sf /etc/systemd/system/stryker-sshkeys.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/stryker-sshkeys.service"
+ln -sf /etc/systemd/system/stryker-net.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/stryker-net.service"
 
 # Enable SSH
 ln -sf /lib/systemd/system/ssh.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/ssh.service"
@@ -282,6 +325,25 @@ mkdir -p "$ROOTFS/sdcard/Stryker/hs"
 mkdir -p "$ROOTFS/sdcard/Stryker/captured"
 mkdir -p "$ROOTFS/sdcard/Stryker/reports"
 
+# ── Critical-path verification (fail the build instead of shipping a rootfs
+#    that can never let the app in — mirrors unpackAndVerify's agent witness) ─
+MISSING=""
+for f in \
+    "$ROOTFS/usr/local/sbin/stryker-agentd" \
+    "$ROOTFS/usr/local/sbin/stryker-ptyd" \
+    "$ROOTFS/usr/bin/socat" \
+    "$ROOTFS/etc/systemd/system/stryker-agent.service" \
+    "$ROOTFS/etc/systemd/system/stryker-net.service" \
+    "$ROOTFS/etc/systemd/system/serial-getty@ttyAMA0.service.d/autologin.conf" \
+    ; do
+    [ -s "$f" ] || MISSING="$MISSING $f"
+done
+if [ -n "$MISSING" ]; then
+    echo "FATAL: critical guest files missing or empty:$MISSING" >&2
+    exit 1
+fi
+[ -x "$ROOTFS/usr/local/sbin/stryker-agentd" ] || { echo "FATAL: stryker-agentd not executable" >&2; exit 1; }
+
 # ── Extract guest core payload (pixie.py, checker.py, etc.) ───────────────
 if [ -f /work/stryker-guest-core.tar ]; then
     echo "Extracting stryker-guest-core.tar into rootfs..."
@@ -295,7 +357,8 @@ if [ -f /work/stryker-guest-core.tar ]; then
     ls -la "$ROOTFS/CORE/PixieWps/" 2>/dev/null
     ls -la "$ROOTFS/exploits/" 2>/dev/null
 else
-    echo "WARNING: stryker-guest-core.tar not found"
+    echo "FATAL: stryker-guest-core.tar not found — the agent and CORE tools would be missing" >&2
+    exit 1
 fi
 
 echo "Rootfs build complete — exact match with original StrykerOSS."

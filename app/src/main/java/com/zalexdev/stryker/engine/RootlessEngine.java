@@ -739,14 +739,35 @@ public final class RootlessEngine {
         }
         cmd.append("command -v socat >/dev/null 2>&1 || (export DEBIAN_FRONTEND=noninteractive; ")
            .append("apt-get install -y --no-install-recommends socat >/dev/null 2>&1); ")
+           // An agent listening on 0.0.0.0 with no IP address is unreachable through the slirp
+           // hostfwd — the 'listening' check below would then lie about being up. Self-heal the
+           // network first: static slirp addresses on eth0, and persist them so the next boot
+           // does not start from the same broken state (pre-rootfs.imgz guests only).
+           .append("if ! ip -4 addr show dev eth0 2>/dev/null | grep -q '10.0.2.15'; then ")
+           .append("ip link set eth0 up 2>/dev/null; ")
+           .append("ip addr flush dev eth0 2>/dev/null; ")
+           .append("ip addr add 10.0.2.15/24 dev eth0 2>/dev/null; ")
+           .append("ip route add default via 10.0.2.2 dev eth0 2>/dev/null; ")
+           .append("mkdir -p /etc/network /run/stryker; ")
+           .append("[ -f /etc/network/interfaces ] || printf 'auto lo\\niface lo inet loopback\\n\\nauto eth0\\niface eth0 inet static\\n    address 10.0.2.15\\n    netmask 255.255.255.0\\n    gateway 10.0.2.2\\n' > /etc/network/interfaces; ")
+           .append("touch /run/stryker/net-ok; ")
+           .append("fi; ")
            .append("(systemctl restart stryker-agent.service >/dev/null 2>&1 ")
            .append("|| (pkill -f stryker-agentd >/dev/null 2>&1; ")
            .append("setsid /usr/local/sbin/stryker-agentd >/dev/null 2>&1 &)); ")
-           .append("sleep 3; ss -ltn 2>/dev/null | grep -q ':1050' && echo __AGENT_UP__ || echo __AGENT_DOWN__");
+           .append("sleep 3; ")
+           // A guest whose agent answers 1050 is the only proof of 'up': it needs the agent
+           // AND the IP both to be true, which is what the app's own ping then exercises.
+           .append("ip -4 addr show dev eth0 2>/dev/null | grep -q '10.0.2.15' ")
+           .append("&& ss -ltn 2>/dev/null | grep -q ':1050' && echo __AGENT_UP__ || echo __AGENT_DOWN__");
 
         boolean up = false;
-        for (String l : GuestConsole.run(cmd.toString(), sock, 180_000)) {
-            if (l != null && l.contains("__AGENT_UP__")) up = true;
+        // One attempt is often not enough: DHCP-less first-boot races (address applied before
+        // slirp finishes wiring the NIC) and slow apt fallbacks both need a second try.
+        for (int attempt = 0; attempt < 2 && !up; attempt++) {
+            for (String l : GuestConsole.run(cmd.toString(), sock, 180_000)) {
+                if (l != null && l.contains("__AGENT_UP__")) up = true;
+            }
         }
         if (staged != null) {
             //noinspection ResultOfMethodCallIgnored
