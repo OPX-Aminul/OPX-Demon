@@ -18,9 +18,15 @@ public final class StrykerEndpoints {
     public static final String FALLBACK_ROOTLESS_INITRD   = ROOTLESS_BASE + "initrd.img";
     public static final String FALLBACK_ROOTLESS_ROOTFS   = ROOTLESS_BASE + "rootfs.imgz";
 
+    // IMPORTANT: these must match the qemu-system-aarch64 currently uploaded to the
+    // all-core-file release. The Dockerfile pipeline patches the QEMU binary (links
+    // libslirp.so), so a core rebuild changes its size/hash — build.yml re-pins
+    // stryker_manifest.json after every upload, keep these in sync with it. A stale
+    // pin makes every install download the file, fail verification at 100%, and then
+    // re-download the same binary forever.
     public static final String FALLBACK_ROOTLESS_QEMU_SHA256 =
-            "e84323d6bcb00f35a426a186d96af64e34a88e5e7fda1bb12d05ee918f46fbca";
-    public static final long FALLBACK_ROOTLESS_QEMU_SIZE = 128425936L;
+            "108ef92bb5bc3ff861c3fbc255d6c1465f0f439b725efa1a017a663ee00b24ba";
+    public static final long FALLBACK_ROOTLESS_QEMU_SIZE = 128470352L;
 
     public static final String FALLBACK_ROOTLESS_KERNEL_SHA256 =
             "cbe59a02e7ea979a150661032440c94e2c4db0b735af2416e11ae5cac15a58e4";

@@ -29,8 +29,8 @@
     "note": "Local dev ships these inside the APK under assets/rootless/. This block is the OTA fallback; arm64-v8a only.",
     "qemu": {
       "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/qemu-system-aarch64",
-      "sha256": "e84323d6bcb00f35a426a186d96af64e34a88e5e7fda1bb12d05ee918f46fbca",
-      "size": 128425936
+      "sha256": "108ef92bb5bc3ff861c3fbc255d6c1465f0f439b725efa1a017a663ee00b24ba",
+      "size": 128470352
     },
     "kernel": {
       "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/Image",
