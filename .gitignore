@@ -21,6 +21,8 @@ keystore.properties
 # Signing keys / secrets — never commit
 *.jks
 *.keystore
+!keystore/
+!keystore/stryker-release.jks
 *.p12
 *.pfx
 *.pem

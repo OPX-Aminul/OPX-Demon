@@ -72,16 +72,25 @@ Output APKs land in `app/build/outputs/apk/`.
 
 ### Release signing
 
-Configure these in `~/.gradle/gradle.properties` (or pass via `-P` / environment):
+This repository ships a **self-signed release keystore** at `keystore/stryker-release.jks` so CI and
+contributors can produce identical, installable signed APKs without extra setup. The credentials are
+configured in `gradle.properties` (already active for every Gradle run):
 
 ```properties
-STRYKER_RELEASE_STORE_FILE=/path/to/keystore.jks
-STRYKER_RELEASE_STORE_PASSWORD=...
-STRYKER_RELEASE_KEY_ALIAS=...
-STRYKER_RELEASE_KEY_PASSWORD=...
+STRYKER_RELEASE_STORE_FILE=../keystore/stryker-release.jks
+STRYKER_RELEASE_STORE_PASSWORD=7e7ce8b8687259f0cd09917cee0c07f7
+STRYKER_RELEASE_KEY_ALIAS=stryker-release
+STRYKER_RELEASE_KEY_PASSWORD=7e7ce8b8687259f0cd09917cee0c07f7
 ```
 
+> The store file path is relative to the `:app` project directory, so it resolves to
+> `<repo>/keystore/stryker-release.jks`. To sign with a different key instead, override any of these
+> in `~/.gradle/gradle.properties`, via `-P`, or as environment variables.
+
 If the variables are not set, the release build is left unsigned so CI / contributors can still produce an APK.
+
+> ⚠️ **Security note:** the release key is committed to this open-source repository so anyone can
+> reproduce builds. Do not use this key for a store-distributed app that needs update integrity.
 
 ---
 
