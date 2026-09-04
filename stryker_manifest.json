@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 101,
-    "versionName": "1.0.1",
-    "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/v1.0.1/app-release.apk",
-    "sha256": "b57e8a19e411efe018dca3d24aabdaf1152b6590385d31909167b4f68ae682d3",
-    "size": 20993344,
+    "versionCode": 103,
+    "versionName": "1.0.3",
+    "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/v1.0.3/app-release.apk",
+    "sha256": "f38bec2b10e1bd149921dca395d7941376ce4e6aafd92444fe5c218c0dad507b",
+    "size": 20993337,
     "mandatory": false,
-    "changelog": "StrykerOSS 1.0.1 signed release.\n\n- Fixes QEMU boot: creates the libslirp.so.0 alias the QEMU binary links against, so the rootless VM starts on-device.\n- Dockerfile now patches the QEMU binary to link libslirp.so for future core rebuilds.\n- Fully signed APK (v1 JAR + v2 + v3 + v4)."
+    "changelog": "StrykerOSS 1.0.3 — fixes the download loop.\n\n- Root cause: the all-core-file release carried a rebuilt (libslirp-patched) QEMU, but the manifest still pinned the original binary's size/hash. Every install downloaded QEMU to 100%, failed the size check, re-downloaded the same file, and never moved to the next step.\n- Manifest + in-app fallback now pin the actual release QEMU (108ef92b…).\n- Build pipeline re-pins the manifest automatically after every core rebuild, so this can never silently break again.\n- Downloads now stop retrying deterministic hash/size failures and resume partial files instead of restarting from 0 on flaky networks."
   },
   "news": [
     {
