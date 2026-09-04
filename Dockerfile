@@ -156,10 +156,14 @@ RUN cd ${QEMU_DIR} && ./configure \
     --with-coroutine=ucontext \
     && make -j$(nproc) install
 
-# Rename QEMU binary
+# Rename QEMU binary. QEMU is linked with DT_NEEDED "libslirp.so.0" while the
+# app ships the library as "libslirp.so", so also repoint the binary's needed
+# entry to the shipped name. Without this, Android boots die with:
+# CANNOT LINK EXECUTABLE ... library "libslirp.so.0" not found.
 RUN cp /opt/qemu-out/bin/qemu-system-aarch64 /opt/qemu-out/qemu-system-aarch64 \
     && cp /opt/qemu-out/lib/libslirp.so.0 /opt/qemu-out/libslirp.so \
-    && patchelf --set-soname libslirp.so /opt/qemu-out/libslirp.so
+    && patchelf --set-soname libslirp.so /opt/qemu-out/libslirp.so \
+    && patchelf --replace-needed libslirp.so.0 libslirp.so /opt/qemu-out/qemu-system-aarch64
 
 # ==============================================================================
 # SECTION 3: Final Artifacts — Exact Match with Original Release

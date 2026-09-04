@@ -122,6 +122,7 @@ public final class QemuInstaller {
             }
 
             stage(p, Stage.FINALIZING);
+            RootlessPaths.ensureLibslirpNames(context);
             ensureMinimumDisk(context, p);
             boolean ok = RootlessEngine.get(context).isInstalled();
             if (ok) {
@@ -179,6 +180,7 @@ public final class QemuInstaller {
             }
 
             stage(p, Stage.FINALIZING);
+            RootlessPaths.ensureLibslirpNames(context);
             ensureMinimumDisk(context, p);
             boolean ok = RootlessEngine.get(context).isInstalled();
             if (ok) {
