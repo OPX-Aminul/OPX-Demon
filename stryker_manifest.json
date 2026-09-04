@@ -65,7 +65,7 @@
   "news": [
     {
       "id": 2,
-      "title": "Stryker 6.0 — Rootless engine & Debian",
+      "title": "Stryker 6.0 \u2014 Rootless engine & Debian",
       "description": "The full toolset now runs without root: Stryker boots an arm64 QEMU virtual machine and routes tools into the guest. The chroot moved from Alpine to Debian trixie, the same rootfs the VM boots. Also new: a root-free network scanner (mDNS, SSDP, NetBIOS, SNMP), Cameradar RTSP discovery, a reworked dashboard and VM settings. RouterScan has been removed. arm64-v8a only.",
       "newsDate": "2026-08-09",
       "newsUrl": "https://github.com/zalexdev/strykerapp/releases/tag/v6.0",
