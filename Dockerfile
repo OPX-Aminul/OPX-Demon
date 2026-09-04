@@ -32,14 +32,17 @@ COPY rootless-assets/stryker-guest-core.tar /work/stryker-guest-core.tar
 COPY build-rootfs/build-rootfs.sh /work/build-rootfs.sh
 RUN chmod +x /work/build-rootfs.sh && /work/build-rootfs.sh
 
-# Extract kernel and initrd from the installed rootfs
-RUN cp /work/rootfs/boot/vmlinuz-* /work/Image 2>/dev/null || \
-    cp /work/rootfs/boot/vmlinuz /work/Image 2>/dev/null || \
-    echo "Kernel not found in /boot — extracting from kernel package"
+# Extract kernel and initrd from the installed rootfs. If the package install above was
+# silently skipped (the apt block ends with '|| true'), retry the kernel package now — a VM
+# without /work/Image cannot boot at all, and failing the build here is the only way to catch it.
+RUN ls /work/rootfs/boot/vmlinuz-* >/dev/null 2>&1 || \
+    chroot /work/rootfs /bin/sh -c 'export DEBIAN_FRONTEND=noninteractive; \
+        apt-get update >/dev/null 2>&1 || true; \
+        apt-get install -y --no-install-recommends linux-image-arm64' || true
+RUN cp /work/rootfs/boot/vmlinuz-* /work/Image
 RUN cp /work/rootfs/boot/initrd.img* /work/initrd.img 2>/dev/null || \
-    cp /work/rootfs/boot/initrd /work/initrd.img 2>/dev/null || \
-    echo "initrd not found in /boot — will be created from rootfs"
-RUN ls -lh /work/Image /work/initrd.img 2>/dev/null || true
+    cp /work/rootfs/boot/initrd /work/initrd.img
+RUN ls -lh /work/Image /work/initrd.img
 
 # Create gzip-compressed ext4 image (exact format match with original rootfs.imgz)
 RUN dd if=/dev/zero of=/work/rootfs.img bs=1M count=1500 \

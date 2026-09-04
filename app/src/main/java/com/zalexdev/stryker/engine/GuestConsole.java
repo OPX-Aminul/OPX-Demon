@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Locale;
 
 /**
  * Runs commands on the guest's serial console.
@@ -46,7 +47,8 @@ final class GuestConsole {
         if (sock == null) return out;
         try {
             OutputStream os = sock.getOutputStream();
-            // A leading newline lands us on a fresh prompt even if the console was mid-line.
+            // open() has already driven any login prompt; the leading newline lands on a fresh
+            // shell line even if the console was mid-line when we got it.
             os.write(("\n" + command + "\n" + "echo " + MARK + "$?\n")
                     .getBytes(StandardCharsets.UTF_8));
             os.flush();
@@ -158,7 +160,7 @@ final class GuestConsole {
         }
     }
 
-    /** Keeps the real output: drops the echoed command line, the marker lines and the prompt. */
+    /** Keeps the real output: drops the echoed command line, the marker lines, prompts and login noise. */
     private static void collect(String raw, ArrayList<String> out) {
         for (String line : raw.split("\r?\n")) {
             String t = line.replace("\r", "").trim();
@@ -166,6 +168,10 @@ final class GuestConsole {
             if (t.contains(MARK)) continue;
             if (t.startsWith("echo " + MARK)) continue;
             if (t.endsWith("#") && t.contains("@")) continue;
+            // Login noise our handshake can produce; none of it is command output.
+            String low = t.toLowerCase(Locale.ROOT);
+            if (low.endsWith("login:") || low.startsWith("password:")
+                    || low.contains("last login") || low.contains("login incorrect")) continue;
             out.add(t);
         }
     }
