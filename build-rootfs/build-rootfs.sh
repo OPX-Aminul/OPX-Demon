@@ -257,6 +257,21 @@ ln -sf /etc/systemd/system/stryker-sshkeys.service "$ROOTFS/etc/systemd/system/m
 # Enable SSH
 ln -sf /lib/systemd/system/ssh.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/ssh.service"
 
+# ── Serial console autologin (root) ──────────────────────────────────────
+# The app bootstraps the guest agent over ttyAMA0 when port 1050 is silent.
+# Without autologin the console sits at "stryker login:", the bootstrap commands
+# are eaten by agetty's login prompt as a username, and boot times out with
+# "the guest booted but stryker-agentd never came up". An override unit runs a
+# root login shell on ttyAMA0, which is what the app's console driver expects.
+# --autologin makes agetty exec 'login -f root' (preauthenticated); do NOT also
+# pass -o login options — combining the two is flaky across util-linux versions.
+mkdir -p "$ROOTFS/etc/systemd/system/serial-getty@ttyAMA0.service.d"
+cat > "$ROOTFS/etc/systemd/system/serial-getty@ttyAMA0.service.d/autologin.conf" <<'AUTOEOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --keep-baud 115200,38400,9600 %I $TERM
+AUTOEOF
+
 # ── Strip docs/man/locale to shrink image ────────────────────────────────────
 rm -rf "$ROOTFS/usr/share/man" "$ROOTFS/usr/share/doc" \
        "$ROOTFS/usr/share/locale" "$ROOTFS/usr/share/info"

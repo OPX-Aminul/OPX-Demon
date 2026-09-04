@@ -20,9 +20,10 @@ import java.util.ArrayList;
  * at "waiting for the guest agent" forever, with the app unable to run a single command to find
  * out why.
  *
- * QEMU already wires ttyAMA0 to a unix socket and the guest autologins a root shell on it, so
- * the console can do the bootstrap that the port cannot. It is slow and line-oriented, so it is
- * only used when the agent is unreachable — never on the hot path.
+ * QEMU already wires ttyAMA0 to a unix socket. The rootfs autologins root on it (serial-getty
+ * override), but an older rootfs without that override still presents "stryker login:" — so
+ * {@link #open} drives the login program (root / stryker) when it sees a prompt. It is slow and
+ * line-oriented, so it is only used when the agent is unreachable — never on the hot path.
  */
 final class GuestConsole {
 
@@ -41,10 +42,9 @@ final class GuestConsole {
     static ArrayList<String> run(String command, String socketPath, int timeoutMs) {
         ArrayList<String> out = new ArrayList<>();
         if (command == null || socketPath == null) return out;
-        LocalSocket sock = new LocalSocket();
+        LocalSocket sock = open(socketPath, timeoutMs);
+        if (sock == null) return out;
         try {
-            sock.connect(new LocalSocketAddress(socketPath, LocalSocketAddress.Namespace.FILESYSTEM));
-            sock.setSoTimeout(timeoutMs > 0 ? timeoutMs : READ_TIMEOUT_MS);
             OutputStream os = sock.getOutputStream();
             // A leading newline lands us on a fresh prompt even if the console was mid-line.
             os.write(("\n" + command + "\n" + "echo " + MARK + "$?\n")
@@ -70,6 +70,81 @@ final class GuestConsole {
             try { sock.close(); } catch (Exception ignored) {}
         }
         return out;
+    }
+
+    /**
+     * Connects to the console socket and makes sure a root shell is at the other end.
+     *
+     * The new rootfs autologins root, so most of the time the shell is already there. But the
+     * override only ships in newer rootfs builds, and guests installed from older artifacts
+     * still boot to "stryker login:" — commands written there are consumed as a username and
+     * vanish. When no shell prompt is seen, log in with the rootfs credentials (root / stryker)
+     * before returning. Returns null when the console cannot be reached at all.
+     */
+    private static LocalSocket open(String socketPath, int timeoutMs) {
+        LocalSocket sock = new LocalSocket();
+        try {
+            sock.connect(new LocalSocketAddress(socketPath, LocalSocketAddress.Namespace.FILESYSTEM));
+            sock.setSoTimeout(READ_TIMEOUT_MS);
+
+            StringBuilder buf = new StringBuilder();
+            drain(sock, buf, 3000);
+            if (!promptSeen(buf.toString())) {
+                // Not a shell: drive the login program. Debian login asks for the password
+                // with "Password:" and accepts the user on the next prompt.
+                OutputStream os = sock.getOutputStream();
+                os.write("\nroot\n".getBytes(StandardCharsets.UTF_8));
+                os.flush();
+                buf.setLength(0);
+                drain(sock, buf, 3000);
+                if (buf.toString().toLowerCase(java.util.Locale.ROOT).contains("password")) {
+                    os.write("stryker\n".getBytes(StandardCharsets.UTF_8));
+                    os.flush();
+                }
+                buf.setLength(0);
+                drain(sock, buf, 3000);
+            }
+            sock.setSoTimeout(timeoutMs > 0 ? timeoutMs : READ_TIMEOUT_MS);
+            return sock;
+        } catch (Exception e) {
+            Log.w(TAG, "console connect failed: " + e.getMessage());
+            try { sock.close(); } catch (Exception ignored) {}
+            return null;
+        }
+    }
+
+    /** Reads whatever the console emits until quiet or deadline — enough to catch a prompt. */
+    private static void drain(LocalSocket sock, StringBuilder buf, int quietMs) {
+        try {
+            InputStream is = sock.getInputStream();
+            // Bound each read to the quiet window: with the default (long) read timeout a silent
+            // console would block one read() call far past the deadline we are aiming for.
+            sock.setSoTimeout(quietMs);
+            byte[] chunk = new byte[4096];
+            long deadline = System.currentTimeMillis() + quietMs;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    int r = is.read(chunk);
+                    if (r <= 0) return;
+                    buf.append(new String(chunk, 0, r, StandardCharsets.UTF_8));
+                } catch (java.net.SocketTimeoutException ste) {
+                    return; // quiet period — the console has said its piece
+                }
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** True when the console looks like a shell rather than agetty's login prompt. */
+    private static boolean promptSeen(String text) {
+        String t = text.replace("\r", "").toLowerCase(java.util.Locale.ROOT);
+        if (t.contains("login:")) return false;
+        for (String line : text.split("\r?\n")) {
+            String s = line.replace("\r", "").trim();
+            if (s.endsWith("#")) return true;   // root prompt
+            if (s.endsWith("$")) return true;   // user prompt
+        }
+        return false;
     }
 
     private static int countOf(CharSequence hay, String needle) {

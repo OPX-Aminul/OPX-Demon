@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 103,
-    "versionName": "1.0.3",
+    "versionCode": 104,
+    "versionName": "1.0.4",
     "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/v1.0.3/app-release.apk",
     "sha256": "f38bec2b10e1bd149921dca395d7941376ce4e6aafd92444fe5c218c0dad507b",
     "size": 20993337,
     "mandatory": false,
-    "changelog": "StrykerOSS 1.0.3 — fixes the download loop.\n\n- Root cause: the all-core-file release carried a rebuilt (libslirp-patched) QEMU, but the manifest still pinned the original binary's size/hash. Every install downloaded QEMU to 100%, failed the size check, re-downloaded the same file, and never moved to the next step.\n- Manifest + in-app fallback now pin the actual release QEMU (108ef92b…).\n- Build pipeline re-pins the manifest automatically after every core rebuild, so this can never silently break again.\n- Downloads now stop retrying deterministic hash/size failures and resume partial files instead of restarting from 0 on flaky networks."
+    "changelog": "StrykerOSS 1.0.4 — fixes VM boot getting stuck at the login prompt.\n\n- Root cause: the rootfs presented 'stryker login:' on ttyAMA0 instead of a root shell, so the app's console bootstrap (used whenever the guest agent is not answering) wrote its commands into the login prompt, where they were eaten as a username. Boot then ran out the 600s budget with 'the guest booted but stryker-agentd never came up'.\n- Rootfs now autologins root on the serial console (serial-getty override).\n- The console driver also logs in itself (root / stryker) when it still finds a login prompt, so guests installed from older artifacts are covered too.\n- The console bootstrap is retried every 30s during boot instead of exactly once, so an early attempt landing before systemd is up no longer wastes the rest of the boot budget.\n- Keep the VM running after a failed agent bootstrap instead of leaving it dead: a later retry or a dashboard restart can recover it without redownloading anything."
   },
   "news": [
     {
