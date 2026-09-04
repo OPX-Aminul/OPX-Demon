@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 100,
-    "versionName": "1.0.0",
-    "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/v1.0.0/StrykerOSS-1.0.0.apk",
-    "sha256": "982e7d9c9044ce06593d42c10253c1a37454f12d6a7581a78fc05ee6b50262c3",
-    "size": 20985211,
+    "versionCode": 101,
+    "versionName": "1.0.1",
+    "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/v1.0.1/app-release.apk",
+    "sha256": "b57e8a19e411efe018dca3d24aabdaf1152b6590385d31909167b4f68ae682d3",
+    "size": 20993344,
     "mandatory": false,
-    "changelog": "StrykerOSS 1.0.0 signed release.\n\n- Fully signed APK (v1 JAR + v2 + v3 + v4).\n- Rootless engine downloads qemu, kernel, initrd, libslirp and rootfs from the all-core-file release.\n- SHA-256 and file-size verification on every core binary so a mismatch fails the install."
+    "changelog": "StrykerOSS 1.0.1 signed release.\n\n- Fixes QEMU boot: creates the libslirp.so.0 alias the QEMU binary links against, so the rootless VM starts on-device.\n- Dockerfile now patches the QEMU binary to link libslirp.so for future core rebuilds.\n- Fully signed APK (v1 JAR + v2 + v3 + v4)."
   },
   "news": [
     {
