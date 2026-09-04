@@ -39,8 +39,8 @@
     },
     "initrd": {
       "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/initrd.img",
-      "sha256": "77223e4ad3d4d107f7cd7da41065c8e4fbdfcf662d3923b57d69c879de50bb87",
-      "size": 38228336
+      "sha256": "9739e88777c204449e18736cfde1983492cf884e70d4478e5e8e07fbe4a7467a",
+      "size": 38228293
     },
     "libslirp": {
       "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/libslirp.so",
@@ -49,8 +49,8 @@
     },
     "rootfs": {
       "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/rootfs.imgz",
-      "sha256": "d3ead6368d679e5acc1b55756b773c04b29b225d93d0d0a07ed09a39ca51d255",
-      "size": 379126383
+      "sha256": "4a17688f379c33b6d3d050d54c9c6da83778f08bca3571f7dc21a97cf22694fb",
+      "size": 379120356
     }
   },
   "app": {
@@ -60,7 +60,7 @@
     "sha256": "f38bec2b10e1bd149921dca395d7941376ce4e6aafd92444fe5c218c0dad507b",
     "size": 20993337,
     "mandatory": false,
-    "changelog": "StrykerOSS 1.0.4 — fixes VM boot getting stuck at the login prompt.\n\n- Root cause: the rootfs presented 'stryker login:' on ttyAMA0 instead of a root shell, so the app's console bootstrap (used whenever the guest agent is not answering) wrote its commands into the login prompt, where they were eaten as a username. Boot then ran out the 600s budget with 'the guest booted but stryker-agentd never came up'.\n- Rootfs now autologins root on the serial console (serial-getty override).\n- The console driver also logs in itself (root / stryker) when it still finds a login prompt, so guests installed from older artifacts are covered too.\n- The console bootstrap is retried every 30s during boot instead of exactly once, so an early attempt landing before systemd is up no longer wastes the rest of the boot budget.\n- Keep the VM running after a failed agent bootstrap instead of leaving it dead: a later retry or a dashboard restart can recover it without redownloading anything."
+    "changelog": "StrykerOSS 1.0.4 \u2014 fixes VM boot getting stuck at the login prompt.\n\n- Root cause: the rootfs presented 'stryker login:' on ttyAMA0 instead of a root shell, so the app's console bootstrap (used whenever the guest agent is not answering) wrote its commands into the login prompt, where they were eaten as a username. Boot then ran out the 600s budget with 'the guest booted but stryker-agentd never came up'.\n- Rootfs now autologins root on the serial console (serial-getty override).\n- The console driver also logs in itself (root / stryker) when it still finds a login prompt, so guests installed from older artifacts are covered too.\n- The console bootstrap is retried every 30s during boot instead of exactly once, so an early attempt landing before systemd is up no longer wastes the rest of the boot budget.\n- Keep the VM running after a failed agent bootstrap instead of leaving it dead: a later retry or a dashboard restart can recover it without redownloading anything."
   },
   "news": [
     {
