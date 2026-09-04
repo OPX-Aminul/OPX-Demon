@@ -38,7 +38,6 @@ public final class RootlessPaths {
                 int n;
                 while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
                 out.flush();
-                out.getFD().sync();
             }
         } catch (Throwable ignored) {
         }
