@@ -105,6 +105,53 @@ jobs:
           gh release view all-core-file --json assets \
             --jq '.assets[] | "  \(.name) (\(.size / 1048576 * 100 | round / 100) MB)"'
 
+      # ══════════════════════════════════════════════════════════════════════
+      # SYNC: Re-pin rootless hashes in the manifest after every core rebuild.
+      # The app downloads these five files at install time and validates them
+      # against stryker_manifest.json (fetched from raw.githubusercontent.com).
+      # If size/sha256 drift from what the pipeline just uploaded, the install
+      # downloads a file to 100%, fails verification, and re-downloads the same
+      # binary forever. Re-pin from the artifacts on every run.
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Sync rootless manifest with uploaded artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          mapping = [
+              ("qemu-system-aarch64", "qemu"),
+              ("Image", "kernel"),
+              ("initrd.img", "initrd"),
+              ("libslirp.so", "libslirp"),
+              ("rootfs.imgz", "rootfs"),
+          ]
+          with open("stryker_manifest.json") as fh:
+              manifest = json.load(fh)
+          rl = manifest["rootless"]
+          for file_name, key in mapping:
+              with open(file_name, "rb") as fh:
+                  digest = hashlib.sha256(fh.read()).hexdigest()
+              rl[key]["sha256"] = digest
+              rl[key]["size"] = os.path.getsize(file_name)
+              print(f"  {file_name}: {rl[key]['size']} bytes, sha256 {digest[:12]}…")
+          with open("stryker_manifest.json", "w") as fh:
+              json.dump(manifest, fh, indent=2)
+              fh.write("\n")
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add stryker_manifest.json
+          if git diff --cached --quiet; then
+            echo "✅ Manifest already in sync — nothing to commit"
+          else
+            git commit -m "ci: sync rootless manifest hashes after core rebuild"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main \
+              && echo "✅ Manifest synced to main" \
+              || echo "⚠️  Could not push the synced manifest — installs keep the previous pins until the next rebuild"
+          fi
+
       - name: Cleanup
         if: always()
         run: docker rmi stryker-rootfs stryker-qemu 2>/dev/null || true

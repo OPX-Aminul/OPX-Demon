@@ -58,8 +58,15 @@ public final class VerifiedDownloader {
                     return result;
                 }
                 lastError = result.error;
-                if (lastError != null && lastError.startsWith("Checksum")) {
-                    deleteQuietly(part);
+                // These failures are deterministic for a fixed URL: the server delivered a full,
+                // well-formed response that simply does not match the manifest pins. Re-fetching
+                // produces the identical bytes, so retrying would only re-download the entire
+                // file two more times for nothing — exactly the loop users saw when a core
+                // rebuild changed a binary without re-pinning the manifest. attempt() already
+                // removed the unusable .part file, so no stale data survives.
+                if (lastError != null && (lastError.startsWith("Checksum")
+                        || lastError.startsWith("Size mismatch")
+                        || lastError.startsWith("Truncated"))) {
                     return result;
                 }
             } catch (IOException e) {
@@ -67,7 +74,12 @@ public final class VerifiedDownloader {
             }
             sleepBackoff(attempt);
         }
-        deleteQuietly(part);
+        // Every attempt died mid-transfer (timeout/EOF/connection drop). The .part file holds a
+        // valid prefix, so keep it: the next run resumes with a Range request instead of pulling
+        // the whole file again from byte 0. Corrupt-data failures already deleted it above.
+        if (part.length() == 0) {
+            deleteQuietly(part);
+        }
         return Result.fail(lastError);
     }
 
