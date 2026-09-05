@@ -2,7 +2,7 @@
   xmlns:tools="http://schemas.android.com/tools"
   tools:ignore="MissingTranslation">
 
-  <string name="app_name" translatable="false">Stryker Terminal</string>
+  <string name="app_name" translatable="false">Terminal</string>
   <string name="copy_text">Copy</string>
   <string name="paste_text">Paste</string>
   <string name="super_paste_text">Super Paste</string>
@@ -18,12 +18,12 @@
   <string name="service_acquire_lock">Acquire Lock</string>
   <string name="service_release_lock">Release Lock</string>
 
-  <string name="setup_info">Hello, Stryker Terminal</string>
+  <string name="setup_info">Hello, Terminal</string>
   <string name="setup_next">Let\'s Go!</string>
   <string name="setup_setup_method">Select your installation method</string>
   <string name="setup_online">Online Setup</string>
   <string name="setup_local">Local Zip File Setup</string>
-  <string name="setup_backup">Restore from Stryker Terminal Backup</string>
+  <string name="setup_backup">Restore from Terminal Backup</string>
   <string name="setup_source_parameter">Source Parameter</string>
   <string name="setup_input_source_parameter">Input source parameter…</string>
   <string name="setup_dots" translatable="false">…</string>
@@ -52,7 +52,7 @@
   <string name="customization_settings_desc">Font, ColorScheme</string>
   <string name="customization_settings">Customization</string>
 
-  <string name="term_settings_subtitle">Stryker Terminal</string>
+  <string name="term_settings_subtitle">Terminal</string>
   <string name="term_settings_section_prefs">Preferences</string>
   <string name="term_settings_section_maint">Maintenance</string>
   <string name="term_settings_section_about">About</string>
@@ -100,7 +100,7 @@
   <string name="float_up">Float Up</string>
   <string name="shell_not_found">Shell %s not found</string>
   <string name="shell_not_found_message">Would you like you install it?</string>
-  <string name="fullscreen_mode_changed">FullScreen mode changed, please restart Stryker Terminal.</string>
+  <string name="fullscreen_mode_changed">FullScreen mode changed, please restart Terminal.</string>
   <string name="permission_denied">Storage permission denied — external file access is limited (the terminal still works).</string>
   <string name="error">Oops!</string>
   <string name="use_system_shell">System Shell</string>
@@ -220,7 +220,7 @@
   <string name="default_source_url" translatable="false">https://example.com/terminal</string>
 
   <string name="sources_licenses">
-    Stryker Terminal is based on NeoTerm and Termux, licensed under the GNU GPL v3.0.
+    Terminal is based on NeoTerm and Termux, licensed under the GNU GPL v3.0.
     The complete open-source license list for the whole app — every library, bundled
     binary and chroot tool — is in Settings → About → Open-source licenses.
 
@@ -427,7 +427,7 @@ OFL is used by almost all libre fonts. Selling fonts by themselves is not allowe
   </string-array>
 
   <string-array name="custom_preview_script_colors">
-    <item>Welcome to Stryker Terminal\\n</item>
+    <item>Welcome to Terminal\\n</item>
     <item>"\\e[30m Dim black \\e[0m\\n"</item>
     <item>"\\e[31m Dim red \\e[0m\\n"</item>
     <item>"\\e[32m Dim green \\e[0m\\n"</item>

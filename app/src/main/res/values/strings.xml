@@ -1027,7 +1027,7 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
 
     <string name="shortcut_terminal_short">Terminal</string>
     <string name="shortcut_terminal_long">Open OPX-Demon terminal</string>
-    <string name="terminal_launcher_label" translatable="false">OPX-Demon Terminal</string>
+    <string name="terminal_launcher_label" translatable="false">Terminal</string>
 
     <string name="mac_title">MAC Changer</string>
     <string name="mac_subtitle">Spoof or restore the hardware address of any wireless interface.</string>
