@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <!-- Primary SEO -->
+  <title>OPX-Demon — Mobile Pentest Suite for Android | OP AMINUL FF</title>
+  <meta name="description" content="OPX-Demon is a free, open-source mobile pentest suite for Android: WiFi attacks (deauth, handshake, WPS Pixie Dust), Nmap, Nuclei web scanning, Metasploit, HID & USB arsenal, MAC changer, BLE WhisperPair and more — running a full Debian trixie chroot or rootless QEMU VM on your device. Download the latest APK v1.0.8 free.">
+  <meta name="keywords" content="OP Aminul Left, OPX Aminul, OP Aminul FF, OPX, OPX-Demon, OPX Demon, opx demon download, opx aminul left, op aminul ff app, android pentest suite, wifi pentesting android, pixie dust wps attack apk, nmap android apk, metasploit android apk, nuclei android, hid attack android, usb arsenal android, mac changer android, stryker, strykeross, opx tools, opaminulff">
+  <meta name="author" content="OPX-AMINUL (OP AMINUL FF)">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <meta name="theme-color" content="#04060c">
+  <meta name="rating" content="general">
+  <meta name="application-name" content="OPX-Demon">
+  <link rel="canonical" href="https://opx-aminul.github.io/OPX-Demon/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="OPX-Demon">
+  <meta property="og:title" content="OPX-Demon — Mobile Pentest Suite for Android">
+  <meta property="og:description" content="Free & open-source Android pentest suite — WiFi attacks, Nmap, Nuclei, Metasploit, HID, USB Arsenal and a full Debian chroot. Download the latest APK free.">
+  <meta property="og:url" content="https://opx-aminul.github.io/OPX-Demon/">
+  <meta property="og:image" content="https://opx-aminul.github.io/OPX-Demon/assets/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="OPX-Demon logo — neon demon on dark background">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="OPX-Demon — Mobile Pentest Suite for Android">
+  <meta name="twitter:description" content="WiFi attacks, Nmap, Nuclei, Metasploit, HID & USB Arsenal on your phone. Free, open-source, GPLv3. Download the latest APK.">
+  <meta name="twitter:image" content="https://opx-aminul.github.io/OPX-Demon/assets/og.png">
+
+  <!-- Icons -->
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/favicon.png">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Structured data: SoftwareApplication -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "OPX-Demon",
+    "alternateName": ["OPX Demon", "OP Aminul Left", "OPX Aminul", "OPX Aminul Left"],
+    "operatingSystem": "Android 7.0+",
+    "applicationCategory": "SecurityApplication",
+    "softwareVersion": "1.0.8",
+    "fileSize": "~120MB",
+    "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+    "author": {
+      "@type": "Person",
+      "name": "OPX-AMINUL",
+      "alternateName": "OP AMINUL FF",
+      "url": "https://opaminulff.vercel.app/"
+    },
+    "publisher": { "@type": "Organization", "name": "OPX" },
+    "description": "A free and open-source mobile pentest suite for Android. Network, wireless and web security tools with a Debian trixie arm64 chroot and a rootless QEMU engine.",
+    "downloadUrl": "https://github.com/OPX-Aminul/OPX-Demon/releases/latest/download/app-release.apk",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "featureList": "WiFi deauth and handshake capture, WPS Pixie Dust attacks, Nmap integration, Nuclei web scanning, Metasploit console, HID DuckyScript injection, USB gadget arsenal, MAC changer, BLE WhisperPair exploit, GeoMac mapping, VNC desktop, rootless QEMU engine",
+    "screenshot": "https://opx-aminul.github.io/OPX-Demon/assets/og.png"
+  }
+  </script>
+
+  <!-- Structured data: FAQ -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Is OPX-Demon free?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. OPX-Demon is 100% free and open-source under GNU GPL v3.0. There are no ads, no subscriptions and no locked features." }
+      },
+      {
+        "@type": "Question",
+        "name": "Does OPX-Demon need a rooted phone?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Root (Magisk or KernelSU) unlocks the native chroot engine, but a stock, non-rooted device can still run the built-in rootless QEMU VM engine." }
+      },
+      {
+        "@type": "Question",
+        "name": "Which USB Wi-Fi adapters work with OPX-Demon?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Monitor-mode adapters such as Atheros AR9271 and Realtek 88XXAU (rtl8812au/8821cu/8822bu) are recommended. Drivers rtl8xxxu, rtw88, ath9k_htc, carl9170, mt76, rt2x00, rtl8187 and zd1211rw are pre-built into the kernel, and firmware is bundled in the rootfs." }
+      },
+      {
+        "@type": "Question",
+        "name": "Why does OPX-Demon work on Xiaomi / MIUI phones when the original app does not?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Xiaomi kernels misreport full-speed USB devices as low-speed, breaking Realtek adapters. OPX-Demon ships a custom 6.12.94 kernel with a hub.c classification fix plus a QEMU host-libusb quirk, so adapters like rtl8188fu enumerate correctly." }
+      },
+      {
+        "@type": "Question",
+        "name": "Where do I download the latest OPX-Demon APK?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Every release is published on GitHub Releases. The Download button on this site always fetches the newest app-release.apk directly from the latest release." }
+      }
+    ]
+  </script>
+</head>
+<body>
+
+  <!-- Animated background -->
+  <div class="bg-stage" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-blob blob-1" aria-hidden="true"></div>
+  <div class="bg-blob blob-2" aria-hidden="true"></div>
+  <div class="bg-blob blob-3" aria-hidden="true"></div>
+  <div class="bg-scanline" aria-hidden="true"></div>
+
+  <!-- Browser-style router bar -->
+  <nav class="router-bar" aria-label="Site navigation">
+    <div class="rb-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    <div class="rb-nav">
+      <a href="#/" data-route="">Home</a>
+      <a href="#/modules" data-route="modules">Modules</a>
+      <a href="#/screens" data-route="screens">Screens</a>
+      <a href="#/download" data-route="download">Download</a>
+      <a href="#/faq" data-route="faq">FAQ</a>
+    </div>
+    <div class="rb-address" aria-hidden="true">
+      <span class="lock">&#128274;</span>
+      <span class="url">https://<b>opx-aminul.github.io</b>/OPX-Demon/<span id="rb-path"></span></span>
+      <span class="rb-caret"></span>
+    </div>
+    <button type="button" class="rb-reload" id="rb-reload" title="Reload" aria-label="Reload">&#8635;</button>
+  </nav>
+
+  <main class="shell">
+
+    <!-- ================= HOME ================= -->
+    <section class="view" id="view-home">
+      <div class="hero">
+        <div class="hero-copy">
+          <span class="hero-badge"><span class="pulse-dot"></span> v1.0.8 · LATEST RELEASE OUT NOW</span>
+          <h1>Demon-grade<br><span class="grad">pentest power</span><br>in your pocket.</h1>
+          <p class="tagline"><b>OPX-Demon</b> is a free, open-source mobile penetration-testing suite for Android.
+            WiFi attacks, Nmap, Nuclei, Metasploit, HID &amp; USB gadgets — all running from a real
+            <b>Debian trixie arm64 chroot</b>, or a <b>rootless QEMU VM</b> when root is unavailable.</p>
+          <div class="hero-cta">
+            <a class="btn btn-primary dl-link" href="https://github.com/OPX-Aminul/OPX-Demon/releases/latest/download/app-release.apk">
+              &#11015;&#65039; Download APK — Free
+            </a>
+            <a class="btn btn-ghost" href="#/modules">Explore 16 modules &#8594;</a>
+          </div>
+          <div class="hero-meta">
+            <span class="chip">Android 7.0+</span>
+            <span class="chip">GPLv3 · Open Source</span>
+            <span class="chip">Root &amp; Rootless engines</span>
+            <span class="chip">No ads · No telemetry</span>
+          </div>
+        </div>
+
+        <div class="hero-visual">
+          <div class="logo-orb">
+            <div class="orbit" aria-hidden="true"><span></span><span></span><span></span></div>
+            <img src="assets/logo.png" alt="OPX-Demon app logo — neon demon emblem" width="224" height="224">
+          </div>
+          <div class="term-card t1" aria-hidden="true">
+            <div class="tc-title">root@opx-demon</div>
+            <code>$ nmap -sS 192.168.1.0/24</code>
+            <code><b>✔ 12 hosts up · 54 ports</b></code>
+          </div>
+          <div class="term-card t2" aria-hidden="true">
+            <div class="tc-title">wlan0mon</div>
+            <code>$ wifipixie --attack</code>
+            <code><b>✔ PMKID captured in 8.4s</b></code>
+          </div>
+        </div>
+      </div>
+
+      <div class="marquee" aria-hidden="true">
+        <div class="marquee-track">
+          <span>WiFi Deauth</span><span>Pixie Dust WPS</span><span>Handshake Capture</span><span>Nmap</span><span>Nuclei</span><span>Metasploit</span><span>HID Injection</span><span>USB Arsenal</span><span>MAC Changer</span><span>WhisperPair BLE</span><span>GeoMac</span><span>VNC Desktop</span>
+          <span>WiFi Deauth</span><span>Pixie Dust WPS</span><span>Handshake Capture</span><span>Nmap</span><span>Nuclei</span><span>Metasploit</span><span>HID Injection</span><span>USB Arsenal</span><span>MAC Changer</span><span>WhisperPair BLE</span><span>GeoMac</span><span>VNC Desktop</span>
+        </div>
+      </div>
+
+      <div class="section" id="stats">
+        <div class="sec-head reveal">
+          <span class="sec-kicker">why opx-demon</span>
+          <h2>Built like a flagship.<br>Released like a weapon.</h2>
+          <p>The same engine the original Stryker app made famous — rebuilt, patched and hardened by OPX.</p>
+        </div>
+        <div class="stats-grid">
+          <div class="stat glass reveal"><div class="num" data-count="16">0</div><div class="lbl">Security modules</div></div>
+          <div class="stat glass reveal"><div class="num" data-count="150" data-suffix="+">0</div><div class="lbl">Bundled tools</div></div>
+          <div class="stat glass reveal"><div class="num" data-count="2">0</div><div class="lbl">Engines: chroot + QEMU</div></div>
+          <div class="stat glass reveal"><div class="num" data-count="0" data-prefix="$">0</div><div class="lbl">Cost, forever</div></div>
+        </div>
+      </div>
+
+      <div class="section" id="highlights">
+        <div class="sec-head reveal">
+          <span class="sec-kicker">the opx edge</span>
+          <h2>Fixes you won't find anywhere else.</h2>
+        </div>
+        <div class="modules-grid">
+          <article class="module glass reveal">
+            <div class="m-icon">&#128246;</div>
+            <h3>Xiaomi / MIUI USB — solved</h3>
+            <p>MIUI kernels misreport full-speed USB adapters as low-speed, killing Realtek dongles.
+               OPX-Demon ships a custom 6.12.94 kernel with a hub.c classification fix plus a QEMU
+               host-libusb quirk. Your <code>rtl8188fu</code> finally enumerates.</p>
+            <span class="m-tag">EXCLUSIVE</span>
+          </article>
+          <article class="module glass reveal">
+            <div class="m-icon">&#128295;</div>
+            <h3>Drivers pre-built in</h3>
+            <p><code>rtl8xxxu</code>, <code>rtw88</code> (8821cu/8822bu/8812au), <code>ath9k_htc</code>,
+               <code>carl9170</code>, <code>mt76</code>, <code>rt2x00</code>, <code>rtl8187</code>,
+               <code>zd1211rw</code> — compiled into the kernel. Adapter firmware ships inside the
+               rootfs, so it just works after install.</p>
+          </article>
+          <article class="module glass reveal">
+            <div class="m-icon">&#9889;</div>
+            <h3>Rootless QEMU engine</h3>
+            <p>No root? No problem. The same Debian rootfs boots in a QEMU VM at
+               <code>localhost:1050</code> on stock devices — with resumable downloads, fixed
+               libslirp boot and no more stuck login prompts.</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="cta-band glass reveal">
+          <h2>Ready to unleash the demon?</h2>
+          <p>Grab the latest signed APK straight from GitHub Releases — always current, always free.</p>
+          <a class="btn btn-primary dl-link" href="https://github.com/OPX-Aminul/OPX-Demon/releases/latest/download/app-release.apk">&#11015;&#65039; Download OPX-Demon v1.0.8</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= MODULES ================= -->
+    <section class="view" id="view-modules">
+      <div class="section">
+        <div class="sec-head reveal">
+          <span class="sec-kicker">arsenal overview</span>
+          <h2>Every module. One suite.</h2>
+          <p>Sixteen fully-integrated modules cover wireless, network, web, physical-access and
+             post-exploitation workflows — no CLI required, but a full terminal is always one swipe away.</p>
+        </div>
+        <div class="modules-grid">
+          <article class="module glass reveal"><div class="m-icon">&#128200;</div><h3>Dashboard</h3><p>Live overview of the chroot, USB adapters and mount state, with quick actions, app news feed and WiFi history.</p><span class="m-tag">CORE</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#128225;</div><h3>WiFi networks</h3><p>Scan, deauth, capture WPA handshakes and run WPS attacks — Pixie Dust, common PINs and custom PIN sequences via monitor-mode adapters.</p><span class="m-tag">WIRELESS</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#129517;</div><h3>Handshakes</h3><p>Local handshake vault with rename &amp; share, export to OnlineHashCrack, and on-device cracking via Hashcat.</p><span class="m-tag">CRACKING</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#128260;</div><h3>MAC changer</h3><p>Inline and dedicated MAC randomizer with persistent profiles per interface.</p><span class="m-tag">ANONYMITY</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#127909;</div><h3>WhisperPair (BLE)</h3><p>Fast Pair discovery, CVE-2025-36911 checks and full exploit chain, post-pair account-key writes and HFP audio capture/passthrough.</p><span class="m-tag">BLE</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#127760;</div><h3>Local network</h3><p>Nmap host discovery, port scans and OS fingerprinting with per-device exploit dispatch and a live terminal.</p><span class="m-tag">NETWORK</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#128269;</div><h3>Nmap</h3><p>Direct Nmap interface with custom scripts, NSE engine and exported reports.</p><span class="m-tag">NETWORK</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#128165;</div><h3>Web scanner (Nuclei)</h3><p>Multi-target Nuclei scans with severity-grouped findings and per-finding evidence.</p><span class="m-tag">WEB</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#129520;</div><h3>Arsenal</h3><p>Custom exploit &amp; scanner database with template arguments: <code>{IP}</code>, <code>{PORT}</code>, <code>{MAC}</code>, <code>{GW}</code>, <code>{MASK}</code>.</p><span class="m-tag">EXPLOITS</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#9000;&#65039;</div><h3>HID Attacks</h3><p>DuckyScript-compatible USB HID injection — pure-Java parser (Hak5 v1 + v3 superset), 7 keyboard layouts and a live execution log.</p><span class="m-tag">PHYSICAL</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#128189;</div><h3>USB Arsenal</h3><p>USB-gadget profile manager: HID keyboard/mouse, mass-storage, RNDIS/ECM/ACM, custom VID/PID/serial, mount .img/.iso images.</p><span class="m-tag">PHYSICAL</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#128021;</div><h3>Metasploit</h3><p>Native MSF console inside the chroot with sessions, payload generation and a module browser.</p><span class="m-tag">EXPLOITS</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#128205;</div><h3>GeoMac</h3><p>OSM-based map of captured BSSIDs and handshakes with WiGLE-style KML/CSV export.</p><span class="m-tag">MAPPING</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#128421;&#65039;</div><h3>VNC desktop</h3><p>Stand up an in-chroot XFCE/Xfce-VNC session and view it locally on the device.</p><span class="m-tag">DESKTOP</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#128736;&#65039;</div><h3>Core manager</h3><p>Mount, unmount and repair the chroot; manage installed components and incremental core repair.</p><span class="m-tag">CORE</span></article>
+          <article class="module glass reveal"><div class="m-icon">&#9654;&#65039;</div><h3>Terminal</h3><p>Built-in terminal (drawer &rarr; Terminal, plus a home-screen launcher icon) dropping straight into the chroot shell.</p><span class="m-tag">CORE</span></article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SCREENS ================= -->
+    <section class="view" id="view-screens">
+      <div class="section">
+        <div class="sec-head reveal">
+          <span class="sec-kicker">ui walkthrough</span>
+          <h2>Screen by screen. Activity by activity.</h2>
+          <p>Every screen of the app, exactly as you'll meet it — the same flow the real UI follows from
+             first launch to full attack surface.</p>
+        </div>
+
+        <div class="screens-wrap">
+          <div class="screen-row glass reveal">
+            <div class="scr-visual" aria-hidden="true"><div class="scr-wire"></div><div class="scr-scan"></div><div class="scr-glyph">&#128640;</div></div>
+            <div class="scr-body">
+              <span class="scr-step">SCREEN 01 · SPLASH</span>
+              <h3>Launch &amp; intro</h3>
+              <p>A neon splash slides you into a one-time intro wizard: storage and runtime permissions, root grant (or rootless mode) and engine choice. Skippable, and never shown again.</p>
+              <div class="scr-feats"><span>Permission wizard</span><span>Root / rootless detect</span><span>One-time setup</span></div>
+            </div>
+          </div>
+
+          <div class="screen-row glass reveal">
+            <div class="scr-visual" aria-hidden="true"><div class="scr-wire"></div><div class="scr-scan"></div><div class="scr-glyph">&#128200;</div></div>
+            <div class="scr-body">
+              <span class="scr-step">SCREEN 02 · DASHBOARD</span>
+              <h3>Dashboard</h3>
+              <p>Mission control. Chroot status, engine health, connected USB adapters and quick actions at a glance — plus the news feed and your WiFi history feed below.</p>
+              <div class="scr-feats"><span>Core status</span><span>Adapter list</span><span>News feed</span><span>Quick actions</span></div>
+            </div>
+          </div>
+
+          <div class="screen-row glass reveal">
+            <div class="scr-visual" aria-hidden="true"><div class="scr-wire"></div><div class="scr-scan"></div><div class="scr-glyph">&#128225;</div></div>
+            <div class="scr-body">
+              <span class="scr-step">SCREEN 03 · WIFI</span>
+              <h3>WiFi networks</h3>
+              <p>Pick a network from the live scan, then launch deauth, handshake capture or the full WPS battery — Pixie Dust, common PINs or a custom PIN list — with a live packet counter.</p>
+              <div class="scr-feats"><span>Live scan</span><span>Deauth</span><span>Handshake capture</span><span>Pixie Dust</span></div>
+            </div>
+          </div>
+
+          <div class="screen-row glass reveal">
+            <div class="scr-visual" aria-hidden="true"><div class="scr-wire"></div><div class="scr-scan"></div><div class="scr-glyph">&#129517;</div></div>
+            <div class="scr-body">
+              <span class="scr-step">SCREEN 04 · HANDSHAKES</span>
+              <h3>Handshake vault</h3>
+              <p>Every capture lands here. Rename, share, export to OnlineHashCrack or hand the file to the on-device Hashcat cracker without ever leaving the app.</p>
+              <div class="scr-feats"><span>Rename &amp; share</span><span>OnlineHashCrack export</span><span>Hashcat cracking</span></div>
+            </div>
+          </div>
+
+          <div class="screen-row glass reveal">
+            <div class="scr-visual" aria-hidden="true"><div class="scr-wire"></div><div class="scr-scan"></div><div class="scr-glyph">&#127760;</div></div>
+            <div class="scr-body">
+              <span class="scr-step">SCREEN 05 · LOCAL NET</span>
+              <h3>Local network &amp; Nmap</h3>
+              <p>Host discovery sweeps the subnet, port scans and OS fingerprinting fill the device cards, and each device opens an exploit dispatch sheet with a live terminal attached. A dedicated Nmap screen exposes raw flags, NSE scripts and report export.</p>
+              <div class="scr-feats"><span>Host discovery</span><span>Port scan</span><span>OS fingerprint</span><span>NSE scripts</span></div>
+            </div>
+          </div>
+
+          <div class="screen-row glass reveal">
+            <div class="scr-visual" aria-hidden="true"><div class="scr-wire"></div><div class="scr-scan"></div><div class="scr-glyph">&#128165;</div></div>
+            <div class="scr-body">
+              <span class="scr-step">SCREEN 06 · NUCLEI</span>
+              <h3>Web scanner (Nuclei)</h3>
+              <p>Add targets, pick templates, launch. Findings group by severity with per-finding evidence, and full reports open in their own viewer with terminal output retained.</p>
+              <div class="scr-feats"><span>Multi-target</span><span>Severity grouping</span><span>Evidence view</span></div>
+            </div>
+          </div>
+
+          <div class="screen-row glass reveal">
+            <div class="scr-visual" aria-hidden="true"><div class="scr-wire"></div><div class="scr-scan"></div><div class="scr-glyph">&#9000;&#65039;</div></div>
+            <div class="scr-body">
+              <span class="scr-step">SCREEN 07 · HID</span>
+              <h3>HID IDE &amp; USB Arsenal</h3>
+              <p>Write DuckyScript in the built-in IDE, choose one of 7 keyboard layouts and fire — the execution log streams live. USB Arsenal manages gadget profiles: keyboard, mouse, mass-storage, RNDIS/ECM/ACM, custom VID/PID/serial and .img/.iso mounting.</p>
+              <div class="scr-feats"><span>DuckyScript parser</span><span>7 layouts</span><span>Gadget profiles</span><span>IMG/ISO mount</span></div>
+            </div>
+          </div>
+
+          <div class="screen-row glass reveal">
+            <div class="scr-visual" aria-hidden="true"><div class="scr-wire"></div><div class="scr-scan"></div><div class="scr-glyph">&#128021;</div></div>
+            <div class="scr-body">
+              <span class="scr-step">SCREEN 08 · MSF</span>
+              <h3>Metasploit console</h3>
+              <p>A native MSF console inside the chroot: sessions list, payload generator and a browsable module database — all wrapped in the app UI instead of a raw shell.</p>
+              <div class="scr-feats"><span>Session manager</span><span>msfvenom payloads</span><span>Module browser</span></div>
+            </div>
+          </div>
+
+          <div class="screen-row glass reveal">
+            <div class="scr-visual" aria-hidden="true"><div class="scr-wire"></div><div class="scr-scan"></div><div class="scr-glyph">&#128205;</div></div>
+            <div class="scr-body">
+              <span class="scr-step">SCREEN 09 · GEOMAC</span>
+              <h3>GeoMac &amp; WhisperPair</h3>
+              <p>GeoMac plots every captured BSSID and handshake on an OpenStreetMap layer with WiGLE-style KML/CSV export. WhisperPair discovers Fast Pair BLE devices, checks CVE-2025-36911, runs the exploit chain and can capture HFP audio after pairing.</p>
+              <div class="scr-feats"><span>OSM map</span><span>KML/CSV export</span><span>CVE-2025-36911</span><span>HFP capture</span></div>
+            </div>
+          </div>
+
+          <div class="screen-row glass reveal">
+            <div class="scr-visual" aria-hidden="true"><div class="scr-wire"></div><div class="scr-scan"></div><div class="scr-glyph">&#128736;&#65039;</div></div>
+            <div class="scr-body">
+              <span class="scr-step">SCREEN 10 · CORE &amp; TERM</span>
+              <h3>Core manager, VNC &amp; Terminal</h3>
+              <p>Core manager mounts, unmounts and repairs the chroot with incremental repair. VNC desktop stands up an XFCE session you view locally, and the Terminal — in the drawer or on your home screen — drops straight into a root shell.</p>
+              <div class="scr-feats"><span>Mount / repair</span><span>XFCE over VNC</span><span>Launcher icon</span><span>Root shell</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= DOWNLOAD ================= -->
+    <section class="view" id="view-download">
+      <div class="section">
+        <div class="sec-head reveal">
+          <span class="sec-kicker">get the app</span>
+          <h2>Download OPX-Demon.</h2>
+          <p>One button, always the newest build — the link resolves to the latest GitHub release every time you click it.</p>
+        </div>
+        <div class="download-panel glass reveal">
+          <div class="dl-icon" aria-hidden="true">&#11015;&#65039;</div>
+          <h2>OPX-Demon <span class="ver">v1.0.8 · build 108</span></h2>
+          <p class="dl-note">Signed release APK (minified, R8). Installs alongside any stock launcher.
+            On first launch the in-app installer fetches the Debian trixie arm64 core (~1 GB) —
+            Wi-Fi is recommended.</p>
+          <a class="btn btn-primary dl-big dl-link" href="https://github.com/OPX-Aminul/OPX-Demon/releases/latest/download/app-release.apk">
+            &#11015;&#65039; Download latest APK — Free
+          </a>
+          <div class="dl-alt">
+            <a href="https://github.com/OPX-Aminul/OPX-Demon/releases" target="_blank" rel="noopener">All releases</a>
+            <a href="https://github.com/OPX-Aminul/OPX-Demon" target="_blank" rel="noopener">Source code</a>
+            <a href="https://github.com/OPX-Aminul/OPX-Demon/issues" target="_blank" rel="noopener">Report an issue</a>
+            <a href="https://opaminulff.vercel.app/" target="_blank" rel="noopener">Developer site</a>
+          </div>
+          <div class="dl-checks">
+            <span>No ads</span><span>No trackers</span><span>GPLv3 licensed</span><span>Reproducible signing</span><span>Android 7.0+</span>
+          </div>
+        </div>
+
+        <div class="section" id="requirements">
+          <div class="sec-head reveal">
+            <span class="sec-kicker">before you install</span>
+            <h2>Requirements.</h2>
+          </div>
+          <div class="req-grid">
+            <div class="req glass reveal"><div class="r-icon">&#128241;</div><div><h4>Android device</h4><p>Android 7.0 (API 24) or newer. Root via Magisk/KernelSU for the native chroot engine; the rootless QEMU engine runs on stock devices.</p></div></div>
+            <div class="req glass reveal"><div class="r-icon">&#128190;</div><div><h4>~1 GB free storage</h4><p>For the Debian trixie chroot, bundled tools and firmware signatures.</p></div></div>
+            <div class="req glass reveal"><div class="r-icon">&#128246;</div><div><h4>USB Wi-Fi adapter</h4><p>External monitor-mode adapter for WiFi attacks — Atheros AR9271 or Realtek 88XXAU recommended. OTG cable required.</p></div></div>
+            <div class="req glass reveal"><div class="r-icon">&#129518;</div><div><h4>Gadget-capable kernel <small>(optional)</small></h4><p>For HID Attacks &amp; USB Arsenal: USB configfs enabled, kernel ≥ 3.19, populated <code>/sys/class/udc/</code>. Most modern kernels qualify.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= FAQ ================= -->
+    <section class="view" id="view-faq">
+      <div class="section">
+        <div class="sec-head reveal">
+          <span class="sec-kicker">answers</span>
+          <h2>Frequently asked questions.</h2>
+        </div>
+        <div class="faq-list">
+          <details class="faq glass reveal" open>
+            <summary>Is OPX-Demon really free?</summary>
+            <div class="faq-a">Yes — 100% free and open-source under <b>GNU GPL v3.0</b>. No ads, no subscriptions, no premium tiers. The source lives at <a class="faq-link" href="https://github.com/OPX-Aminul/OPX-Demon">github.com/OPX-Aminul/OPX-Demon</a>.</div>
+          </details>
+          <details class="faq glass reveal">
+            <summary>Does it need a rooted phone?</summary>
+            <div class="faq-a">Root unlocks the fast native chroot engine, but a <b>stock, non-rooted device</b> can still run the built-in rootless QEMU VM — the same Debian rootfs booted at <code>localhost:1050</code>.</div>
+          </details>
+          <details class="faq glass reveal">
+            <summary>Which USB Wi-Fi adapters are supported?</summary>
+            <div class="faq-a">Monitor-mode adapters like the <b>Atheros AR9271</b> and <b>Realtek 88XXAU</b> family. Drivers <code>rtl8xxxu</code>, <code>rtw88</code>, <code>ath9k_htc</code>, <code>carl9170</code>, <code>mt76</code>, <code>rt2x00</code>, <code>rtl8187</code> and <code>zd1211rw</code> are pre-built into the shipped kernel, with firmware bundled in the rootfs.</div>
+          </details>
+          <details class="faq glass reveal">
+            <summary>Why does it work on Xiaomi / MIUI when the original app doesn't?</summary>
+            <div class="faq-a">Xiaomi kernels misreport full-speed USB devices as low-speed, so Realtek adapters abort enumeration. OPX-Demon ships a custom <b>6.12.94 kernel</b> with a <code>hub.c</code> classification fix plus a QEMU host-libusb quirk — two independent layers that make adapters like <code>rtl8188fu</code> enumerate correctly.</div>
+          </details>
+          <details class="faq glass reveal">
+            <summary>Is this legal?</summary>
+            <div class="faq-a">OPX-Demon is a security-testing tool built for <b>authorized testing, education and research only</b>. You are responsible for complying with all applicable laws and for obtaining explicit permission before testing any system or device you do not own.</div>
+          </details>
+          <details class="faq glass reveal">
+            <summary>How do I get the latest version?</summary>
+            <div class="faq-a">Use any Download button on this site — it always points at the newest release asset on GitHub Releases. The in-app OTA core manager keeps the chroot, QEMU kernel and tools up to date separately.</div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= FOOTER ================= -->
+    <footer class="site-footer">
+      <div class="footer-inner glass reveal">
+        <div class="footer-brand">
+          <img src="assets/favicon.png" alt="OPX-Demon logo" width="34" height="34">
+          <div>
+            <b>OPX-Demon</b>
+            <small>by OPX-AMINUL · company OPX</small>
+          </div>
+        </div>
+        <div class="footer-links">
+          <a href="#/modules">Modules</a>
+          <a href="#/screens">Screens</a>
+          <a href="#/download">Download</a>
+          <a href="https://github.com/OPX-Aminul/OPX-Demon" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/OPX-Aminul/OPX-Demon/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://opaminulff.vercel.app/" target="_blank" rel="noopener">Website</a>
+        </div>
+      </div>
+      <p class="footer-fine">© 2026 <b>OPX / OP AMINUL FF</b> · GPLv3 · Authorized security testing only · Not affiliated with any upstream project</p>
+    </footer>
+  </main>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

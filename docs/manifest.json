@@ -1,0 +1,26 @@
+{
+  "name": "OPX-Demon — Mobile Pentest Suite for Android",
+  "short_name": "OPX-Demon",
+  "description": "Free and open-source mobile pentest suite for Android: WiFi attacks, Nmap, Nuclei, Metasploit, HID and USB Arsenal with a Debian chroot or rootless QEMU engine.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#04060c",
+  "theme_color": "#04060c",
+  "lang": "en",
+  "categories": ["security", "utilities"],
+  "icons": [
+    {
+      "src": "assets/favicon.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/logo.png",
+      "sizes": "640x640",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
