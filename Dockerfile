@@ -14,7 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /usr/src
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bc bison flex libssl-dev libelf-dev make cpio kmod wget xz-utils \
+    bc bison flex libssl-dev libelf-dev make patch cpio kmod wget xz-utils python3 \
     crossbuild-essential-arm64 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -53,7 +53,13 @@ RUN mkdir -p /work/firmware/rtlwifi /work/firmware/rtw88 /work/firmware/ath9k_ht
     && for f in htc_9271-1.4.0.fw htc_7010-1.4.0.fw; do \
          wget -q -O "$f" "https://gitlab.com/kernel-firmware/linux-firmware/-/raw/main/ath9k_htc/$f" || true; \
        done \
-    && find /work/firmware -type f -size +1k | sort
+    && find /work/firmware -type f -size +1k | sort \
+    && for f in rtlwifi/rtl8188fu.fw rtlwifi/rtl8188fufw.bin rtlwifi/rtl8188eufw.bin \
+                rtlwifi/rtl8188cufw.bin rtw88/rtw8821c_fw.bin \
+                rtw88/rtw8822b_fw.bin rtw88/rtw8822c_fw.bin \
+                ath9k_htc/htc_9271-1.4.0.fw; do \
+         [ -s "/work/firmware/$f" ] || { echo "FATAL: required firmware missing: $f" >&2; exit 1; }; \
+       done
 
 # ==============================================================================
 # SECTION 1: Rootfs (Debian Trixie + pentest tools + stryker-agentd)

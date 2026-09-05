@@ -3,7 +3,7 @@ name: Build & Update Release
 # Signing: release APK is signed with keystore/stryker-release.jks via
 # gradle.properties (see README → Release signing).
 # Exact match with original StrykerOSS rootless-main release
-# Uses Debian Trixie stock kernel (NOT custom-compiled)
+# Custom arm64 kernel: Xiaomi/MIUI USB ep0 maxpacket fix + USB-WiFi drivers
 # Docker Buildx GHA cache: mode=max caches ALL layers for fast rebuilds
 #
 # A successful run also fires the Build APK workflow (workflow_run) for the
