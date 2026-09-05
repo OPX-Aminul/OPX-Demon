@@ -34,13 +34,13 @@
     },
     "kernel": {
       "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/Image",
-      "sha256": "cbe59a02e7ea979a150661032440c94e2c4db0b735af2416e11ae5cac15a58e4",
-      "size": 37605312
+      "sha256": "4baaf1a3c8c370b4cf44e4ec49ca01e50d899f37133e2d1c97c55508a2e22338",
+      "size": 48517632
     },
     "initrd": {
       "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/initrd.img",
-      "sha256": "07e7678601143e571dbc78ab09db15f00c17a260153e6384565f82b45e6f47f5",
-      "size": 38228554
+      "sha256": "7d6624a77c0e65952b47d300e44d72f62e0eeee88eb5f40cd6fe3badf6fd33d2",
+      "size": 39082343
     },
     "libslirp": {
       "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/libslirp.so",
@@ -49,8 +49,8 @@
     },
     "rootfs": {
       "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/all-core-file/rootfs.imgz",
-      "sha256": "b663e0884ad46724ce503ee106cf656ff3f5acde23a284bceb3ddf5b6b8ec2d5",
-      "size": 379129565
+      "sha256": "0e7cbbd0c6d82f4498b9164781a17eba268708b5ed51040f218d892478e88c22",
+      "size": 366373868
     }
   },
   "app": {
