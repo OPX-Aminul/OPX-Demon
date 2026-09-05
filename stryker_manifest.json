@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 107,
-    "versionName": "1.0.7",
-    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.0.7/app-release.apk",
-    "sha256": "ff99932c8ef3d0cbc468ed3813c47e18f290cde79e285799333b64d51e80a7cf",
-    "size": 21004369,
+    "versionCode": 108,
+    "versionName": "1.0.8",
+    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.0.8/app-release.apk",
+    "sha256": "39632fad6f912e34d7b260305a8e9ea6a6c60046fd998ec5fdd3c67e0a1b0f37",
+    "size": 21609322,
     "mandatory": false,
-    "changelog": "OPX-Demon 1.0.7 \u2014 full rebrand to OPX-Demon.\n\n- The app is now branded OPX-Demon everywhere in the UI (drawer, welcome flow, about, OTA, notifications, USB gadget names).\n- Developer OPX-AMINUL \u00b7 Company OPX \u00b7 Website opaminulff.vercel.app surfaced in About and Account.\n- Rootless engine binaries, OTA manifest and GitHub links now come from the new repo (github.com/OPX-Aminul/OPX-Demon) so downloads keep working after the repo rename.\n- Xiaomi/MIUI USB-WiFi fix, cooked firmware and all previous fixes remain in this build.\n- Signed with the same release key as before, so the update installs cleanly over 1.0.4\u20131.0.6."
+    "changelog": "OPX-Demon 1.0.8 \u2014 new app icon & brand logo.\n\n- Launcher icon (legacy + adaptive + round + the OPX-Demon Terminal shortcut) is now the OPX-Demon logo with background.\n- The transparent logo is used in-app (drawer header, About hero, welcome screen) so it blends with each surface.\n- All previous fixes remain: custom Xiaomi/MIUI USB-WiFi kernel, baked WiFi firmware, incremental core repair, cameradar fallback download.\n- Signed with the same release key \u2014 installs cleanly over 1.0.4\u20131.0.7."
   },
   "news": [
     {
