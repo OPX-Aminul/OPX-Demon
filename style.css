@@ -38,7 +38,7 @@ body {
 ::selection { background: rgba(0, 229, 192, 0.35); color: #fff; }
 
 a { color: inherit; text-decoration: none; }
-img { max-width: 100%; display: block; }
+img { max-width: 100%; height: auto; display: block; }
 button { font-family: inherit; cursor: pointer; }
 
 code {
@@ -327,9 +327,16 @@ code {
 /* Hero visual: floating glass device panel */
 .hero-visual { position: relative; display: flex; justify-content: center; }
 .logo-orb {
-  position: relative; width: min(360px, 78vw); aspect-ratio: 1;
+  position: relative;
+  width: min(360px, 78vw);
+  height: min(360px, 78vw);
+  max-width: min(360px, 70vh);
+  max-height: min(360px, 70vh);
+  aspect-ratio: 1;
+  overflow: hidden;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
   animation: fadeUp 1s 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .logo-orb::before {
@@ -352,7 +359,13 @@ code {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .logo-orb img {
-  position: relative; z-index: 2; width: 62%;
+  position: relative; z-index: 2;
+  width: 62%;
+  height: 62%;
+  max-width: 62%;
+  max-height: 62%;
+  aspect-ratio: 1;
+  object-fit: contain;
   filter: drop-shadow(0 0 34px rgba(0, 229, 192, 0.45));
   animation: logoFloat 5.5s ease-in-out infinite;
 }
@@ -711,7 +724,12 @@ footer.site-footer { padding: 44px 0 30px; }
   .hero .tagline { margin: 0 auto; }
   .hero-cta, .hero-meta { justify-content: center; }
   .hero-visual { order: -1; }
-  .logo-orb { width: min(280px, 66vw); }
+  .logo-orb {
+    width: min(220px, 52vw);
+    height: min(220px, 52vw);
+    max-width: min(220px, 38vh);
+    max-height: min(220px, 38vh);
+  }
   .term-card { display: none; }
   .modules-grid { grid-template-columns: repeat(2, 1fr); }
 }
