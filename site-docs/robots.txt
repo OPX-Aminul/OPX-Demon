@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# OPX-Demon official site — crawl everything
+Sitemap: https://opx-aminul.github.io/OPX-Demon/sitemap.xml
