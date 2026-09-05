@@ -42,14 +42,20 @@ jobs:
           VERSION=$(grep 'versionName' app/build.gradle | grep -oP '[\"\x27]\K[0-9][^"]*')
           TAG="v${VERSION}"
 
-          # Create or update release
+          # Update an existing release first (keeps the curated release notes untouched)
+          if gh release upload "$TAG" \
+            app/build/outputs/apk/release/*.apk \
+            --clobber; then
+            echo "APK updated in existing release: $TAG"
+            exit 0
+          fi
+
+          # Release does not exist yet: create it with generated notes
+          # Do not overwrite notes on later builds so hand-written changelogs stay intact
           gh release create "$TAG" \
             --title "StrykerOSS $TAG" \
-            --notes "Automated build from Build & Update Release" \
+            --notes "StrykerOSS $TAG" \
+            --generate-notes \
             --latest \
-            app/build/outputs/apk/release/*.apk || \
-          gh release upload "$TAG" \
-            app/build/outputs/apk/release/*.apk \
-            --clobber
-
-          echo "✅ APK release created: $TAG"
+            app/build/outputs/apk/release/*.apk
+          echo "APK release created: $TAG"
