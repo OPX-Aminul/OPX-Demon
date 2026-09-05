@@ -282,7 +282,7 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
         wps_lock.setOnClickListener(view -> {
             MaterialAlertDialogBuilder d = new MaterialAlertDialogBuilder(context)
                     .setTitle("WPS Locked")
-                    .setMessage("Stryker detected that this network is WPS Locked. This means that you can't use WPS to connect to this network. You can still try wps attacks, but they will fail.")
+                    .setMessage("OPX-Demon detected that this network is WPS Locked. This means that you can't use WPS to connect to this network. You can still try wps attacks, but they will fail.")
                     .setPositiveButton(android.R.string.ok, (dialog1, which) -> dialog1.dismiss());
             d.show();
         });

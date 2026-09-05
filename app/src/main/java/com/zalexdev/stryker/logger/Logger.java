@@ -90,7 +90,7 @@ public class Logger {
             file.createNewFile();
             FileOutputStream fOut = new FileOutputStream(file);
             OutputStreamWriter editor = new OutputStreamWriter(fOut);
-            editor.append("=====[Powered by Stryker " + BuildConfig.VERSION_NAME + "]=====" + "\n\n");
+            editor.append("=====[Powered by OPX-Demon " + BuildConfig.VERSION_NAME + "]=====" + "\n\n");
             editor.append("Nmap scan report for ").append(ip).append("\n\n");
             editor.append("==================================" + "\n\n\n");
             for (String line : output) {

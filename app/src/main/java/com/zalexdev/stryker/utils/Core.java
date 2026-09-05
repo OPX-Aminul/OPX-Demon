@@ -198,7 +198,7 @@ public class Core {
 
     public void copyToClipBoard(String s){
         ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-        ClipData clip = ClipData.newPlainText("Stryker", s);
+        ClipData clip = ClipData.newPlainText("OPX-Demon", s);
         clipboard.setPrimaryClip(clip);
     }
     public ArrayList<String> getNetwork(String bssid){

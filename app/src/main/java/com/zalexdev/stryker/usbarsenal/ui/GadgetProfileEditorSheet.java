@@ -67,7 +67,7 @@ public final class GadgetProfileEditorSheet {
         Context ctx = host.requireContext();
         String resolved = MassStorageImageStore.copyToWorkingDir(ctx, uri);
         if (resolved == null) {
-            new Core(ctx).toaster("Could not copy image into Stryker storage");
+            new Core(ctx).toaster("Could not copy image into OPX-Demon storage");
             return;
         }
         massImagePath = resolved;
@@ -181,10 +181,10 @@ public final class GadgetProfileEditorSheet {
                     os,
                     fns,
                     vidVal, pidVal,
-                    textOf(mfg).isEmpty() ? "Stryker" : textOf(mfg),
+                    textOf(mfg).isEmpty() ? "OPX" : textOf(mfg),
                     textOf(prod).isEmpty() ? "Composite" : textOf(prod),
                     textOf(serial).isEmpty() ? "STRYKER" : textOf(serial),
-                    "Stryker Gadget",
+                    "OPX-Demon Gadget",
                     chipMass.isChecked() ? massImagePath : null,
                     ro.isChecked(),
                     cdrom.isChecked(),

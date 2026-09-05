@@ -32,7 +32,7 @@
             android:layout_marginStart="4dp"
             android:layout_marginTop="4dp"
             android:layout_marginBottom="18dp"
-            android:text="Stryker needs root and storage access to run its tooling chroot and store scan output."
+            android:text="OPX-Demon needs root and storage access to run its tooling chroot and store scan output."
             android:textColor="@color/grey"
             android:textSize="13sp" />
 

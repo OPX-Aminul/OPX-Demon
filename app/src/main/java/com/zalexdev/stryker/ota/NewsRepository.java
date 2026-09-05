@@ -23,7 +23,7 @@ public final class NewsRepository {
 
     public static List<News> defaults() {
         News oss = new News();
-        oss.title = "StrykerOSS is open source";
+        oss.title = "OPX-Demon is open source";
         oss.description = "Released as free and open-source software. Visit the GitHub repository "
                 + "for source, issues and contributions.";
         oss.newsDate = "2026";

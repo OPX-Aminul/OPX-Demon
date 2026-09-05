@@ -13,7 +13,7 @@ public class StrykerApp extends com.stryker.terminal.App {
     public void onCreate() {
         super.onCreate();
         LogStore store = LogStore.init(this);
-        store.add(LogEntry.INFO, "session", "==== Stryker " + BuildConfig.VERSION_NAME
+        store.add(LogEntry.INFO, "session", "==== OPX-Demon " + BuildConfig.VERSION_NAME
                 + " session start ====");
         String abi = Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "unknown";
         store.add(LogEntry.INFO, "session", "Device: " + Build.MANUFACTURER + " " + Build.MODEL

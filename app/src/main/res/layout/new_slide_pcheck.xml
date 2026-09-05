@@ -31,7 +31,7 @@
             android:layout_marginStart="4dp"
             android:layout_marginTop="4dp"
             android:layout_marginBottom="18dp"
-            android:text="Stryker probes your hardware to predict which tools will work without surprises."
+            android:text="OPX-Demon probes your hardware to predict which tools will work without surprises."
             android:textColor="@color/grey"
             android:textSize="13sp" />
 

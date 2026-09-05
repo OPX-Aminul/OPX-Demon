@@ -33,7 +33,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:padding="10dp"
-                android:text="Stryker Geomac"
+                android:text="OPX-Demon Geomac"
                 android:textColor="@android:color/white"
                 android:textSize="18dp" />
 

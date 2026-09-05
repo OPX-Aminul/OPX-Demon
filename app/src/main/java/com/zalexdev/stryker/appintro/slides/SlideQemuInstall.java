@@ -114,7 +114,7 @@ public class SlideQemuInstall extends Fragment {
         logCard.setVisibility(View.VISIBLE);
         logRecycler.setVisibility(View.VISIBLE);
         setStatus(StatusKind.RUNNING, "Rootless engine", "Starting...");
-        log(LogLevel.INFO, "Stryker " + BuildConfig.VERSION_NAME + " · build " + BuildConfig.VERSION_CODE);
+        log(LogLevel.INFO, "OPX-Demon " + BuildConfig.VERSION_NAME + " · build " + BuildConfig.VERSION_CODE);
         log(LogLevel.INFO, "Engine: rootless (QEMU aarch64)");
 
         runOnUi(() -> {

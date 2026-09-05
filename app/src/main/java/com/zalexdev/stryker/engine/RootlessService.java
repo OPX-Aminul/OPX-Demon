@@ -87,7 +87,7 @@ public class RootlessService extends Service {
 
     private Notification buildNotification(String text) {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Stryker rootless engine")
+                .setContentTitle("OPX-Demon rootless engine")
                 .setContentText(text)
                 .setSmallIcon(R.drawable.bolt)
                 .setOngoing(true)
