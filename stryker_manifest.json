@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 105,
-    "versionName": "1.0.5",
-    "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/v1.0.5/app-release.apk",
-    "sha256": "73f37755f31c626c44eb1e947b36e3c50661612fe2784d352a19091035781864",
-    "size": 21004232,
+    "versionCode": 106,
+    "versionName": "1.0.6",
+    "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/v1.0.6/app-release.apk",
+    "sha256": "1398feecf4b298ae992dd8b25064f1a4b25b69a65ae3352550224abf6afa44cc",
+    "size": 21004222,
     "mandatory": false,
-    "changelog": "StrykerOSS 1.0.5 \u2014 custom Xiaomi/MIUI USB kernel + WiFi firmware.\n\n- Custom arm64 kernel (6.12.94) with a two-layer Xiaomi/MIUI USB fix: a QEMU host-libusb quirk plus a hub.c else-if that reclassifies full-speed devices misreported as low-speed, so Realtek dongles no longer fail with \u201cInvalid ep0 maxpacket\u201d on Xiaomi phones (Poco F1 etc.).\n- Kernel now ships USB-WiFi drivers (rtl8xxxu / rtw88 / ath9k_htc / carl9170 / mt76 / rt2x00 / rtl8187 / zd1211rw) enabled, with rtl8188fufw.bin + rtl8188eufw.bin + rtw88 blobs baked into the rootfs \u2014 download the engine and WiFi just works.\n- /lib/modules is populated and kernel modules (loop/squashfs/overlay) are built-in, so .img/.iso mounting and module recovery work without extra steps.\n- Incremental repair: re-running the installer only fetches the missing core files instead of re-downloading everything.\n- The guest agent is re-waited after the resize2fs cycle so tools come back instead of showing \u201cVM not reachable on :1050\u201d."
+    "changelog": "StrykerOSS 1.0.6 \u2014 cameradar install fix.\n\n- Cameradar installation could fail with \u201ccurl: (22) 403\u201d when the GitHub API (api.github.com) rate-limits the device's IP, and the error 403 also leaked out as a visible step failure.\n- The installer now falls back to the rate-limit-free direct download URL (github.com/.../releases/latest/download/cameradar_linux_<arch>.tar.gz) when the API is blocked, so RTSP camera discovery installs reliably even on networks where the API quota is exhausted.\n- Download failure is now reported cleanly instead of cascading into bogus tar/verify errors."
   },
   "news": [
     {
