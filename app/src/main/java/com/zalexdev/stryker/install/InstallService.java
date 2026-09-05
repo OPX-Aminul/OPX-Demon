@@ -525,9 +525,11 @@ public class InstallService extends Service {
         c.add("CDURL=$(curl -fsSL https://api.github.com/repos/Ullaakut/cameradar/releases/latest "
                 + "| tr ',' '\\n' | grep browser_download_url | grep \"$CARCH\" | grep '\\.tar\\.gz' "
                 + "| head -1 | cut -d'\"' -f4)");
+        c.add("[ -n \"$CDURL\" ] || CDURL=\"https://github.com/Ullaakut/cameradar/releases/latest/download/cameradar_${CARCH}.tar.gz\"");
         c.add("[ -n \"$CDURL\" ] || echo '×Could not resolve a release URL'");
         c.add("echo \"×Downloading $CDURL\"");
-        c.add("[ -n \"$CDURL\" ] && curl -fL --retry 3 --retry-delay 2 -o /tmp/cameradar.tar.gz \"$CDURL\"");
+        c.add("if [ -n \"$CDURL\" ]; then curl -fL --retry 3 --retry-delay 2 -o /tmp/cameradar.tar.gz \"$CDURL\" "
+                + "|| echo '×Download failed — check the connection and try again'; fi");
 
         c.add("echo ×Unpacking binary");
         c.add("rm -rf /tmp/cameradar-x; mkdir -p /tmp/cameradar-x; "
