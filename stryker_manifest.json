@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 108,
-    "versionName": "1.0.8",
-    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.0.8/app-release.apk",
-    "sha256": "39632fad6f912e34d7b260305a8e9ea6a6c60046fd998ec5fdd3c67e0a1b0f37",
-    "size": 21609322,
+    "versionCode": 109,
+    "versionName": "1.0.9",
+    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.0.9/app-release.apk",
+    "sha256": "9c58cdb672406f374569504c818f925396b0955a13d6797b264e3ae26bfff120",
+    "size": 22031245,
     "mandatory": false,
-    "changelog": "OPX-Demon 1.0.8 \u2014 new app icon & brand logo.\n\n- Launcher icon (legacy + adaptive + round + the OPX-Demon Terminal shortcut) is now the OPX-Demon logo with background.\n- The transparent logo is used in-app (drawer header, About hero, welcome screen) so it blends with each surface.\n- All previous fixes remain: custom Xiaomi/MIUI USB-WiFi kernel, baked WiFi firmware, incremental core repair, cameradar fallback download.\n- Signed with the same release key \u2014 installs cleanly over 1.0.4\u20131.0.7."
+    "changelog": "OPX-Demon 1.0.9 \u2014 Terminal shortcut gets its own icon and name.\n\n- Home-screen Terminal launcher is now named Terminal (not OPX-Demon).\n- Terminal uses the new neon prompt logo (with-bg / without-bg).\n- Main OPX-Demon app icon and UI are unchanged.\n- Signed with the same release key \u2014 installs cleanly over 1.0.4\u20131.0.8."
   },
   "news": [
     {
