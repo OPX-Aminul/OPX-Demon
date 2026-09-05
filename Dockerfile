@@ -14,11 +14,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /usr/src
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bc bison flex libssl-dev libelf-dev make patch cpio kmod wget xz-utils python3 \
-    crossbuild-essential-arm64 \
+    ca-certificates curl patch bison flex libssl-dev libelf-dev make cpio kmod wget \
+    bc xz-utils python3 crossbuild-essential-arm64 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget -q https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz \
+RUN curl -fL --retry 5 --connect-timeout 20 \
+        -o linux-${KERNEL_VERSION}.tar.xz \
+        https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz \
     && tar xf linux-${KERNEL_VERSION}.tar.xz
 
 COPY build-tools/xiaomi-hub.patch /usr/src/xiaomi-hub.patch
