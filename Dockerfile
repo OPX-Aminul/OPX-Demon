@@ -39,12 +39,13 @@ RUN cd linux-${KERNEL_VERSION} \
     && make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules \
     && make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=/work/modules modules_install
 
-# Bake the Realtek 8188FU/EU firmware (rtl8xxxu) + rtw88 + ath9k_htc blobs
+# Bake the Realtek 8188FU/EU firmware (rtl8xxxu) + rtw88 + ath9k_htc blobs.
+# File names are the ones linux-firmware actually ships; rtl8xxxu loads
+# rtl8188fufw.bin for the 8188FU dongle and rtl8188eufw.bin for the 8188EU.
 RUN mkdir -p /work/firmware/rtlwifi /work/firmware/rtw88 /work/firmware/ath9k_htc \
     && cd /work/firmware/rtlwifi \
-    && for f in rtl8188fu.fw rtl8188fufw.bin rtl8188eufw.bin rtl8188efw.bin \
-                rtl8188cufw.bin rtl8192cufw.bin rtl8192eufw.bin rtl8723bu_fw.bin \
-                rtl8723aufw.bin rtl8812aufw.bin rtl8812aefw.bin; do \
+    && for f in rtl8188fufw.bin rtl8188eufw.bin rtl8188efw.bin \
+                rtl8192cufw.bin rtl8192sefw.bin rtl8812aefw.bin; do \
          wget -q -O "$f" "https://gitlab.com/kernel-firmware/linux-firmware/-/raw/main/rtlwifi/$f" || true; \
        done \
     && cd /work/firmware/rtw88 \
@@ -56,9 +57,8 @@ RUN mkdir -p /work/firmware/rtlwifi /work/firmware/rtw88 /work/firmware/ath9k_ht
          wget -q -O "$f" "https://gitlab.com/kernel-firmware/linux-firmware/-/raw/main/ath9k_htc/$f" || true; \
        done \
     && find /work/firmware -type f -size +1k | sort \
-    && for f in rtlwifi/rtl8188fu.fw rtlwifi/rtl8188fufw.bin rtlwifi/rtl8188eufw.bin \
-                rtlwifi/rtl8188cufw.bin rtw88/rtw8821c_fw.bin \
-                rtw88/rtw8822b_fw.bin rtw88/rtw8822c_fw.bin \
+    && for f in rtlwifi/rtl8188fufw.bin rtlwifi/rtl8188eufw.bin rtlwifi/rtl8192cufw.bin \
+                rtw88/rtw8821c_fw.bin rtw88/rtw8822b_fw.bin rtw88/rtw8822c_fw.bin \
                 ath9k_htc/htc_9271-1.4.0.fw; do \
          [ -s "/work/firmware/$f" ] || { echo "FATAL: required firmware missing: $f" >&2; exit 1; }; \
        done
