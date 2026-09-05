@@ -891,10 +891,19 @@ public class Core {
 
     /** True when the last generateSuProcess() could not spawn su at all. See the note there. */
     private volatile boolean suSpawnFailed = false;
+    private volatile boolean suMissingLogged = false;
 
     public boolean suSpawnFailed() { return suSpawnFailed; }
 
     public Process generateSuProcess(){
+        if (isRootless()) {
+            suSpawnFailed = true;
+            try {
+                return Runtime.getRuntime().exec(new String[]{"/system/bin/sh", "-c", "exit 1"});
+            } catch (IOException ex) {
+                return null;
+            }
+        }
         try {
             Process process = Runtime.getRuntime().exec("su");
             suSpawnFailed = false;
@@ -906,7 +915,10 @@ public class Core {
             // printed nothing, and every failure downstream invents its own reason for the empty
             // output: that is how "no root" used to surface as "no usable tar".
             suSpawnFailed = true;
-            logger.writeLine("su is not available on this device", 3);
+            if (!suMissingLogged) {
+                suMissingLogged = true;
+                logger.writeLine("su is not available on this device", 3);
+            }
             try {
                 return Runtime.getRuntime().exec(new String[]{"/system/bin/sh", "-c", "exit 1"});
             } catch (IOException ex) {
@@ -1089,6 +1101,9 @@ public class Core {
 
 
     public ArrayList<String> customMegaCommand(String command){
+        if (isRootless()) {
+            return customChrootCommand(command, true);
+        }
         Process process;
         try {
             process = Runtime.getRuntime().exec("su -mm");

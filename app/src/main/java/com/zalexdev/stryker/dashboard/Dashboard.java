@@ -28,12 +28,16 @@ import com.getkeepsafe.taptargetview.TapTargetView;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.snackbar.Snackbar;
 import com.zalexdev.stryker.MainActivity;
 import com.zalexdev.stryker.R;
 import com.zalexdev.stryker.arsenal.ArsenalFragment;
 import com.zalexdev.stryker.engine.EngineStatus;
+import com.zalexdev.stryker.engine.QemuInstaller;
+import com.zalexdev.stryker.engine.RootlessCoreFiles;
 import com.zalexdev.stryker.engine.RootlessEngine;
+import com.zalexdev.stryker.engine.RootlessPaths;
 import com.zalexdev.stryker.engine.RootlessService;
 import com.zalexdev.stryker.engine.VmBootStage;
 import com.zalexdev.stryker.engine.VmStatsCollector;
@@ -75,6 +79,12 @@ public class Dashboard extends Fragment {
     private ExpandableLayout vmStatsExpand, vmUsbExpand;
     private ExecutorService vmStatsExec;
     private final AtomicBoolean vmSampling = new AtomicBoolean(false);
+    private final AtomicBoolean coreRepairing = new AtomicBoolean(false);
+    private boolean coreRepairAutoTried;
+    private MaterialCardView coreRepairCard;
+    private TextView coreRepairBody, coreRepairProgressText;
+    private LinearProgressIndicator coreRepairProgress;
+    private MaterialButton coreRepairDownload;
 
     @Nullable
     @Override
@@ -172,8 +182,126 @@ public class Dashboard extends Fragment {
         }
 
         setupVmCard(view);
+        setupCoreRepair(view);
 
         showFirstScanTip(menuWifi);
+    }
+
+    private void setupCoreRepair(View view) {
+        coreRepairCard = view.findViewById(R.id.core_repair);
+        coreRepairBody = view.findViewById(R.id.core_repair_body);
+        coreRepairProgress = view.findViewById(R.id.core_repair_progress);
+        coreRepairProgressText = view.findViewById(R.id.core_repair_progress_text);
+        coreRepairDownload = view.findViewById(R.id.core_repair_download);
+        if (coreRepairCard == null) return;
+        if (!core.isRootless()) {
+            coreRepairCard.setVisibility(View.GONE);
+            return;
+        }
+        coreRepairDownload.setOnClickListener(v -> startCoreRepair());
+        scanCoreFiles(true);
+    }
+
+    private void scanCoreFiles() {
+        scanCoreFiles(false);
+    }
+
+    private void scanCoreFiles(boolean autoStart) {
+        if (coreRepairCard == null || context == null) return;
+        new Thread(() -> {
+            try {
+                RootlessPaths.ensureSlirpSoname(context);
+            } catch (Throwable ignored) {}
+            final List<RootlessCoreFiles.Gap> gaps = RootlessCoreFiles.missing(context);
+            Activity host = activity;
+            if (host == null) return;
+            host.runOnUiThread(() -> {
+                if (coreRepairCard == null) return;
+                if (gaps.isEmpty()) {
+                    coreRepairCard.setVisibility(View.GONE);
+                    return;
+                }
+                coreRepairCard.setVisibility(View.VISIBLE);
+                if (coreRepairBody != null) {
+                    coreRepairBody.setText(RootlessCoreFiles.summarize(gaps));
+                }
+                if (coreRepairDownload != null && !coreRepairing.get()) {
+                    coreRepairDownload.setEnabled(true);
+                    coreRepairDownload.setText(R.string.dashboard_core_repair_download);
+                }
+                if (autoStart && !coreRepairAutoTried && !coreRepairing.get()) {
+                    coreRepairAutoTried = true;
+                    startCoreRepair();
+                }
+            });
+        }, "core-scan").start();
+    }
+
+    private void startCoreRepair() {
+        if (context == null || !coreRepairing.compareAndSet(false, true)) return;
+        if (coreRepairDownload != null) {
+            coreRepairDownload.setEnabled(false);
+            coreRepairDownload.setText(R.string.dashboard_core_repair_working);
+        }
+        if (coreRepairProgress != null) {
+            coreRepairProgress.setVisibility(View.VISIBLE);
+            coreRepairProgress.setIndeterminate(true);
+        }
+        if (coreRepairProgressText != null) {
+            coreRepairProgressText.setVisibility(View.VISIBLE);
+            coreRepairProgressText.setText("");
+        }
+        final Context app = context.getApplicationContext();
+        new Thread(() -> {
+            boolean ok = QemuInstaller.repair(app, new QemuInstaller.Progress() {
+                @Override public void onStage(QemuInstaller.Stage stage) {
+                    postRepairText(stage.title);
+                }
+                @Override public void onBytes(String label, long done) {
+                    postRepairText(label + " · " + String.format(Locale.US, "%.1f MB", done / 1024.0 / 1024.0));
+                }
+                @Override public void onLog(int level, String message) {
+                    postRepairText(message);
+                }
+            });
+            Activity host = activity;
+            if (host == null) {
+                coreRepairing.set(false);
+                return;
+            }
+            final boolean repaired = ok;
+            host.runOnUiThread(() -> {
+                coreRepairing.set(false);
+                if (coreRepairProgress != null) coreRepairProgress.setVisibility(View.GONE);
+                if (repaired) {
+                    if (coreRepairCard != null) coreRepairCard.setVisibility(View.GONE);
+                    core.toaster(getString(R.string.dashboard_core_repair_done));
+                    RootlessService.start(context);
+                    refreshVmStatus();
+                } else {
+                    if (coreRepairDownload != null) {
+                        coreRepairDownload.setEnabled(true);
+                        coreRepairDownload.setText(R.string.dashboard_core_repair_download);
+                    }
+                    if (coreRepairProgressText != null) {
+                        coreRepairProgressText.setVisibility(View.VISIBLE);
+                        coreRepairProgressText.setText(R.string.dashboard_core_repair_failed);
+                    }
+                    scanCoreFiles();
+                }
+            });
+        }, "core-repair").start();
+    }
+
+    private void postRepairText(String text) {
+        Activity host = activity;
+        if (host == null || text == null) return;
+        host.runOnUiThread(() -> {
+            if (coreRepairProgressText != null) {
+                coreRepairProgressText.setVisibility(View.VISIBLE);
+                coreRepairProgressText.setText(text);
+            }
+        });
     }
 
 
@@ -557,6 +685,7 @@ public class Dashboard extends Fragment {
             vmRefreshing = true;
             vmHandler.post(vmTick);
         }
+        if (core != null && core.isRootless() && !coreRepairing.get()) scanCoreFiles();
     }
 
     @Override
@@ -585,9 +714,14 @@ public class Dashboard extends Fragment {
         vmRing = null;
         vmCpuGraph = null;
         vmRamGraph = null;
-        vmCpuValue = null;
-        vmRamValue = null;
-        super.onDestroyView();
+         vmCpuValue = null;
+         vmRamValue = null;
+         coreRepairCard = null;
+         coreRepairBody = null;
+         coreRepairProgressText = null;
+         coreRepairProgress = null;
+         coreRepairDownload = null;
+         super.onDestroyView();
     }
 
     private void renderHero(TextView hello, TextView subtitle, TextView savedCount, TextView recentScanCount, TextView recentScanSubtitle) {

@@ -522,14 +522,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startRootlessLaunch() {
+        boolean installed = com.zalexdev.stryker.engine.RootlessEngine.get(this).isInstalled();
         if (!core.getBoolean("first_open")
-                || !com.zalexdev.stryker.engine.RootlessEngine.get(this).isInstalled()) {
+                || (!installed && !com.zalexdev.stryker.engine.RootlessCoreFiles.anyPresent(this))) {
             core.putString("username", "User");
             launchRunning = false;
             startActivity(new Intent(this, AppIntroActivity.class));
             return;
         }
-        com.zalexdev.stryker.engine.RootlessService.start(this);
+        if (installed) {
+            com.zalexdev.stryker.engine.RootlessService.start(this);
+        }
         landOn(new Dashboard());
         schedulePromo();
         checkForUsb();

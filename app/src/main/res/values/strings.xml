@@ -229,6 +229,11 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
     <string name="dashboard_magisk_body">Stryker uses root constantly — Magisk notifications get noisy fast. Want us to silence them?</string>
     <string name="dashboard_magisk_dismiss">Dismiss</string>
     <string name="dashboard_magisk_silence">Silence</string>
+    <string name="dashboard_core_repair_title">Missing core files</string>
+    <string name="dashboard_core_repair_download">Download missing</string>
+    <string name="dashboard_core_repair_working">Downloading…</string>
+    <string name="dashboard_core_repair_done">Core files repaired — you can start the VM</string>
+    <string name="dashboard_core_repair_failed">Repair failed — see the log</string>
 
     <string name="cmd_hint">Use $ifc for the interface name and $ch for the channel in your commands</string>
     <string name="cmd_add_device">Add USB device</string>

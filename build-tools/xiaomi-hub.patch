@@ -1,0 +1,23 @@
+diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+--- a/drivers/usb/core/hub.c
++++ b/drivers/usb/core/hub.c
+@@ -5110,6 +5110,17 @@
+ 		udev->ep0.desc.wMaxPacketSize = cpu_to_le16(i);
+ 		usb_ep0_reinit(udev);
++	} else if (udev->speed == USB_SPEED_LOW &&
++			(i == 16 || i == 32 || i == 64)) {
++		/* Xiaomi/MIUI host stacks report full-speed devices as
++		 * low-speed. Per the USB spec a low-speed device must
++		 * report an ep0 maxpacket of 8 or less, so a device the
++		 * host calls low-speed with ep0 maxpacket 16/32/64 is
++		 * really full-speed. Reclassify and accept it instead of
++		 * failing enumeration with "Invalid ep0 maxpacket". */
++		dev_info(&udev->dev, "ep0 maxpacket %d on a low-speed device "
++				"reported by the host - correcting to full-speed\n",
++				i);
++		udev->speed = USB_SPEED_FULL;
++		udev->ep0.desc.wMaxPacketSize = cpu_to_le16(i);
++		usb_ep0_reinit(udev);
+ 	} else {
+ 		/* Initial guess is wrong and descriptor's value is invalid */
+ 		dev_err(&udev->dev, "Invalid ep0 maxpacket: %d\n", maxp0);

@@ -1,8 +1,59 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# StrykerOSS Unified Dockerfile — Exact Match with Original
-# Uses Debian Trixie stock kernel (NOT custom-compiled)
+# StrykerOSS Unified Dockerfile
+# Custom arm64 kernel: Xiaomi/MIUI USB ep0 maxpacket fix + USB-WiFi drivers
 # Docker Buildx GHA mode=max caches ALL layers for fast rebuilds
 # ─────────────────────────────────────────────────────────────────────────────
+
+# ==============================================================================
+# SECTION 0: Custom kernel (Xiaomi/MIUI USB fix + USB-WiFi drivers + firmware)
+# ==============================================================================
+
+FROM debian:bookworm AS kernel-builder
+ARG KERNEL_VERSION=6.12.94
+ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /usr/src
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bc bison flex libssl-dev libelf-dev make cpio kmod wget xz-utils \
+    crossbuild-essential-arm64 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN wget -q https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz \
+    && tar xf linux-${KERNEL_VERSION}.tar.xz
+
+COPY build-tools/xiaomi-hub.patch /usr/src/xiaomi-hub.patch
+COPY build-tools/usb-wifi.fragment /usr/src/usb-wifi.fragment
+
+RUN cd linux-${KERNEL_VERSION} \
+    && patch -p1 < /usr/src/xiaomi-hub.patch \
+    && grep -q 'correcting to full-speed' drivers/usb/core/hub.c \
+    && make ARCH=arm64 defconfig \
+    && scripts/kconfig/merge_config.sh -m -O . ./.config /usr/src/usb-wifi.fragment >/dev/null 2>&1 || true \
+    && make ARCH=arm64 olddefconfig \
+    && grep -q 'CONFIG_USB_XHCI_HCD=y' .config \
+    && grep -q 'CONFIG_RTL8XXXU=y' .config \
+    && grep -q 'CONFIG_ATH9K_HTC=y' .config \
+    && make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image \
+    && make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules \
+    && make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=/work/modules modules_install
+
+# Bake the Realtek 8188FU/EU firmware (rtl8xxxu) + rtw88 + ath9k_htc blobs
+RUN mkdir -p /work/firmware/rtlwifi /work/firmware/rtw88 /work/firmware/ath9k_htc \
+    && cd /work/firmware/rtlwifi \
+    && for f in rtl8188fu.fw rtl8188fufw.bin rtl8188eufw.bin rtl8188efw.bin \
+                rtl8188cufw.bin rtl8192cufw.bin rtl8192eufw.bin rtl8723bu_fw.bin \
+                rtl8723aufw.bin rtl8812aufw.bin rtl8812aefw.bin; do \
+         wget -q -O "$f" "https://gitlab.com/kernel-firmware/linux-firmware/-/raw/main/rtlwifi/$f" || true; \
+       done \
+    && cd /work/firmware/rtw88 \
+    && for f in rtw8821c_fw.bin rtw8822b_fw.bin rtw8822c_fw.bin rtw8812a_fw.bin; do \
+         wget -q -O "$f" "https://gitlab.com/kernel-firmware/linux-firmware/-/raw/main/rtw88/$f" || true; \
+       done \
+    && cd /work/firmware/ath9k_htc \
+    && for f in htc_9271-1.4.0.fw htc_7010-1.4.0.fw; do \
+         wget -q -O "$f" "https://gitlab.com/kernel-firmware/linux-firmware/-/raw/main/ath9k_htc/$f" || true; \
+       done \
+    && find /work/firmware -type f -size +1k | sort
 
 # ==============================================================================
 # SECTION 1: Rootfs (Debian Trixie + pentest tools + stryker-agentd)
@@ -32,16 +83,34 @@ COPY rootless-assets/stryker-guest-core.tar /work/stryker-guest-core.tar
 COPY build-rootfs/build-rootfs.sh /work/build-rootfs.sh
 RUN chmod +x /work/build-rootfs.sh && /work/build-rootfs.sh
 
-# Extract kernel and initrd from the installed rootfs. If the package install above was
-# silently skipped (the apt block ends with '|| true'), retry the kernel package now — a VM
-# without /work/Image cannot boot at all, and failing the build here is the only way to catch it.
-RUN ls /work/rootfs/boot/vmlinuz-* >/dev/null 2>&1 || \
-    chroot /work/rootfs /bin/sh -c 'export DEBIAN_FRONTEND=noninteractive; \
-        apt-get update >/dev/null 2>&1 || true; \
-        apt-get install -y --no-install-recommends linux-image-arm64' || true
+# Install the custom kernel + matching modules + firmware into the rootfs
+COPY --from=kernel-builder /work/modules/lib/modules /work/custom-modules
+COPY --from=kernel-builder /work/firmware /work/custom-firmware
+COPY --from=kernel-builder /usr/src/linux-6.12.94/arch/arm64/boot/Image /work/custom-Image
+
+RUN chroot /work/rootfs /bin/sh -c 'export DEBIAN_FRONTEND=noninteractive; \
+        dpkg --purge linux-image-arm64 >/dev/null 2>&1 || true; \
+        rm -rf /lib/modules /usr/lib/modules /boot/vmlinuz-* /boot/initrd.img-*' \
+    && mkdir -p /work/rootfs/lib/modules \
+    && cp -a /work/custom-modules/. /work/rootfs/lib/modules/ \
+    && mkdir -p /work/rootfs/usr/lib/firmware \
+    && cp -a /work/custom-firmware/. /work/rootfs/usr/lib/firmware/ \
+    && KVER=$(ls /work/rootfs/lib/modules | head -n1) \
+    && cp /work/custom-Image /work/rootfs/boot/vmlinuz-${KVER} \
+    && mkdir -p /work/rootfs/proc /work/rootfs/sys /work/rootfs/dev \
+    && mount -t proc proc /work/rootfs/proc 2>/dev/null || true \
+    && mount -t devtmpfs devtmpfs /work/rootfs/dev 2>/dev/null || true \
+    && chroot /work/rootfs /bin/sh -c "export DEBIAN_FRONTEND=noninteractive; \
+         update-initramfs -c -k ${KVER} >/dev/null 2>&1; depmod -a ${KVER} >/dev/null 2>&1; true" \
+    && umount /work/rootfs/dev 2>/dev/null || true \
+    && umount /work/rootfs/proc 2>/dev/null || true \
+    && ls -lh /work/rootfs/boot/vmlinuz-* /work/rootfs/boot/initrd.img-*
+
+# Extract the custom kernel + regenerated initrd. The custom-kernel install above never
+# silently skips, so a missing /work/Image or /work/initrd.img here is a hard failure —
+# a VM without them cannot boot at all, and nothing a later apt run would add could fix it.
 RUN cp /work/rootfs/boot/vmlinuz-* /work/Image
-RUN cp /work/rootfs/boot/initrd.img* /work/initrd.img 2>/dev/null || \
-    cp /work/rootfs/boot/initrd /work/initrd.img
+RUN cp /work/rootfs/boot/initrd.img* /work/initrd.img
 RUN ls -lh /work/Image /work/initrd.img
 
 # Create gzip-compressed ext4 image (exact format match with original rootfs.imgz)

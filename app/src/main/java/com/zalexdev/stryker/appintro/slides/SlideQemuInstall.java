@@ -124,7 +124,10 @@ public class SlideQemuInstall extends Fragment {
         });
 
         new Thread(() -> {
-            if (QemuInstaller.assetsPresent(context)) {
+            if (com.zalexdev.stryker.engine.RootlessCoreFiles.anyPresent(context)
+                    && !RootlessEngine.get(context).isInstalled()) {
+                log(LogLevel.INFO, "Partial install — downloading only the missing files");
+            } else if (QemuInstaller.assetsPresent(context)) {
                 log(LogLevel.INFO, "Artifacts bundled in the APK — installing offline");
             } else {
                 int missing = QemuInstaller.countMissing(context);
