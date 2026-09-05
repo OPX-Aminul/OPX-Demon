@@ -15,7 +15,7 @@ WORKDIR /usr/src
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl patch bison flex libssl-dev libelf-dev make cpio kmod wget \
-    bc xz-utils python3 crossbuild-essential-arm64 \
+    bc xz-utils python3 build-essential crossbuild-essential-arm64 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fL --retry 5 --connect-timeout 20 \
