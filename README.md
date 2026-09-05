@@ -13,6 +13,38 @@ StrykerOSS bundles a curated set of network, wireless and web security tools int
 
 ---
 
+## Xiaomi / MIUI USB fix — solved here, not in the original
+
+The original developer's app fails to use USB Wi-Fi adapters on **Xiaomi / MIUI phones** (Poco F1 and
+similar). Xiaomi's QEMU/KVM kernels misreport full-speed USB devices as **low-speed**, so Realtek
+adapters (e.g. `rtl8188fu`, VID:PID `0bda:f179`) abort enumeration with `Invalid ep0 maxpacket` and the
+adapter never shows up — `iw dev` stays empty and WiFi attacks are impossible.
+
+**This fork ships the fix the original doesn't have**, on two independent layers:
+
+1. **Kernel layer (custom 6.12.94 arm64 kernel)** — a `hub.c` classification fix that reclassifies
+   full-speed devices wrongly reported as low-speed before the driver USB core sees them.
+2. **QEMU layer** — a `host-libusb` quirk that corrects the misreported speed as the device is
+   attached through QEMU's USB host backend.
+
+Supporting changes that make it stick:
+
+- A custom kernel is now compiled in CI and shipped (with the patched `hub.c`) instead of the stock
+  kernel, so the fix survives on every device.
+- USB-Wi-Fi drivers are pre-enabled and built in: `rtl8xxxu`, `rtw88` (`8821cu` / `8822b` / `8822c` /
+  `8812au`), `ath9k_htc`, `carl9170`, `mt76`, `rt2x00`, `rtl8187`, `zd1211rw`.
+- `rtl8188fufw.bin`, `rtl8188eufw.bin`, `rtw88` and `ath9k_htc` firmware are baked into the rootfs, so
+  install the engine and the adapter just works with no extra downloads.
+- `loop`, `squashfs` and `overlay` are built-in, so `.img` / `.iso` mounting and kernel-module
+  recovery work inside the guest without extra steps.
+
+Additional fixes on top of the original: incremental core repair (only the missing binaries are
+re-fetched), the guest is re-waited after the resize2fs cycle (fixes "VM not reachable on :1050"),
+rootless downloads resume instead of restarting, QEMU finds `libslirp` at boot, and VM boot no longer
+gets stuck at the login prompt.
+
+---
+
 ## Capabilities
 
 | Module | Description |
