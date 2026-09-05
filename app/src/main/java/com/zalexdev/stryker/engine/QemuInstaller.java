@@ -97,11 +97,19 @@ public final class QemuInstaller {
     }
 
     public static boolean install(Context context, Progress p) {
+        if (RootlessCoreFiles.anyPresent(context) && !RootlessEngine.get(context).isInstalled()) {
+            log(p, 1, "Partial install detected — downloading only the missing files");
+            return RootlessCoreFiles.repair(context, p);
+        }
         if (!assetsPresent(context)) {
             log(p, 1, "No bundled artifacts — fetching the engine from the release");
             return installFromNetwork(context, p);
         }
         return installFromAssets(context, p);
+    }
+
+    public static boolean repair(Context context, Progress p) {
+        return RootlessCoreFiles.repair(context, p);
     }
 
     private static boolean installFromAssets(Context context, Progress p) {
@@ -124,6 +132,10 @@ public final class QemuInstaller {
 
             stage(p, Stage.EXTRACTING_LIBS);
             copyAsset(am, ASSET_DIR + "/libslirp.so", RootlessPaths.libslirp(context), p, "libslirp.so");
+            if (!RootlessPaths.ensureSlirpSoname(context)) {
+                log(p, 3, "Could not create libslirp.so.0 (QEMU SONAME)");
+                return false;
+            }
 
             stage(p, Stage.DECOMPRESSING_ROOTFS);
             String rootfsAsset = rootfsAssetName(context);
@@ -168,40 +180,43 @@ public final class QemuInstaller {
             QemuDownloader.Bundle b = QemuDownloader.resolve(context);
 
             stage(p, Stage.EXTRACTING_QEMU);
-            if (!fetch(b.qemu, RootlessPaths.qemuBin(context), "QEMU", p)) return false;
+            if (!fetchIfNeeded(b.qemu, RootlessPaths.qemuBin(context), "QEMU", p, 1)) return false;
             RootlessPaths.qemuBin(context).setExecutable(true, false);
 
             stage(p, Stage.EXTRACTING_KERNEL);
-            if (!fetch(b.kernel, RootlessPaths.kernel(context), "kernel", p)) return false;
-            if (!fetch(b.initrd, RootlessPaths.initrd(context), "initrd", p)) return false;
+            if (!fetchIfNeeded(b.kernel, RootlessPaths.kernel(context), "kernel", p, 1)) return false;
+            if (!fetchIfNeeded(b.initrd, RootlessPaths.initrd(context), "initrd", p, 1)) return false;
 
             stage(p, Stage.EXTRACTING_LIBS);
-            if (!fetch(b.libslirp, RootlessPaths.libslirp(context), "libslirp.so", p)) return false;
+            if (!fetchIfNeeded(b.libslirp, RootlessPaths.libslirp(context), "libslirp.so", p, 1)) return false;
+            if (!RootlessPaths.ensureSlirpSoname(context)) {
+                log(p, 3, "Could not create libslirp.so.0 (QEMU SONAME)");
+                return false;
+            }
 
             stage(p, Stage.DECOMPRESSING_ROOTFS);
             File rootfs = RootlessPaths.rootfs(context);
             // rootfs.img is grown to the VM disk size after install, so it can never be matched
-            // against the manifest by length. Existence is the resume check: a retry after a
-            // partial run must not re-download 379 MB of archive just to decompress it again.
-            if (rootfs.exists()) {
-                log(p, 2, "rootfs.img already on device — skipping download");
+            // against the manifest by length. Existence above the raw archive size is the resume
+            // check: a retry after a partial run must not re-download the whole archive just to
+            // decompress it again.
+            boolean compressed = b.rootfs != null && b.rootfs.url != null
+                    && (b.rootfs.url.endsWith(".imgz") || b.rootfs.url.endsWith(".gz"));
+            if (rootfs.isFile() && rootfs.length() >= 50L * 1024 * 1024) {
+                log(p, 1, "rootfs.img already present (" + mb(rootfs.length()) + ") — skipping");
+            } else if (!compressed) {
+                if (!fetch(b.rootfs, rootfs, "rootfs.img", p)) return false;
             } else {
-                boolean compressed = b.rootfs != null && b.rootfs.url != null
-                        && (b.rootfs.url.endsWith(".imgz") || b.rootfs.url.endsWith(".gz"));
-                if (!compressed) {
-                    if (!fetch(b.rootfs, rootfs, "rootfs.img", p)) return false;
-                } else {
-                    File archive = new File(base, "rootfs.download");
-                    if (!fetch(b.rootfs, archive, "rootfs", p)) return false;
-                    log(p, 1, "Decompressing rootfs (this can take a minute)");
-                    if (!gunzipFile(archive, rootfs, p)) {
-                        //noinspection ResultOfMethodCallIgnored
-                        archive.delete();
-                        return false;
-                    }
+                File archive = new File(base, "rootfs.download");
+                if (!fetch(b.rootfs, archive, "rootfs", p)) return false;
+                log(p, 1, "Decompressing rootfs (this can take a minute)");
+                if (!gunzipFile(archive, rootfs, p)) {
                     //noinspection ResultOfMethodCallIgnored
                     archive.delete();
+                    return false;
                 }
+                //noinspection ResultOfMethodCallIgnored
+                archive.delete();
             }
 
             stage(p, Stage.FINALIZING);
@@ -221,6 +236,37 @@ public final class QemuInstaller {
             return false;
         }
     }
+
+    private static boolean fetchIfNeeded(com.zalexdev.stryker.ota.RemoteManifest.Asset asset, File dest,
+                                         String label, Progress p, long minBytes) {
+        if (dest.isFile() && dest.length() >= minBytes) {
+            if (asset != null && asset.size > 0 && dest.length() != asset.size) {
+                log(p, 1, label + " size mismatch (" + dest.length() + " vs " + asset.size
+                        + ") — re-downloading");
+            } else {
+                log(p, 1, label + " already present (" + mb(dest.length()) + ") — skipping");
+                return true;
+            }
+        }
+        return fetch(asset, dest, label, p);
+    }
+
+    static boolean fetchAsset(com.zalexdev.stryker.ota.RemoteManifest.Asset asset, File dest,
+                              String label, Progress p) {
+        return fetch(asset, dest, label, p);
+    }
+
+    static boolean gunzipFetched(File src, File dest, Progress p) {
+        return gunzipFile(src, dest, p);
+    }
+
+    static void growDisk(Context context, Progress p) {
+        ensureMinimumDisk(context, p);
+    }
+
+    static void emit(Progress p, int level, String msg) { log(p, level, msg); }
+
+    static void emitStage(Progress p, Stage s) { stage(p, s); }
 
     private static boolean fetch(com.zalexdev.stryker.ota.RemoteManifest.Asset asset, File dest,
                                  String label, Progress p) {

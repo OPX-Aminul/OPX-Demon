@@ -55,7 +55,7 @@ projects linked above and on request.
 | Artifact | Origin | License | Notes |
 |---|---|---|---|
 | `qemu-system-aarch64` | [QEMU](https://www.qemu.org) — custom build (`--enable-libusb`, virtfs) | **GPL-2.0-only** | Not stock Debian QEMU. Corresponding source and build configuration on request. |
-| `Image`, `initrd.img` | Debian kernel `6.12.94+deb13-arm64` | **GPL-2.0** | Unmodified Debian binary; source via `apt source linux`. |
+| `Image`, `initrd.img` | Debian kernel `6.12.94` (Linux upstream tag) with the StrykerOS Xiaomi/MIUI USB ep0 maxpacket fix and USB-WiFi drivers | **GPL-2.0** | Custom-built arm64 kernel; corresponding source and build configuration in the repository (`build-tools/xiaomi-hub.patch`, `build-tools/usb-wifi.fragment`, `Dockerfile`). |
 | `libslirp.so` | [libslirp](https://gitlab.freedesktop.org/slirp/libslirp) | **BSD-3-Clause** | Binary redistribution requires the upstream copyright notice, reproduced in the release notes. |
 | `rootfs.imgz`, `chroot64-debian.tar.gz` | Debian trixie arm64 | per-package | `/usr/share/doc/<package>/copyright` inside the image; see <https://www.debian.org/legal/licenses/>. |
 

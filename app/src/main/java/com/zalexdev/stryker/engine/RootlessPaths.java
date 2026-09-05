@@ -15,6 +15,7 @@ public final class RootlessPaths {
     public static File qemuBin(Context c)   { return new File(base(c), "qemu-system-aarch64"); }
     public static File libslirp(Context c)  { return new File(base(c), "libslirp.so"); }
     public static File libslirpSo0(Context c) { return new File(base(c), "libslirp.so.0"); }
+    public static File libslirpSoname(Context c) { return libslirpSo0(c); }
 
     /**
      * The all-core-file QEMU binary was linked with a DT_NEEDED of "libslirp.so.0",
@@ -66,6 +67,12 @@ public final class RootlessPaths {
 
     public static final int GUEST_SSH_PORT = 22;
     public static final int HOST_SSH_PORT  = 2222;
+
+    public static boolean ensureSlirpSoname(Context c) {
+        if (!libslirp(c).isFile() || libslirp(c).length() == 0) return false;
+        ensureLibslirpNames(c);
+        return libslirpSo0(c).exists() && libslirpSo0(c).length() > 0;
+    }
 
     public static File activeFlag(Context c) {
         return new File(base(c), ".active");

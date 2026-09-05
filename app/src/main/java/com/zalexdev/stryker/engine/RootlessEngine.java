@@ -77,11 +77,13 @@ public final class RootlessEngine {
 
 
     public boolean isInstalled() {
-        return RootlessPaths.qemuBin(app).exists()
-                && RootlessPaths.kernel(app).exists()
-                && RootlessPaths.initrd(app).exists()
-                && RootlessPaths.libslirp(app).exists()
-                && RootlessPaths.rootfs(app).exists();
+        RootlessPaths.ensureSlirpSoname(app);
+        return RootlessPaths.qemuBin(app).isFile()
+                && RootlessPaths.kernel(app).isFile()
+                && RootlessPaths.initrd(app).isFile()
+                && RootlessPaths.libslirp(app).isFile()
+                && RootlessPaths.libslirpSoname(app).exists()
+                && RootlessPaths.rootfs(app).isFile();
     }
 
     public boolean isRunning() {
@@ -511,29 +513,47 @@ public final class RootlessEngine {
     }
 
     private static final String ATH9K_HTC_FW = "/lib/firmware/ath9k_htc/htc_9271-1.4.0.fw";
+    private static final String RTL8188FU_FW = "/lib/firmware/rtlwifi/rtl8188fu.fw";
 
     private void ensureWifiFirmware() {
         try {
             ArrayList<String> have = GuestExec.run(
-                    "[ -f " + ATH9K_HTC_FW + " ] && echo __FW_OK__ || echo __FW_MISSING__");
+                    "[ -f " + ATH9K_HTC_FW + " ] && echo __ATH_OK__ || echo __ATH_MISSING__; "
+                    + "[ -f " + RTL8188FU_FW + " ] && echo __RTL_OK__ || echo __RTL_MISSING__");
+            boolean ath = false, rtl = false;
             for (String l : have) {
-                if (l != null && l.contains("__FW_OK__")) return;
+                if (l == null) continue;
+                if (l.contains("__ATH_OK__")) ath = true;
+                if (l.contains("__RTL_OK__")) rtl = true;
             }
-            GuestExec.logToStore("guest is missing " + ATH9K_HTC_FW
-                    + " — installing firmware-ath9k-htc (ath9k_htc dongles fail with "
-                    + "\"Target is unresponsive\" without it)");
+            if (ath && rtl) return;
+            GuestExec.logToStore("guest is missing WiFi firmware (ath9k_htc=" + !ath
+                    + ", rtl8188fu=" + !rtl + ") — seeding from the filesystem");
+            ArrayList<String> res = GuestExec.run(
+                    "for s in /lib/firmware /usr/lib/firmware; do [ -d \"$s\" ] || continue; "
+                    + "if [ ! -f " + ATH9K_HTC_FW + " ] && [ -f \"$s/ath9k_htc/htc_9271-1.4.0.fw\" ]; then "
+                    + "mkdir -p /lib/firmware/ath9k_htc; cp \"$s/ath9k_htc/htc_9271-1.4.0.fw\" /lib/firmware/ath9k_htc/; fi; "
+                    + "if [ ! -f " + RTL8188FU_FW + " ] && [ -f \"$s/rtlwifi/rtl8188fu.fw\" ]; then "
+                    + "mkdir -p /lib/firmware/rtlwifi; cp \"$s/rtlwifi/rtl8188fu.fw\" /lib/firmware/rtlwifi/; fi; "
+                    + "if [ ! -f /lib/firmware/rtlwifi/rtl8188fufw.bin ] && [ -f \"$s/rtlwifi/rtl8188fufw.bin\" ]; then "
+                    + "mkdir -p /lib/firmware/rtlwifi; cp \"$s/rtlwifi/rtl8188fufw.bin\" /lib/firmware/rtlwifi/; fi; "
+                    + "done; "
+                    + "[ -f " + ATH9K_HTC_FW + " ] && echo __ATH_SEEDED__; "
+                    + "[ -f " + RTL8188FU_FW + " ] || [ -f /lib/firmware/rtlwifi/rtl8188fufw.bin ] && echo __RTL_SEEDED__; true");
+            boolean athOk = false, rtlOk = false;
+            for (String l : res) {
+                if (l == null) continue;
+                if (l.contains("__ATH_SEEDED__")) athOk = true;
+                if (l.contains("__RTL_SEEDED__")) rtlOk = true;
+            }
+            if (athOk || rtlOk) {
+                GuestExec.logToStore("WiFi firmware seeded — replug the dongle to retry");
+                return;
+            }
+            GuestExec.logToStore("WiFi firmware not on the filesystem — installing firmware packages");
             GuestExec.run("export DEBIAN_FRONTEND=noninteractive; "
-                    + "apt-get install -y --no-install-recommends firmware-ath9k-htc wireless-regdb "
+                    + "apt-get install -y --no-install-recommends firmware-ath9k-htc firmware-realtek wireless-regdb "
                     + ">/dev/null 2>&1; true");
-            ArrayList<String> after = GuestExec.run(
-                    "[ -f " + ATH9K_HTC_FW + " ] && echo __FW_OK__ || echo __FW_MISSING__");
-            for (String l : after) {
-                if (l != null && l.contains("__FW_OK__")) {
-                    GuestExec.logToStore("ath9k_htc firmware installed — replug the dongle to retry");
-                    return;
-                }
-            }
-            GuestExec.logToStore("could not install firmware-ath9k-htc (no network in the VM?)");
         } catch (Throwable ignored) {
         }
     }
@@ -917,12 +937,30 @@ public final class RootlessEngine {
         qemuExecutor.submit(() -> {
             try {
                 maybeResizeFilesystem();
+                awaitAgentAfterResize();
                 reclaimFreedSpace();
                 ensureKernelModules();
             } catch (Throwable t) {
                 Log.w(TAG, "post-boot maintenance failed: " + t.getMessage());
             }
         });
+    }
+
+    private void awaitAgentAfterResize() {
+        if (GuestExec.ping(2000)) return;
+        GuestExec.logToStore("resize cycle interrupted the guest agent — waiting for port :1050 to come back");
+        long deadline = System.currentTimeMillis() + 90_000;
+        while (System.currentTimeMillis() < deadline) {
+            if (GuestExec.ping(2000)) {
+                GuestExec.logToStore("guest agent is back after the resize");
+                return;
+            }
+            try { Thread.sleep(2000); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+        GuestExec.logToStore("guest agent did not return after the resize — restart the VM if tools stay offline");
     }
 
     public boolean usbAttached() {
@@ -1078,6 +1116,7 @@ public final class RootlessEngine {
 
     private void ensureExecutable() {
         try { RootlessPaths.qemuBin(app).setExecutable(true, false); } catch (Exception ignored) {}
+        RootlessPaths.ensureSlirpSoname(app);
     }
 
     public File resolveShareDir() {
