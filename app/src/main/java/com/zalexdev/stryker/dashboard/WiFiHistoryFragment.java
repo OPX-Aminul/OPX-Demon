@@ -121,7 +121,7 @@ public class WiFiHistoryFragment extends Fragment {
             } else if (!path.endsWith(".csv")) {
                 valueLayout.setError("File must be a csv");
             } else if (!Core.contains(core.customCommand("cat " + path), "SSID,")) {
-                valueLayout.setError("File is not a valid Stryker network file");
+                valueLayout.setError("File is not a valid OPX-Demon network file");
             } else {
                 try {
                     valueLayout.setError(null);

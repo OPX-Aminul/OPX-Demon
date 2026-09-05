@@ -376,7 +376,7 @@ public final class SsdpResolver extends DiscoveryResolver {
             conn.setConnectTimeout(ScanConfig.HTTP_TIMEOUT_MS);
             conn.setReadTimeout(ScanConfig.HTTP_TIMEOUT_MS);
             conn.setRequestMethod("GET");
-            conn.setRequestProperty("User-Agent", "Stryker");
+            conn.setRequestProperty("User-Agent", "OPX-Demon");
             conn.setRequestProperty("Accept", "text/xml, application/xml");
             conn.setRequestProperty("Connection", "close");
             conn.setInstanceFollowRedirects(false);
@@ -532,7 +532,7 @@ public final class SsdpResolver extends DiscoveryResolver {
                 + "MAN: \"ssdp:discover\"\r\n"
                 + "MX: 1\r\n"
                 + "ST: " + target + "\r\n"
-                + "USER-AGENT: Android/" + release + " UPnP/1.1 Stryker/1.0\r\n"
+                + "USER-AGENT: Android/" + release + " UPnP/1.1 OPX-Demon/1.0\r\n"
                 + "\r\n";
         return message.getBytes(StandardCharsets.UTF_8);
     }

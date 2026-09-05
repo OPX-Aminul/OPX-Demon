@@ -30,7 +30,7 @@
             android:layout_marginStart="4dp"
             android:layout_marginTop="4dp"
             android:layout_marginBottom="16dp"
-            android:text="How should Stryker run its Linux tooling? You can change this later by reinstalling."
+            android:text="How should OPX-Demon run its Linux tooling? You can change this later by reinstalling."
             android:textColor="@color/grey"
             android:textSize="13sp" />
 

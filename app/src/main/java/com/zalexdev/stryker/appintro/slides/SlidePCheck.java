@@ -187,13 +187,13 @@ public class SlidePCheck extends Fragment {
                 archOk
                         ? "Samsung stock ROM detected — wifi/local scan may misbehave"
                         : Build.MANUFACTURER + " · " + primaryAbi()
-                                + " — Stryker is arm64-v8a only and will not run here");
+                                + " — OPX-Demon is arm64-v8a only and will not run here");
         applyRow(spaceOk, spaceSub, spaceBadge,
                 freeGb + " GB free on /data",
                 "Only " + freeGb + " GB free — Debian chroot install needs ~" + REQUIRED_FREE_GB + " GB");
         if (!archOk) {
             disclaimer.setText("This device reports " + primaryAbi()
-                    + ". Stryker ships arm64-v8a binaries only — the chroot toolset cannot be installed here.");
+                    + ". OPX-Demon ships arm64-v8a binaries only — the chroot toolset cannot be installed here.");
         }
     }
 

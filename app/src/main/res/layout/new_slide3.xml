@@ -32,7 +32,7 @@
             android:layout_marginStart="4dp"
             android:layout_marginTop="4dp"
             android:layout_marginBottom="14dp"
-            android:text="Pulls and unpacks the Debian-based tooling chroot Stryker runs on."
+            android:text="Pulls and unpacks the Debian-based tooling chroot OPX-Demon runs on."
             android:textColor="@color/grey"
             android:textSize="13sp" />
 
@@ -92,7 +92,7 @@
                             android:id="@+id/status_title"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Stryker chroot"
+                            android:text="OPX-Demon chroot"
                             android:textColor="?android:attr/textColorPrimary"
                             android:textSize="16sp"
                             android:textStyle="bold" />

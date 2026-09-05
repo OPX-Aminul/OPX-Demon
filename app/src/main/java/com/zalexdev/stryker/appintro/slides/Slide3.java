@@ -136,9 +136,9 @@ public class Slide3 extends Fragment {
         logCard.setVisibility(View.VISIBLE);
         logRecycler.setVisibility(View.VISIBLE);
         resetStages();
-        setStatus(StatusKind.RUNNING, "Stryker chroot", "Starting...");
+        setStatus(StatusKind.RUNNING, "OPX-Demon chroot", "Starting...");
         log(LogLevel.INFO, "Architecture: arm64-v8a");
-        log(LogLevel.INFO, "Stryker " + BuildConfig.VERSION_NAME + " · build " + BuildConfig.VERSION_CODE);
+        log(LogLevel.INFO, "OPX-Demon " + BuildConfig.VERSION_NAME + " · build " + BuildConfig.VERSION_CODE);
         if (activity instanceof com.zalexdev.stryker.appintro.AppIntroActivity
                 && ((com.zalexdev.stryker.appintro.AppIntroActivity) activity).isMigration()) {
             log(LogLevel.WARN, "An older Linux system is installed. It will be unmounted and "
@@ -198,9 +198,9 @@ public class Slide3 extends Fragment {
                     markStage(InstallStage.DEPLOYING_EXPLOITS, RowState.ACTIVE);
                     log(LogLevel.STEP, "Deploying built-in exploits");
                     if (GuestCore.ensure(core)) {
-                        log(LogLevel.SUCCESS, "Stryker payload unpacked — /CORE, /exploits");
+                        log(LogLevel.SUCCESS, "OPX-Demon payload unpacked — /CORE, /exploits");
                     } else {
-                        log(LogLevel.WARN, "Stryker payload did not verify — /CORE tools may be missing");
+                        log(LogLevel.WARN, "OPX-Demon payload did not verify — /CORE tools may be missing");
                     }
                     core.deleteFile("/sdcard/Stryker/exploits/");
                     core.copyFile("/data/data/com.zalexdev.stryker/files/checker.py",
@@ -218,7 +218,7 @@ public class Slide3 extends Fragment {
                     log(LogLevel.SUCCESS, "Version marker written");
 
                     markStage(InstallStage.DONE, RowState.DONE);
-                    setStatus(StatusKind.SUCCESS, "Stryker chroot",
+                    setStatus(StatusKind.SUCCESS, "OPX-Demon chroot",
                             "Installation complete — moving on...");
                     log(LogLevel.SUCCESS, "All stages passed");
 
@@ -241,7 +241,7 @@ public class Slide3 extends Fragment {
     }
 
     private void failWith(String reason) {
-        setStatus(StatusKind.FAILED, "Stryker chroot", reason);
+        setStatus(StatusKind.FAILED, "OPX-Demon chroot", reason);
         log(LogLevel.ERROR, reason);
         runOnUi(() -> {
             progress.setIndeterminate(false);

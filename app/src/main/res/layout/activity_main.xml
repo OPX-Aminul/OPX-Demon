@@ -41,7 +41,7 @@
                     android:layout_marginStart="10dp"
                     android:layout_weight="1"
                     android:fontFamily="@font/lato"
-                    android:text="StrykerOSS"
+                    android:text="OPX-Demon"
                     android:textSize="26dp"
                     android:textStyle="bold" />
 

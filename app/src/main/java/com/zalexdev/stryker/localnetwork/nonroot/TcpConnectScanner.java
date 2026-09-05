@@ -275,7 +275,7 @@ public final class TcpConnectScanner {
             if (read <= 0 && isHttpPort(port)) {
                 OutputStream out = socket.getOutputStream();
                 out.write(("GET / HTTP/1.0\r\nHost: " + ip
-                        + "\r\nUser-Agent: Stryker\r\nConnection: close\r\n\r\n")
+                        + "\r\nUser-Agent: OPX-Demon\r\nConnection: close\r\n\r\n")
                         .getBytes(StandardCharsets.ISO_8859_1));
                 out.flush();
                 read = readUpTo(in, buffer, cap, 0);

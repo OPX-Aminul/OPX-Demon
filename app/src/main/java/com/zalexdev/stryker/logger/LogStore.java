@@ -356,7 +356,7 @@ public final class LogStore {
                      "SELECT ts,level,tool,msg FROM " + TABLE
                              + " WHERE " + where + " ORDER BY _id ASC",
                      args.toArray(new String[0]))) {
-            w.write("==== Stryker log export ====\n");
+            w.write("==== OPX-Demon log export ====\n");
             while (c.moveToNext()) {
                 String tool = c.isNull(2) ? "" : c.getString(2);
                 w.write(fmt.format(new Date(c.getLong(0))));

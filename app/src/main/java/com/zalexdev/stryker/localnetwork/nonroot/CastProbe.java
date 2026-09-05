@@ -118,7 +118,7 @@ public final class CastProbe {
             conn.setUseCaches(false);
             conn.setDoInput(true);
             conn.setInstanceFollowRedirects(false);
-            conn.setRequestProperty("User-Agent", "Stryker");
+            conn.setRequestProperty("User-Agent", "OPX-Demon");
             conn.setRequestProperty("Accept", "application/json");
             conn.setRequestProperty("Connection", "close");
 
