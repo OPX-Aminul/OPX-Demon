@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 104,
-    "versionName": "1.0.4",
-    "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/v1.0.3/app-release.apk",
-    "sha256": "f38bec2b10e1bd149921dca395d7941376ce4e6aafd92444fe5c218c0dad507b",
-    "size": 20993337,
+    "versionCode": 105,
+    "versionName": "1.0.5",
+    "url": "https://github.com/OPX-Aminul/strykerapp/releases/download/v1.0.5/app-release.apk",
+    "sha256": "73f37755f31c626c44eb1e947b36e3c50661612fe2784d352a19091035781864",
+    "size": 21004232,
     "mandatory": false,
-    "changelog": "StrykerOSS 1.0.4 \u2014 fixes VM boot getting stuck at the login prompt.\n\n- Root cause: the rootfs presented 'stryker login:' on ttyAMA0 instead of a root shell, so the app's console bootstrap (used whenever the guest agent is not answering) wrote its commands into the login prompt, where they were eaten as a username. Boot then ran out the 600s budget with 'the guest booted but stryker-agentd never came up'.\n- Rootfs now autologins root on the serial console (serial-getty override).\n- The console driver also logs in itself (root / stryker) when it still finds a login prompt, so guests installed from older artifacts are covered too.\n- The console bootstrap is retried every 30s during boot instead of exactly once, so an early attempt landing before systemd is up no longer wastes the rest of the boot budget.\n- Keep the VM running after a failed agent bootstrap instead of leaving it dead: a later retry or a dashboard restart can recover it without redownloading anything."
+    "changelog": "StrykerOSS 1.0.5 \u2014 custom Xiaomi/MIUI USB kernel + WiFi firmware.\n\n- Custom arm64 kernel (6.12.94) with a two-layer Xiaomi/MIUI USB fix: a QEMU host-libusb quirk plus a hub.c else-if that reclassifies full-speed devices misreported as low-speed, so Realtek dongles no longer fail with \u201cInvalid ep0 maxpacket\u201d on Xiaomi phones (Poco F1 etc.).\n- Kernel now ships USB-WiFi drivers (rtl8xxxu / rtw88 / ath9k_htc / carl9170 / mt76 / rt2x00 / rtl8187 / zd1211rw) enabled, with rtl8188fufw.bin + rtl8188eufw.bin + rtw88 blobs baked into the rootfs \u2014 download the engine and WiFi just works.\n- /lib/modules is populated and kernel modules (loop/squashfs/overlay) are built-in, so .img/.iso mounting and module recovery work without extra steps.\n- Incremental repair: re-running the installer only fetches the missing core files instead of re-downloading everything.\n- The guest agent is re-waited after the resize2fs cycle so tools come back instead of showing \u201cVM not reachable on :1050\u201d."
   },
   "news": [
     {
