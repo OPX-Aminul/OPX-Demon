@@ -60,7 +60,7 @@ static void parse_message(struct neigh_ctx *ctx, struct nlmsghdr *nh) {
 }
 
 JNIEXPORT jint JNICALL
-Java_com_zalexdev_stryker_localnetwork_nonroot_Neighbours_nativeDump(JNIEnv *env, jclass clazz,
+Java_com_opx_demon_localnetwork_nonroot_Neighbours_nativeDump(JNIEnv *env, jclass clazz,
                                                                     jobject list) {
     (void) clazz;
     jclass listClass = (*env)->GetObjectClass(env, list);

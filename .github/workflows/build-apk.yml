@@ -53,8 +53,8 @@ jobs:
           # Release does not exist yet: create it with generated notes
           # Do not overwrite notes on later builds so hand-written changelogs stay intact
           gh release create "$TAG" \
-            --title "StrykerOSS $TAG" \
-            --notes "StrykerOSS $TAG" \
+            --title "OPX-Demon $TAG" \
+            --notes "OPX-Demon $TAG" \
             --generate-notes \
             --latest \
             app/build/outputs/apk/release/*.apk

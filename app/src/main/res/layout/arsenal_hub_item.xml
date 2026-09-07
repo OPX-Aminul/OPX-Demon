@@ -37,7 +37,7 @@
                 android:layout_height="16dp"
                 android:layout_gravity="center"
                 android:src="@drawable/motion_blur"
-                app:tint="@color/stryker_accent" />
+                app:tint="@color/opxdemon_accent" />
         </FrameLayout>
 
         <LinearLayout
@@ -103,6 +103,6 @@
             android:background="@drawable/arsenal_icon_circle"
             android:padding="5dp"
             android:src="@drawable/rocket_launch"
-            app:tint="@color/stryker_accent" />
+            app:tint="@color/opxdemon_accent" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

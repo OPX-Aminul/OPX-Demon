@@ -32,7 +32,7 @@
             android:configChanges="orientation|keyboardHidden|screenSize"
             android:exported="true"
             android:launchMode="singleTask"
-            android:taskAffinity="com.stryker.terminal"
+            android:taskAffinity="com.opx.demon.terminal"
             android:resizeableActivity="true"
             android:theme="@style/AppTheme.NoActionBar"
             android:windowSoftInputMode="adjustResize|stateHidden" />
@@ -48,7 +48,7 @@
             android:name=".ui.other.SettingsActivity"
             android:exported="false"
             android:label="@string/settings"
-            android:theme="@style/Theme.Stryker.Settings" />
+            android:theme="@style/Theme.OpxDemon.Settings" />
         <activity
             android:name=".ui.other.CrashActivity"
             android:exported="false"

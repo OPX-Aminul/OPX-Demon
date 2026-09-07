@@ -63,7 +63,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_lg"
-            app:indicatorColor="@color/stryker_accent"
+            app:indicatorColor="@color/opxdemon_accent"
             app:trackColor="@color/light_lite_contrast"
             app:trackCornerRadius="4dp"
             app:trackThickness="4dp" />

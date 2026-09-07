@@ -19,7 +19,7 @@ f_chk_chroot() {
 
 ######### CHECK IF FS IS ALL MOUNTED ALREADY #########
 f_isAllReady(){
-    for i in proc sys dev dev/pts system sdcard/Stryker; do
+    for i in proc sys dev dev/pts system sdcard/OPX-Demon; do
         if $BUSYBOX mountpoint -q "$MNT/$i"; then
             echo "[+] $i was mounted already."
             continue
@@ -33,18 +33,18 @@ f_isAllReady(){
 }
 
 ######### MOUNT SDCARD #########
-# SAFETY: bind ONLY our own /sdcard/Stryker folder into the chroot, never the
+# SAFETY: bind ONLY our own /sdcard/OPX-Demon folder into the chroot, never the
 # whole shared storage. Binding the entire /sdcard meant a stray "rm -rf" of the
 # chroot tree (our own uninstall, killroot, or a third-party cleaner run while
 # still mounted) could recurse through the bind and wipe the user's ENTIRE
-# internal storage. Scoping the bind to /sdcard/Stryker bounds that blast radius
-# to our own folder. The chroot still sees the data at /sdcard/Stryker exactly
+# internal storage. Scoping the bind to /sdcard/OPX-Demon bounds that blast radius
+# to our own folder. The chroot still sees the data at /sdcard/OPX-Demon exactly
 # as before, so nothing else changes.
 f_mount_sdcard() {
-    if $BUSYBOX mountpoint -q "$MNT/sdcard/Stryker"; then
+    if $BUSYBOX mountpoint -q "$MNT/sdcard/OPX-Demon"; then
         return 0
     fi
-    mkdir -p "$MNT/sdcard/Stryker"
+    mkdir -p "$MNT/sdcard/OPX-Demon"
     for sdcard in \
         "$EXTERNAL_STORAGE" \
         /storage/emulated/0 \
@@ -53,9 +53,9 @@ f_mount_sdcard() {
         /sdcard
     do
         if [ -d "$sdcard" ]; then
-            mkdir -p "$sdcard/Stryker"
-            $BUSYBOX mount -o bind "$sdcard/Stryker" "$MNT/sdcard/Stryker" &&
-                echo "[+] mounted /sdcard/Stryker" && return 0
+            mkdir -p "$sdcard/OPX-Demon"
+            $BUSYBOX mount -o bind "$sdcard/OPX-Demon" "$MNT/sdcard/OPX-Demon" &&
+                echo "[+] mounted /sdcard/OPX-Demon" && return 0
         fi
     done
     return 1
@@ -139,22 +139,22 @@ f_mount_fs() {
 
     ######### SET NETWORK AND HOSTNAME ########
     $BUSYBOX sysctl -w net.ipv4.ip_forward=1
-    echo "127.0.0.1    localhost stryker"              > "$MNT/etc/hosts"
+    echo "127.0.0.1    localhost opxdemon"              > "$MNT/etc/hosts"
     echo "::1    localhost ip6-localhost ip6-loopback" >> "$MNT/etc/hosts"
-    echo "stryker"                                     > "$MNT/etc/hostname"
+    echo "opxdemon"                                     > "$MNT/etc/hostname"
 
     ######### APT IN A CHROOT #########
     mkdir -p "$MNT/etc/apt/apt.conf.d"
     printf 'APT::Sandbox::User "root";\nAcquire::Retries "3";\n' \
-        > "$MNT/etc/apt/apt.conf.d/99stryker"
+        > "$MNT/etc/apt/apt.conf.d/99opxdemon"
     mkdir -p "$MNT/var/lib/apt/lists/partial" "$MNT/var/cache/apt/archives/partial"
 
-    ######### SET STRYKER SHELL PROMPT #########
-    if [ -f "/data/data/$APP_PGK_NAME/files/stryker_profile.sh" ]; then
-        cp -f "/data/data/$APP_PGK_NAME/files/stryker_profile.sh" "$MNT/etc/stryker_profile.sh"
-        chmod 644 "$MNT/etc/stryker_profile.sh"
-        if ! grep -q stryker_profile.sh "$MNT/etc/profile" 2> /dev/null; then
-            echo '. /etc/stryker_profile.sh' >> "$MNT/etc/profile"
+    ######### SET OPXDEMON SHELL PROMPT #########
+    if [ -f "/data/data/$APP_PGK_NAME/files/opxdemon_profile.sh" ]; then
+        cp -f "/data/data/$APP_PGK_NAME/files/opxdemon_profile.sh" "$MNT/etc/opxdemon_profile.sh"
+        chmod 644 "$MNT/etc/opxdemon_profile.sh"
+        if ! grep -q opxdemon_profile.sh "$MNT/etc/profile" 2> /dev/null; then
+            echo '. /etc/opxdemon_profile.sh' >> "$MNT/etc/profile"
         fi
     fi
 

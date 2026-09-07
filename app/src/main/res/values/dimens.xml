@@ -1,5 +1,5 @@
 <resources>
-    <!-- Stryker spacing scale — one vocabulary for padding/margins across screens. -->
+    <!-- OpxDemon spacing scale — one vocabulary for padding/margins across screens. -->
     <dimen name="space_xxs">2dp</dimen>
     <dimen name="space_xs">4dp</dimen>
     <dimen name="space_sm">8dp</dimen>

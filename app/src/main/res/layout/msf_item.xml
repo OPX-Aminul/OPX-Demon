@@ -115,7 +115,7 @@
             android:focusable="true"
             android:padding="8dp"
             android:src="@drawable/rocket_launch"
-            app:tint="@color/stryker_accent" />
+            app:tint="@color/opxdemon_accent" />
     </LinearLayout>
 
     <View

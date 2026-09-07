@@ -30,7 +30,7 @@
             app:iconGravity="textStart"
             app:iconPadding="0dp"
             app:iconSize="18dp"
-            app:iconTint="@color/stryker_accent" />
+            app:iconTint="@color/opxdemon_accent" />
 
         <LinearLayout
             android:layout_width="0dp"

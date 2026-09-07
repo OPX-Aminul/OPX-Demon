@@ -146,7 +146,7 @@
             android:fillViewport="true"
             app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-            <com.zalexdev.stryker.hid.ui.editor.LinedEditText
+            <com.opx.demon.hid.ui.editor.LinedEditText
                 android:id="@+id/ide_editor"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"

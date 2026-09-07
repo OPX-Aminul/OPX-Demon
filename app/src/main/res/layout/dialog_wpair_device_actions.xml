@@ -136,14 +136,14 @@
                 android:insetBottom="0dp"
                 android:minHeight="0dp"
                 android:text="@string/wpair_btn_test"
-                android:textColor="@color/stryker_accent"
+                android:textColor="@color/opxdemon_accent"
                 android:textSize="13sp"
                 app:cornerRadius="14dp"
                 app:icon="@drawable/done"
                 app:iconGravity="textStart"
                 app:iconPadding="6dp"
                 app:iconSize="16dp"
-                app:iconTint="@color/stryker_accent"
+                app:iconTint="@color/opxdemon_accent"
                 app:strokeColor="@color/light_lite_contrast" />
 
             <com.google.android.material.button.MaterialButton
@@ -268,14 +268,14 @@
                 android:paddingStart="8dp"
                 android:paddingEnd="8dp"
                 android:text="@string/wpair_btn_live"
-                android:textColor="@color/stryker_accent"
+                android:textColor="@color/opxdemon_accent"
                 android:textSize="12sp"
                 app:cornerRadius="12dp"
                 app:icon="@drawable/run"
                 app:iconGravity="textStart"
                 app:iconPadding="4dp"
                 app:iconSize="14dp"
-                app:iconTint="@color/stryker_accent"
+                app:iconTint="@color/opxdemon_accent"
                 app:strokeColor="@color/light_lite_contrast" />
 
             <com.google.android.material.button.MaterialButton

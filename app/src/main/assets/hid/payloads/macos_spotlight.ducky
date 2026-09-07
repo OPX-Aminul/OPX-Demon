@@ -9,4 +9,4 @@ STRING terminal
 DELAY 400
 ENTER
 DELAY 1500
-STRINGLN echo "Hello from StrykerOSS over USB HID"
+STRINGLN echo "Hello from OPX-Demon over USB HID"

@@ -27,7 +27,7 @@
                 android:layout_height="22dp"
                 android:layout_gravity="center"
                 android:src="@drawable/shield"
-                app:tint="@color/stryker_accent" />
+                app:tint="@color/opxdemon_accent" />
         </FrameLayout>
 
         <LinearLayout

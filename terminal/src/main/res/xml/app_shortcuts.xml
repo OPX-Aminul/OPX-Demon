@@ -7,7 +7,7 @@
     android:shortcutShortLabel="@string/new_session">
     <intent
       android:action="android.intent.action.RUN"
-      android:targetPackage="com.stryker.terminal"
-      android:targetClass="com.stryker.terminal.ui.term.NeoTermActivity"/>
+      android:targetPackage="com.opx.demon.terminal"
+      android:targetClass="com.opx.demon.terminal.ui.term.NeoTermActivity"/>
   </shortcut>
 </shortcuts>

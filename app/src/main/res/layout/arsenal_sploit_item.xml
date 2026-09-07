@@ -85,7 +85,7 @@
                 android:background="@drawable/arsenal_icon_circle"
                 android:padding="5dp"
                 android:src="@drawable/add"
-                app:tint="@color/stryker_accent" />
+                app:tint="@color/opxdemon_accent" />
         </LinearLayout>
 
         <LinearLayout

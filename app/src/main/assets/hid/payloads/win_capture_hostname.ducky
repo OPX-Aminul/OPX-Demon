@@ -1,5 +1,5 @@
 REM ============================================================
-REM  Back-channel showcase — host output returns to Stryker.
+REM  Back-channel showcase — host output returns to OpxDemon.
 REM ============================================================
 REM
 REM  Companion to start_display_feed.ducky. That one streams the
@@ -11,7 +11,7 @@ REM    1. Open a PowerShell window on the host.
 REM    2. WINHI <timeout_ms> <pipeline>
 REM       The pipeline is wrapped in & { ... } | Out-String, run
 REM       on the host, flattened to one line, and sent back over
-REM       /dev/ttyGS0. Stryker prints the captured value inline in
+REM       /dev/ttyGS0. OpxDemon prints the captured value inline in
 REM       the IDE (line N · captured: …) and pops a MaterialAlert.
 REM
 REM  Try it: change the pipeline below to any of the examples,

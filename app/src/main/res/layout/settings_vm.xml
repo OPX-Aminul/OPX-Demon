@@ -58,7 +58,7 @@
                     android:background="@drawable/settings_icon_bg"
                     android:padding="10dp"
                     android:src="@drawable/ic_cpu"
-                    app:tint="@color/stryker_accent" />
+                    app:tint="@color/opxdemon_accent" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -97,7 +97,7 @@
             android:letterSpacing="0.08"
             android:text="@string/vm_section_resources"
             android:textAllCaps="true"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -124,7 +124,7 @@
                     <ImageView
                         style="@style/VmRowIcon"
                         android:src="@drawable/storage"
-                        app:tint="@color/stryker_accent" />
+                        app:tint="@color/opxdemon_accent" />
 
                     <LinearLayout style="@style/VmRowText">
 
@@ -154,7 +154,7 @@
                     <ImageView
                         style="@style/VmRowIcon"
                         android:src="@drawable/devices"
-                        app:tint="@color/stryker_accent" />
+                        app:tint="@color/opxdemon_accent" />
 
                     <LinearLayout style="@style/VmRowText">
 
@@ -184,7 +184,7 @@
                     <ImageView
                         style="@style/VmRowIcon"
                         android:src="@drawable/ic_ram"
-                        app:tint="@color/stryker_accent" />
+                        app:tint="@color/opxdemon_accent" />
 
                     <LinearLayout style="@style/VmRowText">
 

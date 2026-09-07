@@ -182,16 +182,16 @@ rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 '
 
 # ── Set root password (exact hash from original) ─────────────────────────────
-# Original password: stryker
+# Original password: opxdemon
 # Hash from original rootfs shadow file
 sed -i "s|^root:[^:]*:|root:\$y\$j9T\$zm4PGDwVGyQUURgnce.do0\$dcGRwd7TaU1tZivI0v0LKuRNn69ezPaXgS6qm9zHxN5:|" "$ROOTFS/etc/shadow"
 
 # ── Set hostname (exact match) ───────────────────────────────────────────────
-echo "stryker" > "$ROOTFS/etc/hostname"
+echo "opxdemon" > "$ROOTFS/etc/hostname"
 
 # ── Networking (CRITICAL: QEMU user-net expects 10.0.2.15) ──────────────────
 # Without this the guest boots with NO IP address: port 1050 never becomes
-# reachable through the slirp hostfwd, the app sees "stryker-agentd never came
+# reachable through the slirp hostfwd, the app sees "opxdemon-agentd never came
 # up", and every boot burns the full timeout before failing.
 if [ -f "$ROOTFS/usr/sbin/ifup" ]; then
     mkdir -p "$ROOTFS/etc/network"
@@ -215,9 +215,9 @@ printf 'nameserver 10.0.2.3\n' > "$ROOTFS/etc/resolv.conf"
 # Belt and braces: a dedicated oneshot unit configures eth0 no matter what the
 # distro ifupdown state is. Only its marker file says it already succeeded.
 mkdir -p "$ROOTFS/etc/systemd/system"
-cat > "$ROOTFS/etc/systemd/system/stryker-net.service" <<'NETEOF'
+cat > "$ROOTFS/etc/systemd/system/opxdemon-net.service" <<'NETEOF'
 [Unit]
-Description=Stryker VM network (static 10.0.2.15 for slirp user-net)
+Description=OpxDemon VM network (static 10.0.2.15 for slirp user-net)
 DefaultDependencies=no
 After=systemd-modules-load.service
 Before=network-pre.target
@@ -225,7 +225,7 @@ Wants=network-pre.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'ip link set eth0 up 2>/dev/null; ip addr flush dev eth0 2>/dev/null; ip addr add 10.0.2.15/24 dev eth0 2>/dev/null; ip route add default via 10.0.2.2 dev eth0 2>/dev/null; mkdir -p /run/stryker; touch /run/stryker/net-ok'
+ExecStart=/bin/sh -c 'ip link set eth0 up 2>/dev/null; ip addr flush dev eth0 2>/dev/null; ip addr add 10.0.2.15/24 dev eth0 2>/dev/null; ip route add default via 10.0.2.2 dev eth0 2>/dev/null; mkdir -p /run/opxdemon; touch /run/opxdemon/net-ok'
 [Install]
 WantedBy=multi-user.target
 NETEOF
@@ -240,17 +240,17 @@ EOF
 # ── fstab (exact 9p share mount) ─────────────────────────────────────────────
 cat > "$ROOTFS/etc/fstab" <<'EOF'
 # UNCONFIGURED FSTAB FOR BASE SYSTEM
-strykershare /sdcard/Stryker 9p trans=virtio,version=9p2000.L,msize=262144,nofail,x-systemd.device-timeout=5 0 0
+opxdemonshare /sdcard/OPX-Demon 9p trans=virtio,version=9p2000.L,msize=262144,nofail,x-systemd.device-timeout=5 0 0
 EOF
 
-# ── Create stryker-agentd (exact match — 572 byte shell script) ──────────────
+# ── Create opxdemon-agentd (exact match — 572 byte shell script) ──────────────
 mkdir -p "$ROOTFS/usr/local/sbin"
-cat > "$ROOTFS/usr/local/sbin/stryker-agentd" <<'AGENTEOF'
+cat > "$ROOTFS/usr/local/sbin/opxdemon-agentd" <<'AGENTEOF'
 #!/bin/sh
-# Stryker guest agent: raw command server (1050) + PTY shell server (1051).
+# OpxDemon guest agent: raw command server (1050) + PTY shell server (1051).
 SOCAT="$(command -v socat 2>/dev/null)"
-[ -z "$SOCAT" ] && { echo "stryker-agentd: socat missing" >&2; exit 1; }
-mkdir -p /sdcard/Stryker/hs /sdcard/Stryker/captured /sdcard/Stryker/reports 2>/dev/null
+[ -z "$SOCAT" ] && { echo "opxdemon-agentd: socat missing" >&2; exit 1; }
+mkdir -p /sdcard/OPX-Demon/hs /sdcard/OPX-Demon/captured /sdcard/OPX-Demon/reports 2>/dev/null
 "$SOCAT" TCP-LISTEN:1050,reuseaddr,fork EXEC:/bin/sh,stderr &
 if command -v bash >/dev/null 2>&1; then
   "$SOCAT" TCP-LISTEN:1051,reuseaddr,fork EXEC:'bash -il',pty,setsid,ctty,stderr &
@@ -259,25 +259,25 @@ else
 fi
 wait
 AGENTEOF
-chmod 0755 "$ROOTFS/usr/local/sbin/stryker-agentd"
+chmod 0755 "$ROOTFS/usr/local/sbin/opxdemon-agentd"
 
 # ── Create systemd services (exact match) ────────────────────────────────────
 mkdir -p "$ROOTFS/etc/systemd/system"
-cat > "$ROOTFS/etc/systemd/system/stryker-agent.service" <<'SVCEOF'
+cat > "$ROOTFS/etc/systemd/system/opxdemon-agent.service" <<'SVCEOF'
 [Unit]
-Description=Stryker guest agent (command + terminal servers)
-Wants=stryker-net.service
-After=stryker-net.service network.target
+Description=OpxDemon guest agent (command + terminal servers)
+Wants=opxdemon-net.service
+After=opxdemon-net.service network.target
 [Service]
-ExecStartPre=/bin/sh -c 'mkdir -p /sdcard/Stryker/hs /sdcard/Stryker/captured'
-ExecStart=/usr/local/sbin/stryker-agentd
+ExecStartPre=/bin/sh -c 'mkdir -p /sdcard/OPX-Demon/hs /sdcard/OPX-Demon/captured'
+ExecStart=/usr/local/sbin/opxdemon-agentd
 Restart=always
 RestartSec=2
 [Install]
 WantedBy=multi-user.target
 SVCEOF
 
-cat > "$ROOTFS/etc/systemd/system/stryker-sshkeys.service" <<'SSHEOF'
+cat > "$ROOTFS/etc/systemd/system/opxdemon-sshkeys.service" <<'SSHEOF'
 [Unit]
 Description=Generate SSH host keys on first boot
 ConditionPathExistsGlob=!/etc/ssh/ssh_host_*_key
@@ -292,18 +292,18 @@ SSHEOF
 
 # Enable services
 mkdir -p "$ROOTFS/etc/systemd/system/multi-user.target.wants"
-ln -sf /etc/systemd/system/stryker-agent.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/stryker-agent.service"
-ln -sf /etc/systemd/system/stryker-sshkeys.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/stryker-sshkeys.service"
-ln -sf /etc/systemd/system/stryker-net.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/stryker-net.service"
+ln -sf /etc/systemd/system/opxdemon-agent.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/opxdemon-agent.service"
+ln -sf /etc/systemd/system/opxdemon-sshkeys.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/opxdemon-sshkeys.service"
+ln -sf /etc/systemd/system/opxdemon-net.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/opxdemon-net.service"
 
 # Enable SSH
 ln -sf /lib/systemd/system/ssh.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/ssh.service"
 
 # ── Serial console autologin (root) ──────────────────────────────────────
 # The app bootstraps the guest agent over ttyAMA0 when port 1050 is silent.
-# Without autologin the console sits at "stryker login:", the bootstrap commands
+# Without autologin the console sits at "opxdemon login:", the bootstrap commands
 # are eaten by agetty's login prompt as a username, and boot times out with
-# "the guest booted but stryker-agentd never came up". An override unit runs a
+# "the guest booted but opxdemon-agentd never came up". An override unit runs a
 # root login shell on ttyAMA0, which is what the app's console driver expects.
 # --autologin makes agetty exec 'login -f root' (preauthenticated); do NOT also
 # pass -o login options — combining the two is flaky across util-linux versions.
@@ -320,40 +320,40 @@ rm -rf "$ROOTFS/usr/share/man" "$ROOTFS/usr/share/doc" \
 
 # ── Create required directories ──────────────────────────────────────────────
 mkdir -p "$ROOTFS/run"
-mkdir -p "$ROOTFS/sdcard/Stryker/hs"
-mkdir -p "$ROOTFS/sdcard/Stryker/captured"
-mkdir -p "$ROOTFS/sdcard/Stryker/reports"
+mkdir -p "$ROOTFS/sdcard/OPX-Demon/hs"
+mkdir -p "$ROOTFS/sdcard/OPX-Demon/captured"
+mkdir -p "$ROOTFS/sdcard/OPX-Demon/reports"
 
 # ── Extract guest core payload (pixie.py, checker.py, etc.) ───────────────
-if [ -f /work/stryker-guest-core.tar ]; then
-    echo "Extracting stryker-guest-core.tar into rootfs..."
-    tar xf /work/stryker-guest-core.tar -C "$ROOTFS" 2>/dev/null || true
+if [ -f /work/opxdemon-guest-core.tar ]; then
+    echo "Extracting opxdemon-guest-core.tar into rootfs..."
+    tar xf /work/opxdemon-guest-core.tar -C "$ROOTFS" 2>/dev/null || true
     # Make scripts executable
     chmod -R 0755 "$ROOTFS/CORE" 2>/dev/null || true
     chmod -R 0755 "$ROOTFS/exploits" 2>/dev/null || true
-    chmod 0755 "$ROOTFS/usr/local/sbin/stryker-agentd" 2>/dev/null || true
-    chmod 0755 "$ROOTFS/usr/local/sbin/stryker-ptyd" 2>/dev/null || true
+    chmod 0755 "$ROOTFS/usr/local/sbin/opxdemon-agentd" 2>/dev/null || true
+    chmod 0755 "$ROOTFS/usr/local/sbin/opxdemon-ptyd" 2>/dev/null || true
     echo "Guest core extracted:"
     ls -la "$ROOTFS/CORE/PixieWps/" 2>/dev/null
     ls -la "$ROOTFS/exploits/" 2>/dev/null
 else
-    echo "FATAL: stryker-guest-core.tar not found — the agent and CORE tools would be missing" >&2
+    echo "FATAL: opxdemon-guest-core.tar not found — the agent and CORE tools would be missing" >&2
     exit 1
 fi
 
 # ── Critical-path verification (fail the build instead of shipping a rootfs
 #    that can never let the app in — mirrors unpackAndVerify's agent witness).
-#    Runs AFTER the guest-core extraction: stryker-agentd and stryker-ptyd come
+#    Runs AFTER the guest-core extraction: opxdemon-agentd and opxdemon-ptyd come
 #    from the tar, so checking before it could never pass.
 MISSING=""
 for f in \
-    "$ROOTFS/usr/local/sbin/stryker-agentd" \
-    "$ROOTFS/usr/local/sbin/stryker-ptyd" \
+    "$ROOTFS/usr/local/sbin/opxdemon-agentd" \
+    "$ROOTFS/usr/local/sbin/opxdemon-ptyd" \
     "$ROOTFS/usr/bin/socat" \
     "$ROOTFS/CORE/PixieWps/pixie.py" \
     "$ROOTFS/exploits/checker.py" \
-    "$ROOTFS/etc/systemd/system/stryker-agent.service" \
-    "$ROOTFS/etc/systemd/system/stryker-net.service" \
+    "$ROOTFS/etc/systemd/system/opxdemon-agent.service" \
+    "$ROOTFS/etc/systemd/system/opxdemon-net.service" \
     "$ROOTFS/etc/systemd/system/serial-getty@ttyAMA0.service.d/autologin.conf" \
     ; do
     [ -s "$f" ] || MISSING="$MISSING $f"
@@ -362,7 +362,7 @@ if [ -n "$MISSING" ]; then
     echo "FATAL: critical guest files missing or empty:$MISSING" >&2
     exit 1
 fi
-[ -x "$ROOTFS/usr/local/sbin/stryker-agentd" ] || { echo "FATAL: stryker-agentd not executable" >&2; exit 1; }
-[ -x "$ROOTFS/usr/local/sbin/stryker-ptyd" ] || { echo "FATAL: stryker-ptyd not executable" >&2; exit 1; }
+[ -x "$ROOTFS/usr/local/sbin/opxdemon-agentd" ] || { echo "FATAL: opxdemon-agentd not executable" >&2; exit 1; }
+[ -x "$ROOTFS/usr/local/sbin/opxdemon-ptyd" ] || { echo "FATAL: opxdemon-ptyd not executable" >&2; exit 1; }
 
-echo "Rootfs build complete — exact match with original StrykerOSS."
+echo "Rootfs build complete — exact match with original OPX-Demon."

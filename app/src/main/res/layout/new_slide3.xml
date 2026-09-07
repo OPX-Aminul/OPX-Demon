@@ -78,7 +78,7 @@
                             android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:src="@drawable/download"
-                            app:tint="@color/stryker_accent" />
+                            app:tint="@color/opxdemon_accent" />
                     </FrameLayout>
 
                     <LinearLayout
@@ -146,7 +146,7 @@
             android:letterSpacing="0.08"
             android:text="STAGES"
             android:textAllCaps="true"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="12sp"
             android:textStyle="bold"
             android:visibility="gone" />

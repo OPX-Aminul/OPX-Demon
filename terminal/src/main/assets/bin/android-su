@@ -3,10 +3,10 @@
 #
 # Root Android shell (NON-chroot) using the bundled static bash.
 
-STRYKER_FILES=/data/data/com.zalexdev.stryker/files
+OPX_DEMON_FILES=/data/data/com.opx.demon/files
 
 # Android-side PATH (include common su manager locations).
-export PATH=$STRYKER_FILES/usr/bin:$STRYKER_FILES/usr/sbin:/sbin:/system/bin:/system/xbin:/system/sbin:/su/bin:/magisk/.core/bin:/debug_ramdisk:/apex/com.android.runtime/bin:/apex/com.android.art/bin:/odm/bin:/vendor/bin:.
+export PATH=$OPX_DEMON_FILES/usr/bin:$OPX_DEMON_FILES/usr/sbin:/sbin:/system/bin:/system/xbin:/system/sbin:/su/bin:/magisk/.core/bin:/debug_ramdisk:/apex/com.android.runtime/bin:/apex/com.android.art/bin:/odm/bin:/vendor/bin:.
 # Drop loader env so stock Android binaries run cleanly.
 unset LD_LIBRARY_PATH
 unset LD_PRELOAD
@@ -23,4 +23,4 @@ done
 [ -z "$SU" ] && SU=su
 
 # Root shell using the bundled static bash; -mm keeps the global mount namespace.
-exec "$SU" -mm -s "$STRYKER_FILES/usr/bin/bash"
+exec "$SU" -mm -s "$OPX_DEMON_FILES/usr/bin/bash"

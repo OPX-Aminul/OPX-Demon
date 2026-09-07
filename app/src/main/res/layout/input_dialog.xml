@@ -70,7 +70,7 @@
                 android:id="@+id/ok"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:backgroundTint="@color/stryker_accent"
+                android:backgroundTint="@color/opxdemon_accent"
                 android:text="@android:string/ok"
                 android:textColor="@color/light_contrast"
                 app:cornerRadius="14dp" />

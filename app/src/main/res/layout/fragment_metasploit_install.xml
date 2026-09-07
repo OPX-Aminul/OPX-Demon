@@ -47,7 +47,7 @@
             android:letterSpacing="0.08"
             android:text="@string/msf_section_status"
             android:textAllCaps="true"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -186,7 +186,7 @@
             android:letterSpacing="0.08"
             android:text="@string/msf_install_log_header"
             android:textAllCaps="true"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="12sp"
             android:textStyle="bold"
             android:visibility="gone" />

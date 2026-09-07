@@ -77,7 +77,7 @@
                 android:fontFamily="monospace"
                 android:singleLine="true"
                 android:text="https://example.com/path"
-                android:textColor="@color/stryker_accent"
+                android:textColor="@color/opxdemon_accent"
                 android:textSize="11sp" />
 
             <com.google.android.material.textview.MaterialTextView
@@ -117,7 +117,7 @@
                         android:letterSpacing="0.08"
                         android:text="EXTRACTED"
                         android:textAllCaps="true"
-                        android:textColor="@color/stryker_accent"
+                        android:textColor="@color/opxdemon_accent"
                         android:textSize="9sp"
                         android:textStyle="bold" />
 

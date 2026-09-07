@@ -1,14 +1,14 @@
 #!/bin/bash
 
 function error {
-    echo "Stryker VNC setup helper <<"
+    echo "OpxDemon VNC setup helper <<"
     echo ""
     echo "Failed to update packages, check access to repository or your internet connection."
     exit 1
 }
 
 function scripts_writing_error() {
-    echo "Stryker VNC setup helper <<"
+    echo "OpxDemon VNC setup helper <<"
     echo ""
     echo "Failed to write scripts. Critical error!"
     exit 1
@@ -32,7 +32,7 @@ apt-get install -y --no-install-recommends ca-certificates curl openssl xvfb \
     libgl1-mesa-dri libgl1 x11-xserver-utils x11-xkb-utils xinit procps || error
 
 echo "×Preparing the VNC password"
-PASS=stryker
+PASS=opxdemon
 
 [ ! -f /root/.vnc/passwd ] && echo "No previous VNC password found. Setting $PASS as default password!" && mkdir -p /root/.vnc && x11vnc -storepasswd $PASS /root/.vnc/passwd || echo "Previously generated password found. Keeping your old password!"
 
@@ -46,7 +46,7 @@ echo "×Writing helper scripts"
 echo "#!/bin/bash
 
 function usage () {
-    echo \"Stryker VNC setup helper <<\"
+    echo \"OpxDemon VNC setup helper <<\"
     echo \"\"
     echo \"Usage: vncserver-start\"
     echo \"-p|--port Setup port for VNC\"
@@ -175,7 +175,7 @@ if [ -z \$PASSWORD ]; then
 fi
 mkdir -p /root/.vnc && x11vnc -storepasswd \"\$PASSWORD\" /root/.vnc/passwd" > /usr/local/bin/vncpasswd-setup || scripts_writing_error
 
-# Tail of recent logs — copy/paste this to Stryker if VNC misbehaves
+# Tail of recent logs — copy/paste this to OpxDemon if VNC misbehaves
 echo "#!/bin/bash
 echo '===== xvfb.log ====='; tail -40 /tmp/xvfb.log 2>/dev/null
 echo '===== xfce.log ====='; tail -80 /tmp/xfce.log 2>/dev/null
@@ -188,5 +188,5 @@ chmod +x /usr/local/bin/vnc-diag || scripts_writing_error
 echo "×Verifying the installation"
 command -v x11vnc >/dev/null 2>&1 && command -v Xvfb >/dev/null 2>&1 \
     && echo "×Done" || error
-echo "[!] Use the helper scripts vncserver-start and vncserver-stop to start and stop Stryker XFCE."
+echo "[!] Use the helper scripts vncserver-start and vncserver-stop to start and stop OpxDemon XFCE."
 echo "[!] Run vnc-diag if you get a dark screen — it dumps all VNC logs."

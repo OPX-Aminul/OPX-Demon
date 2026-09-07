@@ -136,7 +136,7 @@
             android:letterSpacing="0.08"
             android:text="ESSENTIALS"
             android:textAllCaps="true"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="11sp"
             android:textStyle="bold" />
 

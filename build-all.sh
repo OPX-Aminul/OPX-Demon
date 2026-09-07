@@ -1,6 +1,6 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────────────────────────────
-# StrykerOSS Exact-Match Build Script
+# OPX-Demon Exact-Match Build Script
 # Builds: Rootfs + QEMU (uses Debian Trixie stock kernel)
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -18,7 +18,7 @@ success() { printf "${GREEN}SUCCESS:${NC} %s\n" "$*"; }
 
 show_help() {
     cat <<EOF
-StrykerOSS Exact-Match Build Tool
+OPX-Demon Exact-Match Build Tool
 
 Usage: $0 [command]
 
@@ -32,28 +32,28 @@ EOF
 }
 
 build_rootfs() {
-    log "Building rootfs (Debian Trixie + pentest tools + stryker-agentd)..."
+    log "Building rootfs (Debian Trixie + pentest tools + opxdemon-agentd)..."
     docker build --network=host \
         --build-arg "SYSTEM_VERSION=60" \
-        -t stryker-rootfs-builder --target rootfs-builder "$SCRIPT_DIR"
-    docker rm -f stryker-rootfs-extract 2>/dev/null || true
-    docker create --name stryker-rootfs-extract stryker-rootfs-builder
+        -t opxdemon-rootfs-builder --target rootfs-builder "$SCRIPT_DIR"
+    docker rm -f opxdemon-rootfs-extract 2>/dev/null || true
+    docker create --name opxdemon-rootfs-extract opxdemon-rootfs-builder
     mkdir -p "$SCRIPT_DIR/output"
-    docker cp stryker-rootfs-extract:/work/rootfs.imgz "$SCRIPT_DIR/output/rootfs.imgz"
-    docker rm stryker-rootfs-extract >/dev/null
+    docker cp opxdemon-rootfs-extract:/work/rootfs.imgz "$SCRIPT_DIR/output/rootfs.imgz"
+    docker rm opxdemon-rootfs-extract >/dev/null
     success "Built output/rootfs.imgz ($(du -h "$SCRIPT_DIR/output/rootfs.imgz" | cut -f1))"
 }
 
 build_qemu() {
     log "Building QEMU 11.0.2 for Android ARM64..."
     docker build --build-arg "QEMU_VERSION=11.0.2" \
-        -t stryker-qemu-builder --target qemu-builder "$SCRIPT_DIR"
-    docker rm -f stryker-qemu-extract 2>/dev/null || true
-    docker create --name stryker-qemu-extract stryker-qemu-builder
+        -t opxdemon-qemu-builder --target qemu-builder "$SCRIPT_DIR"
+    docker rm -f opxdemon-qemu-extract 2>/dev/null || true
+    docker create --name opxdemon-qemu-extract opxdemon-qemu-builder
     mkdir -p "$SCRIPT_DIR/output"
-    docker cp stryker-qemu-extract:/opt/qemu-out/qemu-system-aarch64 "$SCRIPT_DIR/output/"
-    docker cp stryker-qemu-extract:/opt/qemu-out/libslirp.so "$SCRIPT_DIR/output/"
-    docker rm stryker-qemu-extract >/dev/null
+    docker cp opxdemon-qemu-extract:/opt/qemu-out/qemu-system-aarch64 "$SCRIPT_DIR/output/"
+    docker cp opxdemon-qemu-extract:/opt/qemu-out/libslirp.so "$SCRIPT_DIR/output/"
+    docker rm opxdemon-qemu-extract >/dev/null
     success "QEMU ready."
     ls -lh "$SCRIPT_DIR/output/qemu-system-aarch64" "$SCRIPT_DIR/output/libslirp.so"
 }
@@ -70,7 +70,7 @@ case "$1" in
     clean)
         log "Cleaning..."
         rm -rf "$SCRIPT_DIR/output"
-        docker rmi stryker-rootfs-builder stryker-qemu-builder 2>/dev/null || true
+        docker rmi opxdemon-rootfs-builder opxdemon-qemu-builder 2>/dev/null || true
         success "Cleaned."
         ;;
     *)

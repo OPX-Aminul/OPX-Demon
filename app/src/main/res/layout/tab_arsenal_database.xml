@@ -41,7 +41,7 @@
                     app:boxCornerRadiusTopStart="14dp"
                     app:endIconDrawable="@drawable/search"
                     app:endIconMode="custom"
-                    app:endIconTint="@color/stryker_accent"
+                    app:endIconTint="@color/opxdemon_accent"
                     >
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -62,7 +62,7 @@
                     android:layout_marginTop="8dp"
                     android:indeterminate="true"
                     android:visibility="gone"
-                    app:indicatorColor="@color/stryker_accent"
+                    app:indicatorColor="@color/opxdemon_accent"
                     app:trackCornerRadius="4dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -178,7 +178,7 @@
                         android:letterSpacing="0.08"
                         android:text="@string/arsenal_db_suggestions_title"
                         android:textAllCaps="true"
-                        android:textColor="@color/stryker_accent"
+                        android:textColor="@color/opxdemon_accent"
                         android:textSize="11sp"
                         android:textStyle="bold" />
 
@@ -215,7 +215,7 @@
                                     android:layout_width="18dp"
                                     android:layout_height="18dp"
                                     android:src="@drawable/ic_outline_help"
-                                    app:tint="@color/stryker_accent" />
+                                    app:tint="@color/opxdemon_accent" />
 
                                 <com.google.android.material.textview.MaterialTextView
                                     android:layout_width="wrap_content"
@@ -379,7 +379,7 @@
                         android:layout_marginTop="14dp"
                         android:indeterminate="true"
                         android:visibility="gone"
-                        app:indicatorColor="@color/stryker_accent"
+                        app:indicatorColor="@color/opxdemon_accent"
                         app:trackCornerRadius="6dp" />
 
                     <com.google.android.material.textview.MaterialTextView

@@ -82,7 +82,7 @@
                 android:autoLink="all"
                 android:gravity="end"
                 android:text="Device info\nOS"
-                android:textColorLink="@color/stryker_accent_contrast"
+                android:textColorLink="@color/opxdemon_accent_contrast"
                 android:textSize="15dp"
                 android:textStyle="bold" />
         </com.google.android.material.card.MaterialCardView>

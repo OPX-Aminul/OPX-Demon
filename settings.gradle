@@ -16,7 +16,7 @@ dependencyResolutionManagement {
         jcenter()
     }
 }
-rootProject.name = "Stryker"
+rootProject.name = "OPX-Demon"
 include ':app'
 
 include ':terminal'

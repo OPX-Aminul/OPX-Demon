@@ -22,7 +22,7 @@ keystore.properties
 *.jks
 *.keystore
 !keystore/
-!keystore/stryker-release.jks
+!keystore/opx-demon-release.jks
 *.p12
 *.pfx
 *.pem
@@ -78,9 +78,9 @@ CLAUDE.md
 
 # Rootless engine artifacts (~550 MB): built by rootless/build-rootfs/scripts,
 # shipped via GitHub releases + the OTA manifest, never committed.
-# stryker-guest-core.tar is the exception - 3 MB, not in any release, must ship in the APK.
+# opxdemon-guest-core.tar is the exception - 3 MB, not in any release, must ship in the APK.
 /app/src/main/assets/rootless/*
-!/app/src/main/assets/rootless/stryker-guest-core.tar
+!/app/src/main/assets/rootless/opxdemon-guest-core.tar
 
 # Build outputs of rootless/build-rootfs/scripts (rootfs.imgz, Image, initrd.img).
 # The scripts themselves and guest-core/ are source and DO get published.

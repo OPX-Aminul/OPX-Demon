@@ -1,8 +1,8 @@
 name: Build & Update Release
 
-# Signing: release APK is signed with keystore/stryker-release.jks via
+# Signing: release APK is signed with keystore/opx-demon-release.jks via
 # gradle.properties (see README → Release signing).
-# Exact match with original StrykerOSS rootless-main release
+# Exact match with original OPX-Demon rootless-main release
 # Custom arm64 kernel: Xiaomi/MIUI USB ep0 maxpacket fix + USB-WiFi drivers
 # Docker Buildx GHA cache: mode=max caches ALL layers for fast rebuilds
 #
@@ -40,7 +40,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       # ══════════════════════════════════════════════════════════════════════
-      # ROOTFS: Debian Trixie + pentest tools + stryker-agentd
+      # ROOTFS: Debian Trixie + pentest tools + opxdemon-agentd
       # ══════════════════════════════════════════════════════════════════════
       - name: Build rootfs
         uses: docker/build-push-action@v6
@@ -48,13 +48,13 @@ jobs:
           context: .
           target: rootfs-builder
           load: true
-          tags: stryker-rootfs
+          tags: opxdemon-rootfs
           cache-from: type=gha,scope=rootfs
           cache-to: type=gha,scope=rootfs,mode=max
 
       - name: Extract rootfs + kernel + initrd
         run: |
-          docker create --name rootfs-out stryker-rootfs
+          docker create --name rootfs-out opxdemon-rootfs
           docker cp rootfs-out:/work/rootfs.imgz ./rootfs.imgz
           docker cp rootfs-out:/work/Image ./Image
           docker cp rootfs-out:/work/initrd.img ./initrd.img
@@ -71,14 +71,14 @@ jobs:
           context: .
           target: qemu-builder
           load: true
-          tags: stryker-qemu
+          tags: opxdemon-qemu
           build-args: QEMU_VERSION=11.0.2
           cache-from: type=gha,scope=qemu
           cache-to: type=gha,scope=qemu,mode=max
 
       - name: Extract QEMU
         run: |
-          docker create --name qemu-out stryker-qemu /bin/true
+          docker create --name qemu-out opxdemon-qemu /bin/true
           docker cp qemu-out:/opt/qemu-out/qemu-system-aarch64 ./qemu-system-aarch64
           docker cp qemu-out:/opt/qemu-out/libslirp.so ./libslirp.so
           docker rm qemu-out
@@ -108,7 +108,7 @@ jobs:
       # ══════════════════════════════════════════════════════════════════════
       # SYNC: Re-pin rootless hashes in the manifest after every core rebuild.
       # The app downloads these five files at install time and validates them
-      # against stryker_manifest.json (fetched from raw.githubusercontent.com).
+      # against opx_manifest.json (fetched from raw.githubusercontent.com).
       # If size/sha256 drift from what the pipeline just uploaded, the install
       # downloads a file to 100%, fails verification, and re-downloads the same
       # binary forever. Re-pin from the artifacts on every run.
@@ -126,7 +126,7 @@ jobs:
               ("libslirp.so", "libslirp"),
               ("rootfs.imgz", "rootfs"),
           ]
-          with open("stryker_manifest.json") as fh:
+          with open("opx_manifest.json") as fh:
               manifest = json.load(fh)
           rl = manifest["rootless"]
           for file_name, key in mapping:
@@ -135,14 +135,14 @@ jobs:
               rl[key]["sha256"] = digest
               rl[key]["size"] = os.path.getsize(file_name)
               print(f"  {file_name}: {rl[key]['size']} bytes, sha256 {digest[:12]}…")
-          with open("stryker_manifest.json", "w") as fh:
+          with open("opx_manifest.json", "w") as fh:
               json.dump(manifest, fh, indent=2)
               fh.write("\n")
           PY
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add stryker_manifest.json
+          git add opx_manifest.json
           if git diff --cached --quiet; then
             echo "✅ Manifest already in sync — nothing to commit"
           else
@@ -154,5 +154,5 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker rmi stryker-rootfs stryker-qemu 2>/dev/null || true
+        run: docker rmi opxdemon-rootfs opxdemon-qemu 2>/dev/null || true
 

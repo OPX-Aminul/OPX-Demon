@@ -48,7 +48,7 @@
                 android:rotation="45"
                 android:src="@drawable/pinned"
                 android:visibility="gone"
-                app:tint="@color/stryker_accent" />
+                app:tint="@color/opxdemon_accent" />
         </LinearLayout>
 
         <com.google.android.material.textview.MaterialTextView

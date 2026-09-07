@@ -70,7 +70,7 @@
   <string name="term_settings_licenses_title">Open-source licenses</string>
   <string name="term_settings_licenses_subtitle">Third-party components</string>
   <string name="term_settings_github_title">Project on GitHub</string>
-  <string name="term_settings_github_subtitle">github.com/zalexdev/strykerapp</string>
+  <string name="term_settings_github_subtitle">github.com/OPX-Aminul/OPX-Demon</string>
 
   <string name="term_pref_initial_command_title">Initial command</string>
   <string name="term_pref_initial_command_subtitle">Run automatically in every new session</string>
@@ -215,7 +215,7 @@
   <string name="error_new_source_url">URL cannot be empty</string>
   <string name="error_new_source_repo">Repo cannot be empty</string>
   <string name="dangerous_zone">Danger Zone</string>
-  <string name="reset_app_warning">This will delete and re-copy required files to boot Stryker chroot, confirm?</string>
+  <string name="reset_app_warning">This will delete and re-copy required files to boot OPX-Demon chroot, confirm?</string>
 
   <string name="default_source_url" translatable="false">https://example.com/terminal</string>
 

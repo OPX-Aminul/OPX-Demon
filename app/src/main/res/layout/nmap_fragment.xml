@@ -48,7 +48,7 @@
             android:letterSpacing="0.08"
             android:text="@string/nmap_section_target"
             android:textAllCaps="true"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -127,7 +127,7 @@
                         app:iconGravity="textStart"
                         app:iconPadding="0dp"
                         app:iconSize="20dp"
-                        app:iconTint="@color/stryker_accent" />
+                        app:iconTint="@color/opxdemon_accent" />
                 </LinearLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
@@ -523,7 +523,7 @@
             android:letterSpacing="0.08"
             android:text="@string/nmap_section_output"
             android:textAllCaps="true"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -591,7 +591,7 @@
                         app:iconGravity="textStart"
                         app:iconPadding="0dp"
                         app:iconSize="16dp"
-                        app:iconTint="@color/stryker_accent" />
+                        app:iconTint="@color/opxdemon_accent" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -601,7 +601,7 @@
                     android:background="@drawable/terminal_bg"
                     android:orientation="vertical">
 
-                    <com.zalexdev.stryker.utils.NoNestedScrollView
+                    <com.opx.demon.utils.NoNestedScrollView
                         android:id="@+id/nmap_output_scroll"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
@@ -618,7 +618,7 @@
                             android:textColor="#D4D4D4"
                             android:textIsSelectable="true"
                             android:textSize="11sp" />
-                    </com.zalexdev.stryker.utils.NoNestedScrollView>
+                    </com.opx.demon.utils.NoNestedScrollView>
                 </LinearLayout>
 
                 <LinearLayout
@@ -641,7 +641,7 @@
                         app:iconGravity="textStart"
                         app:iconPadding="0dp"
                         app:iconSize="20dp"
-                        app:iconTint="@color/stryker_accent" />
+                        app:iconTint="@color/opxdemon_accent" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/nmap_save_btn"
@@ -657,7 +657,7 @@
                         app:iconGravity="textStart"
                         app:iconPadding="0dp"
                         app:iconSize="20dp"
-                        app:iconTint="@color/stryker_accent" />
+                        app:iconTint="@color/opxdemon_accent" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/nmap_share_btn"
@@ -673,7 +673,7 @@
                         app:iconGravity="textStart"
                         app:iconPadding="0dp"
                         app:iconSize="20dp"
-                        app:iconTint="@color/stryker_accent" />
+                        app:iconTint="@color/opxdemon_accent" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/nmap_clear_btn"

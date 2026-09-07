@@ -20,9 +20,9 @@
         app:boxCornerRadiusTopStart="15dp"
         app:endIconDrawable="@drawable/search"
         app:endIconMode="custom"
-        app:endIconTint="@color/stryker_accent"
+        app:endIconTint="@color/opxdemon_accent"
         app:startIconDrawable="@drawable/filter"
-        app:startIconTint="@color/stryker_accent">
+        app:startIconTint="@color/opxdemon_accent">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/search"

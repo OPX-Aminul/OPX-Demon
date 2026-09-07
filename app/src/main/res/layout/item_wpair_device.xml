@@ -139,7 +139,7 @@
                 android:paddingEnd="6dp"
                 android:paddingBottom="2dp"
                 android:text="@string/wpair_badge_pairing"
-                android:textColor="@color/stryker_accent"
+                android:textColor="@color/opxdemon_accent"
                 android:textSize="9sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
@@ -174,7 +174,7 @@
                 android:paddingStart="8dp"
                 android:paddingEnd="8dp"
                 android:text="@string/wpair_btn_test"
-                android:textColor="@color/stryker_accent"
+                android:textColor="@color/opxdemon_accent"
                 android:textSize="12sp"
                 app:cornerRadius="12dp"
                 app:strokeColor="@color/light_lite_contrast" />

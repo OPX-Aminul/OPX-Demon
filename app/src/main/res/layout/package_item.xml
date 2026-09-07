@@ -113,7 +113,7 @@
             android:layout_marginStart="6dp"
             android:indeterminate="true"
             android:visibility="gone"
-            app:indicatorColor="@color/stryker_accent"
+            app:indicatorColor="@color/opxdemon_accent"
             app:indicatorSize="22dp"
             app:trackThickness="3dp" />
 
@@ -127,7 +127,7 @@
             android:focusable="true"
             android:padding="8dp"
             android:src="@drawable/download"
-            app:tint="@color/stryker_accent" />
+            app:tint="@color/opxdemon_accent" />
     </LinearLayout>
 
     <View

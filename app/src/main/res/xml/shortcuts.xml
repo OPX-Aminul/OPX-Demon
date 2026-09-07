@@ -8,7 +8,7 @@
         android:shortcutLongLabel="@string/shortcut_terminal_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.zalexdev.stryker"
-            android:targetClass="com.stryker.terminal.ui.term.NeoTermActivity" />
+            android:targetPackage="com.opx.demon"
+            android:targetClass="com.opx.demon.terminal.ui.term.NeoTermActivity" />
     </shortcut>
 </shortcuts>

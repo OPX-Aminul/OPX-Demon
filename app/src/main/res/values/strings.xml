@@ -8,7 +8,7 @@
     <string name="local_scan">Scanning the local network may take some time, but the result will be 💣! </string>
     <string name="no_results">No results found </string>
     <string name="ew_welcome">Welcome to the Add Exploit Wizard, please follow all the instructions and follow all the steps to successfully add. Click the "Continue" button to proceed to the next step. </string>
-    <string name="ew_path">(/sdcard/Stryker/exploits/) </string>
+    <string name="ew_path">(/sdcard/OPX-Demon/exploits/) </string>
     <string name="select">Path to exploit: click to select </string>
     <string name="no_pattern">Attention, the application could not find such a line in the file. This may be due to a feature of the script or obfuscation. Are you sure you entered everything correctly? </string>
     <string name="warn">Warning </string>
@@ -277,14 +277,14 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
     <string name="arsenal_add_subtitle">Pick a script, give it a name, optionally a success pattern.</string>
     <string name="arsenal_add_step_file">Source file</string>
     <string name="arsenal_add_file_placeholder">Choose a file</string>
-    <string name="arsenal_add_file_hint">Lives under /sdcard/Stryker/exploits</string>
+    <string name="arsenal_add_file_hint">Lives under /sdcard/OPX-Demon/exploits</string>
     <string name="arsenal_add_field_title">Exploit name</string>
     <string name="arsenal_add_field_args">Arguments</string>
     <string name="arsenal_add_field_args_hint">Use {IP}, {PORT}, {MAC}, {GW}, {MASK} or any custom {VAR} — Arsenal will ask for values before launch.</string>
     <string name="arsenal_add_field_success">Success pattern</string>
     <string name="arsenal_add_field_success_hint">Substring printed when the exploit succeeds. Empty = always treat as success.</string>
     <string name="arsenal_add_pick_file_title">Pick a script</string>
-    <string name="arsenal_add_no_files">No files in /sdcard/Stryker/exploits — copy one there first.</string>
+    <string name="arsenal_add_no_files">No files in /sdcard/OPX-Demon/exploits — copy one there first.</string>
     <string name="arsenal_add_file_required">Choose a script first.</string>
     <string name="arsenal_add_title_required">Give it a name.</string>
     <string name="arsenal_add_no_pattern_title">No success pattern</string>
@@ -300,7 +300,7 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
     <string name="arsenal_run_fill_vars">Fill all {variables} before launching.</string>
     <string name="arsenal_run_delete">Remove from hub</string>
     <string name="arsenal_run_delete_confirm_title">Remove from hub?</string>
-    <string name="arsenal_run_delete_confirm_body">Remove %1$s from your hub? The file stays in /sdcard/Stryker/exploits.</string>
+    <string name="arsenal_run_delete_confirm_body">Remove %1$s from your hub? The file stays in /sdcard/OPX-Demon/exploits.</string>
 
     <string name="arsenal_db_search_hint">Search ExploitDB (e.g. eternalblue)</string>
     <string name="arsenal_db_search_required">Type a query.</string>
@@ -335,8 +335,8 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
     <string name="arsenal_db_add_to_hub">Add to Hub</string>
     <string name="arsenal_db_missing_path">No path on this entry.</string>
     <string name="arsenal_db_missing_id">No EDB-ID on this entry.</string>
-    <string name="arsenal_db_copying">Copying script to /sdcard/Stryker/exploits…</string>
-    <string name="arsenal_db_saved_file">Saved to /sdcard/Stryker/exploits</string>
+    <string name="arsenal_db_copying">Copying script to /sdcard/OPX-Demon/exploits…</string>
+    <string name="arsenal_db_saved_file">Saved to /sdcard/OPX-Demon/exploits</string>
     <string name="arsenal_db_added_to_hub">Added to hub</string>
 
     <string name="arsenal_run_batch_title">Exploit Hub</string>
@@ -519,12 +519,12 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
     <string name="hs_section_files">Captures</string>
     <string name="hs_status_count">%1$d captured</string>
     <string name="hs_status_empty">No captures yet</string>
-    <string name="hs_storage_path">/sdcard/Stryker/captured</string>
+    <string name="hs_storage_path">/sdcard/OPX-Demon/captured</string>
     <string name="hs_meta_size">Size</string>
     <string name="hs_meta_cracked">Cracked</string>
     <string name="hs_meta_total">Total</string>
     <string name="hs_empty_title">Capture handshakes from the Wi-Fi screen</string>
-    <string name="hs_empty_body">Files saved in /sdcard/Stryker/captured will appear here, ready for offline cracking and upload.</string>
+    <string name="hs_empty_body">Files saved in /sdcard/OPX-Demon/captured will appear here, ready for offline cracking and upload.</string>
     <string name="hs_open_capture">Open Wi-Fi scanner</string>
     <string name="hs_refresh">Refresh</string>
     <string name="hs_action_brute">Crack with wordlist</string>
@@ -549,7 +549,7 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
     <string name="hs_rename_title">Rename capture</string>
     <string name="hs_rename_hint">new-name.cap</string>
     <string name="hs_wordlist_title">Pick a wordlist</string>
-    <string name="hs_wordlist_empty">Drop wordlists into /sdcard/Stryker/wordlists</string>
+    <string name="hs_wordlist_empty">Drop wordlists into /sdcard/OPX-Demon/wordlists</string>
     <string name="hs_password_label">Password</string>
     <string name="hs_password_copy">Copy password</string>
     <string name="hs_password_copied">Password copied</string>
@@ -731,7 +731,7 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
     <string name="payload_log_title">Build log</string>
     <string name="payload_status_idle">Fill in the form and tap Generate</string>
     <string name="payload_status_running">Forging payload — keep dialog open</string>
-    <string name="payload_status_done">Saved to /sdcard/Stryker/payloads</string>
+    <string name="payload_status_done">Saved to /sdcard/OPX-Demon/payloads</string>
     <string name="payload_status_failed">Build failed — see log</string>
     <string name="payload_invalid">Fill all four fields first</string>
 
@@ -810,7 +810,7 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
     <string name="hydra_action_copy">Copy credentials</string>
     <string name="hydra_validation_target">Set a service and a host first</string>
     <string name="hydra_validation_creds">Enter a password (or switch to wordlists)</string>
-    <string name="hydra_validation_wordlist">Pick a password wordlist (drop files into /sdcard/Stryker/wordlists)</string>
+    <string name="hydra_validation_wordlist">Pick a password wordlist (drop files into /sdcard/OPX-Demon/wordlists)</string>
     <string name="hydra_toast_copied">Copied to clipboard</string>
 
     <string name="geomac_title">GeoMac</string>
@@ -1140,7 +1140,7 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
     <string name="ide_capture_timeout">line %d · GETWINHI timed out</string>
 
     <string name="screen_mirror_title">Screen Mirror</string>
-    <string name="screen_mirror_subtitle">Live host-screen mirror over CDC ACM. Run stryker-screen.ps1 on the PC, tap Start here.</string>
+    <string name="screen_mirror_subtitle">Live host-screen mirror over CDC ACM. Run opxdemon-screen.ps1 on the PC, tap Start here.</string>
     <string name="screen_mirror_start">Start</string>
     <string name="screen_mirror_stop">Stop</string>
     <string name="screen_mirror_waiting">Waiting for first FRAME…</string>
@@ -1207,7 +1207,7 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
     <string name="delete_app_item_app">•  OPX-Demon itself</string>
     <string name="delete_app_removing">Removing OPX-Demon…</string>
     <string name="delete_app_step_unmount">Unmounting environment</string>
-    <string name="delete_app_step_wipe">Wiping /data/local/stryker</string>
+    <string name="delete_app_step_wipe">Wiping /data/local/opxdemon</string>
     <string name="delete_app_step_uninstall">Uninstalling app</string>
     <string name="delete_app_fail">Couldn\'t unmount — close anything using the chroot and try again</string>
     <string name="delete_app_close">Close</string>

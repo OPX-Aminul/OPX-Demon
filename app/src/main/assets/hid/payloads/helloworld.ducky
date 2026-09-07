@@ -11,4 +11,4 @@ DELAY 200
 ENTER
 DELAY 1500
 STRINGLN Hello, world!
-STRINGLN Typed by StrykerOSS over USB HID.
+STRINGLN Typed by OPX-Demon over USB HID.

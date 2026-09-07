@@ -1,7 +1,7 @@
 #!/system/bin/sh
 
 function show_usage() {
-    echo "Stryker MAC changer for internal wlan interface."
+    echo "OpxDemon MAC changer for internal wlan interface."
     echo ""
     echo "[!] Usage: sh $0 [interface_name] [MAC_address](must be in XX:XX:XX:XX:XX:XX format)"
 }

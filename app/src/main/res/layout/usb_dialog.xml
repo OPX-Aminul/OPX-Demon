@@ -261,7 +261,7 @@
                         android:letterSpacing="0.08"
                         android:text="CAPABILITIES"
                         android:textAllCaps="true"
-                        android:textColor="@color/stryker_accent"
+                        android:textColor="@color/opxdemon_accent"
                         android:textSize="10sp"
                         android:textStyle="bold" />
 
@@ -381,7 +381,7 @@
                         android:letterSpacing="0.08"
                         android:text="DETAILS"
                         android:textAllCaps="true"
-                        android:textColor="@color/stryker_accent"
+                        android:textColor="@color/opxdemon_accent"
                         android:textSize="10sp"
                         android:textStyle="bold" />
 
@@ -439,7 +439,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:layout_marginTop="14dp"
-                android:backgroundTint="@color/stryker_accent"
+                android:backgroundTint="@color/opxdemon_accent"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:text="Set as handshake interface"
@@ -462,7 +462,7 @@
                 android:insetBottom="0dp"
                 android:stateListAnimator="@null"
                 android:text="Set as deauth interface"
-                android:textColor="@color/stryker_accent"
+                android:textColor="@color/opxdemon_accent"
                 android:textSize="13sp"
                 app:cornerRadius="14dp"
                 app:elevation="0dp"
@@ -470,7 +470,7 @@
                 app:iconGravity="textStart"
                 app:iconPadding="8dp"
                 app:iconSize="18dp"
-                app:iconTint="@color/stryker_accent"
+                app:iconTint="@color/opxdemon_accent"
                 app:rippleColor="#1A3949AB"
                 app:strokeColor="@color/light_lite_contrast"
                 app:strokeWidth="1dp" />
@@ -490,7 +490,7 @@
             android:paddingEnd="20dp"
             android:stateListAnimator="@null"
             android:text="Re-scan"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="13sp"
             app:cornerRadius="12dp"
             app:elevation="0dp"

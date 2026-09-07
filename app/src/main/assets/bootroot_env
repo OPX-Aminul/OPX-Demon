@@ -1,10 +1,10 @@
 #!/system/bin/sh
-### Bootroot environment. stryker
+### Bootroot environment. opxdemon
 
 unset LD_PRELOAD
 
 ## Define the owner app package name.
-APP_PGK_NAME=com.zalexdev.stryker
+APP_PGK_NAME=com.opx.demon
 
 ## Login shell used inside the Debian chroot.
 CHROOT_SHELL=/bin/bash
@@ -18,14 +18,14 @@ export PATH=/system/bin:/system/xbin:/sbin:$PATH
 ## Define busybox path.
 BUSYBOX=/data/data/$APP_PGK_NAME/files/busybox
 
-## Define stryker binaries.
+## Define opxdemon binaries.
 chmod 700 /data/data/$APP_PGK_NAME/files/busybox 2> /dev/null
 for helper in chroot_exec bash_exec bootroot killroot; do
     chmod 700 "/data/data/$APP_PGK_NAME/files/$helper" 2> /dev/null
 done
 
 ## Define chroot path to MNT variable.
-MNT="/data/local/stryker/release"
+MNT="/data/local/opxdemon/release"
 
 ## Validate busybox path.
 if [ ! -x "$BUSYBOX" ]; then

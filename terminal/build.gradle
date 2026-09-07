@@ -2,7 +2,7 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
-  namespace 'com.stryker.terminal'
+  namespace 'com.opx.demon.terminal'
   compileSdk 33
 
   packaging {

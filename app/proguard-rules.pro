@@ -1,6 +1,6 @@
--keep class com.zalexdev.stryker.BuildConfig { *; }
+-keep class com.opx.demon.BuildConfig { *; }
 
--keep class com.zalexdev.stryker.custom.** { *; }
+-keep class com.opx.demon.custom.** { *; }
 
 -keep public class * extends androidx.fragment.app.Fragment
 -keep public class * extends androidx.appcompat.app.AppCompatActivity
@@ -51,7 +51,7 @@
     public static ** valueOf(java.lang.String);
 }
 
--keep class com.zalexdev.stryker.wpair.** { *; }
+-keep class com.opx.demon.wpair.** { *; }
 
 -keepclassmembers class * implements android.os.Parcelable {
     public static final ** CREATOR;
@@ -77,12 +77,12 @@
     public static *** v(...);
 }
 
--keep class com.stryker.terminal.** { *; }
--keep class com.stryker.neolang.** { *; }
+-keep class com.opx.demon.terminal.** { *; }
+-keep class com.opx.demon.neolang.** { *; }
 -keep class com.github.wrdlbrnft.sortedlistadapter.** { *; }
 -keep class de.mrapp.android.** { *; }
--dontwarn com.stryker.terminal.**
--dontwarn com.stryker.neolang.**
+-dontwarn com.opx.demon.terminal.**
+-dontwarn com.opx.demon.neolang.**
 
 -keepclassmembers class * {
     @org.greenrobot.eventbus.Subscribe <methods>;

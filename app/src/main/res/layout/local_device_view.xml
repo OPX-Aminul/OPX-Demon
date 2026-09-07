@@ -52,7 +52,7 @@
                         android:layout_marginEnd="-6dp"
                         android:layout_marginBottom="-4dp"
                         android:background="@drawable/circle"
-                        android:backgroundTint="@color/stryker_accent"
+                        android:backgroundTint="@color/opxdemon_accent"
                         android:gravity="center"
                         android:text="0"
                         android:textColor="@color/light_contrast"
@@ -133,7 +133,7 @@
                 app:iconGravity="textStart"
                 app:iconPadding="0dp"
                 app:iconSize="20dp"
-                app:iconTint="@color/stryker_accent" />
+                app:iconTint="@color/opxdemon_accent" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/image_dialog_2"
@@ -150,7 +150,7 @@
                 app:iconGravity="textStart"
                 app:iconPadding="0dp"
                 app:iconSize="20dp"
-                app:iconTint="@color/stryker_accent" />
+                app:iconTint="@color/opxdemon_accent" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/image_dialog_3"
@@ -167,7 +167,7 @@
                 app:iconGravity="textStart"
                 app:iconPadding="0dp"
                 app:iconSize="20dp"
-                app:iconTint="@color/stryker_accent" />
+                app:iconTint="@color/opxdemon_accent" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/image_dialog_4"
@@ -183,7 +183,7 @@
                 app:iconGravity="textStart"
                 app:iconPadding="0dp"
                 app:iconSize="20dp"
-                app:iconTint="@color/stryker_accent" />
+                app:iconTint="@color/opxdemon_accent" />
         </LinearLayout>
 
         <com.google.android.material.textview.MaterialTextView
@@ -465,7 +465,7 @@
             android:letterSpacing="0.08"
             android:text="@string/local_section_actions"
             android:textAllCaps="true"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -504,7 +504,7 @@
                         android:background="@drawable/settings_icon_bg"
                         android:padding="9dp"
                         android:src="@drawable/summarize"
-                        app:tint="@color/stryker_accent" />
+                        app:tint="@color/opxdemon_accent" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -744,7 +744,7 @@
                         android:background="@drawable/settings_icon_bg"
                         android:padding="9dp"
                         android:src="@drawable/rocket_launch"
-                        app:tint="@color/stryker_accent" />
+                        app:tint="@color/opxdemon_accent" />
 
                     <LinearLayout
                         android:layout_width="0dp"

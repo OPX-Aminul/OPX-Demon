@@ -1,0 +1,98 @@
+{
+  "manifest_version": 1,
+  "core": {
+    "version": "chroot-main",
+    "note": "Legacy Alpine chroot for app versions below 6. Do not repoint these keys: shipped builds < 6 read them directly and cannot be changed.",
+    "chroot64": {
+      "url": "https://github.com/zalexdev/strykerapp/releases/download/chroot-main/chroot64.tar.gz",
+      "sha256": "2ad21f1445102913c52099bcb86ab380f9520c9e4d7771e6a951f634451068ac",
+      "size": 58918734
+    },
+    "chroot32": {
+      "url": "https://github.com/zalexdev/strykerapp/releases/download/chroot-main/chroot32.tar.gz",
+      "sha256": "faa4b256819818360945d8fecc8f05f0f158a76e6a61feb8eff66308c32b3341",
+      "size": 140633600
+    },
+    "debian": {
+      "min_version_code": 600,
+      "version": "chroot-debian-trixie",
+      "note": "Debian trixie arm64, same rootfs the rootless VM boots. arm64-v8a only.",
+      "chroot64": {
+        "url": "https://github.com/zalexdev/strykerapp/releases/download/chroot-main/chroot64-debian.tar.gz",
+        "sha256": "bb27ba9f063dc8000eef947db36df1c0b96f1ec56edb36519a24b7f0ec9b030c",
+        "size": 237502035
+      }
+    }
+  },
+  "rootless": {
+    "version": "all-core-file",
+    "note": "Local dev ships these inside the APK under assets/rootless/. This block is the OTA fallback; arm64-v8a only.",
+    "qemu": {
+      "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/qemu-system-aarch64",
+      "sha256": "108ef92bb5bc3ff861c3fbc255d6c1465f0f439b725efa1a017a663ee00b24ba",
+      "size": 128470352
+    },
+    "kernel": {
+      "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/Image",
+      "sha256": "4baaf1a3c8c370b4cf44e4ec49ca01e50d899f37133e2d1c97c55508a2e22338",
+      "size": 48517632
+    },
+    "initrd": {
+      "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/initrd.img",
+      "sha256": "7d6624a77c0e65952b47d300e44d72f62e0eeee88eb5f40cd6fe3badf6fd33d2",
+      "size": 39082343
+    },
+    "libslirp": {
+      "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/libslirp.so",
+      "sha256": "0ffd8937e252d50a5ded386059856523d083769b7e49160bab41f32fb66376e7",
+      "size": 3371272
+    },
+    "rootfs": {
+      "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/rootfs.imgz",
+      "sha256": "0e7cbbd0c6d82f4498b9164781a17eba268708b5ed51040f218d892478e88c22",
+      "size": 366373868
+    }
+  },
+  "app": {
+    "versionCode": 109,
+    "versionName": "1.0.9",
+    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.0/app-release.apk",
+    "sha256": "9c58cdb672406f374569504c818f925396b0955a13d6797b264e3ae26bfff120",
+    "size": 22031245,
+    "mandatory": false,
+    "changelog": "OPX-Demon 1.0.9 \u2014 Terminal shortcut gets its own icon and name.\n\n- Home-screen Terminal launcher is now named Terminal (not OPX-Demon).\n- Terminal uses the new neon prompt logo (with-bg / without-bg).\n- Main OPX-Demon app icon and UI are unchanged.\n- Signed with the same release key \u2014 installs cleanly over 1.0.4\u20131.0.8."
+  },
+  "news": [
+    {
+      "id": 2,
+      "title": "OpxDemon 6.0 \u2014 Rootless engine & Debian",
+      "description": "The full toolset now runs without root: OpxDemon boots an arm64 QEMU virtual machine and routes tools into the guest. The chroot moved from Alpine to Debian trixie, the same rootfs the VM boots. Also new: a root-free network scanner (mDNS, SSDP, NetBIOS, SNMP), Cameradar RTSP discovery, a reworked dashboard and VM settings. RouterScan has been removed. arm64-v8a only.",
+      "newsDate": "2026-08-09",
+      "newsUrl": "https://github.com/OPX-Aminul/OPX-Demon/releases/latest",
+      "imageUrl": "",
+      "pinned": true,
+      "actionbutton1": true,
+      "actionbutton1text": "Open release",
+      "actionbutton1url": "https://github.com/OPX-Aminul/OPX-Demon/releases/latest",
+      "actionbutton2": false,
+      "actionbutton2text": "",
+      "actionbutton2url": ""
+    },
+    {
+      "id": 1,
+      "title": "OPX-Demon is open source",
+      "description": "Released as free and open-source software. Visit the GitHub repository for source, issues and contributions.",
+      "newsDate": "2026-06-14",
+      "newsUrl": "https://github.com/OPX-Aminul/OPX-Demon",
+      "imageUrl": "",
+      "pinned": true,
+      "actionbutton1": true,
+      "actionbutton1text": "Open GitHub",
+      "actionbutton1url": "https://github.com/OPX-Aminul/OPX-Demon",
+      "actionbutton2": false,
+      "actionbutton2text": "",
+      "actionbutton2url": ""
+    }
+  ],
+  "notifications": []
+}

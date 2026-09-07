@@ -57,7 +57,7 @@
                     android:letterSpacing="0.08"
                     android:text="@string/wifi_section_status"
                     android:textAllCaps="true"
-                    android:textColor="@color/stryker_accent"
+                    android:textColor="@color/opxdemon_accent"
                     android:textSize="12sp"
                     android:textStyle="bold" />
 
@@ -99,7 +99,7 @@
                                     android:layout_height="22dp"
                                     android:layout_gravity="center"
                                     android:src="@drawable/wifi"
-                                    app:tint="@color/stryker_accent" />
+                                    app:tint="@color/opxdemon_accent" />
                             </FrameLayout>
 
                             <LinearLayout
@@ -168,7 +168,7 @@
                             android:layout_marginStart="14dp"
                             android:layout_marginEnd="14dp"
                             android:indeterminate="true"
-                            app:indicatorColor="@color/stryker_accent"
+                            app:indicatorColor="@color/opxdemon_accent"
                             app:trackColor="@color/light_lite_contrast"
                             app:trackCornerRadius="2dp" />
 
@@ -358,13 +358,13 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="16dp"
                             android:text="@string/wifi_retry"
-                            android:textColor="@color/stryker_accent"
+                            android:textColor="@color/opxdemon_accent"
                             android:visibility="gone"
                             app:cornerRadius="14dp"
                             app:icon="@drawable/update"
                             app:iconGravity="textStart"
                             app:iconSize="18dp"
-                            app:iconTint="@color/stryker_accent" />
+                            app:iconTint="@color/opxdemon_accent" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 

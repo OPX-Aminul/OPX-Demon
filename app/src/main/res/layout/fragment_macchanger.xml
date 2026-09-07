@@ -258,7 +258,7 @@
             android:letterSpacing="0.08"
             android:text="@string/mac_section_form"
             android:textAllCaps="true"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="11sp"
             android:textStyle="bold" />
 
@@ -288,7 +288,7 @@
                     app:boxCornerRadiusTopEnd="14dp"
                     app:boxCornerRadiusTopStart="14dp"
                     app:startIconDrawable="@drawable/ic_renew"
-                    app:startIconTint="@color/stryker_accent">
+                    app:startIconTint="@color/opxdemon_accent">
 
                     <AutoCompleteTextView
                         android:id="@+id/iface"
@@ -314,9 +314,9 @@
                     app:counterMaxLength="17"
                     app:endIconDrawable="@drawable/ic_generate"
                     app:endIconMode="custom"
-                    app:endIconTint="@color/stryker_accent"
+                    app:endIconTint="@color/opxdemon_accent"
                     app:startIconDrawable="@drawable/password"
-                    app:startIconTint="@color/stryker_accent">
+                    app:startIconTint="@color/opxdemon_accent">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/macaddress"
@@ -352,7 +352,7 @@
                             android:textSize="12sp"
                             app:chipIcon="@drawable/ic_generate"
                             app:chipIconSize="14dp"
-                            app:chipIconTint="@color/stryker_accent" />
+                            app:chipIconTint="@color/opxdemon_accent" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/chip_apple"
@@ -395,7 +395,7 @@
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="14dp"
-            android:backgroundTint="@color/stryker_accent"
+            android:backgroundTint="@color/opxdemon_accent"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:text="@string/mac_btn_change"
@@ -419,7 +419,7 @@
             android:insetBottom="0dp"
             android:stateListAnimator="@null"
             android:text="@string/mac_btn_reset"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="14sp"
             app:cornerRadius="14dp"
             app:elevation="0dp"
@@ -427,7 +427,7 @@
             app:iconGravity="textStart"
             app:iconPadding="8dp"
             app:iconSize="18dp"
-            app:iconTint="@color/stryker_accent"
+            app:iconTint="@color/opxdemon_accent"
             app:rippleColor="#1A3949AB"
             app:strokeColor="@color/light_lite_contrast"
             app:strokeWidth="1dp" />

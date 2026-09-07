@@ -16,7 +16,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/stryker_accent_contrast"
+            android:background="@color/opxdemon_accent_contrast"
             android:orientation="horizontal">
 
             <ImageView
@@ -24,7 +24,7 @@
                 android:layout_height="30dp"
                 android:layout_gravity="center"
                 android:layout_marginStart="10dp"
-                android:background="@color/stryker_accent_contrast"
+                android:background="@color/opxdemon_accent_contrast"
                 android:src="@drawable/point"
                 app:tint="@android:color/white" />
 
@@ -43,7 +43,7 @@
                 android:layout_height="30dp"
                 android:layout_gravity="center"
                 android:layout_marginEnd="10dp"
-                android:background="@color/stryker_accent_contrast"
+                android:background="@color/opxdemon_accent_contrast"
                 android:src="@drawable/close"
                 app:tint="@android:color/white" />
         </LinearLayout>
@@ -53,7 +53,7 @@
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:indeterminate="true"
-            app:indicatorColor="@color/stryker_accent_contrast"
+            app:indicatorColor="@color/opxdemon_accent_contrast"
             app:trackColor="#92A3FF" />
 
         <org.osmdroid.views.MapView

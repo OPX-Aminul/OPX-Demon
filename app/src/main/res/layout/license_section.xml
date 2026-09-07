@@ -9,6 +9,6 @@
     android:layout_marginBottom="4dp"
     android:letterSpacing="0.08"
     android:textAllCaps="true"
-    android:textColor="@color/stryker_accent"
+    android:textColor="@color/opxdemon_accent"
     android:textSize="13sp"
     android:textStyle="bold" />

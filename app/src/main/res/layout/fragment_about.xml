@@ -19,7 +19,7 @@
         android:paddingEnd="16dp"
         android:paddingBottom="32dp">
 
-        <com.zalexdev.stryker.about.FeatureCardStack
+        <com.opx.demon.about.FeatureCardStack
             android:id="@+id/about_feature_stack"
             android:layout_width="match_parent"
             android:layout_height="366dp"
@@ -36,7 +36,7 @@
             android:letterSpacing="0.08"
             android:text="@string/about_section_links"
             android:textAllCaps="true"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="11sp"
             android:textStyle="bold" />
 
@@ -181,7 +181,7 @@
             android:letterSpacing="0.08"
             android:text="@string/about_section_legal"
             android:textAllCaps="true"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="11sp"
             android:textStyle="bold" />
 

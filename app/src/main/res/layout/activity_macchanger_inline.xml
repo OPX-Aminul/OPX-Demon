@@ -78,7 +78,7 @@
             android:layout_height="3dp"
             android:layout_marginTop="14dp"
             android:indeterminate="true"
-            app:indicatorColor="@color/stryker_accent"
+            app:indicatorColor="@color/opxdemon_accent"
             app:trackColor="@color/light_lite_contrast"
             app:trackCornerRadius="2dp" />
 
@@ -131,7 +131,7 @@
                 android:letterSpacing="0.06"
                 android:text="NEW MAC"
                 android:textAllCaps="true"
-                android:textColor="@color/stryker_accent"
+                android:textColor="@color/opxdemon_accent"
                 android:textSize="10sp"
                 android:textStyle="bold" />
 
@@ -142,7 +142,7 @@
                 android:layout_marginTop="2dp"
                 android:fontFamily="monospace"
                 android:text="XX:XX:XX:XX:XX:XX"
-                android:textColor="@color/stryker_accent"
+                android:textColor="@color/opxdemon_accent"
                 android:textIsSelectable="true"
                 android:textSize="18sp"
                 android:textStyle="bold" />

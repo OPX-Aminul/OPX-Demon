@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="dialog_background_color">#FFFFFFFF</color>
-    <color name="stryker_accent_contrast">#304FFE</color>
-    <color name="stryker_accent">#1565C0</color>
-    <color name="stryker_logo_accent">#1565C0</color>
+    <color name="opxdemon_accent_contrast">#304FFE</color>
+    <color name="opxdemon_accent">#1565C0</color>
+    <color name="opxdemon_logo_accent">#1565C0</color>
     <color name="yellow">#F9A825</color>
     <color name="red">#C62828</color>
     <color name="green">#2E7D32</color>

@@ -32,7 +32,7 @@
                 android:layout_height="20dp"
                 android:layout_gravity="center"
                 android:src="@drawable/wifi"
-                app:tint="@color/stryker_accent" />
+                app:tint="@color/opxdemon_accent" />
         </FrameLayout>
 
         <LinearLayout

@@ -194,7 +194,7 @@
                             app:iconGravity="textStart"
                             app:iconPadding="0dp"
                             app:iconSize="20dp"
-                            app:iconTint="@color/stryker_accent" />
+                            app:iconTint="@color/opxdemon_accent" />
                     </LinearLayout>
 
                     <com.google.android.material.progressindicator.LinearProgressIndicator
@@ -376,7 +376,7 @@
                 android:letterSpacing="0.08"
                 android:text="@string/local_section_devices"
                 android:textAllCaps="true"
-                android:textColor="@color/stryker_accent"
+                android:textColor="@color/opxdemon_accent"
                 android:textSize="12sp"
                 android:textStyle="bold" />
 

@@ -81,7 +81,7 @@
                 android:letterSpacing="0.08"
                 android:text="@string/core_mgr_section_source"
                 android:textAllCaps="true"
-                android:textColor="@color/stryker_accent"
+                android:textColor="@color/opxdemon_accent"
                 android:textSize="12sp"
                 android:textStyle="bold" />
 
@@ -119,7 +119,7 @@
                                 android:layout_height="22dp"
                                 android:layout_gravity="center"
                                 android:src="@drawable/storage"
-                                app:tint="@color/stryker_accent" />
+                                app:tint="@color/opxdemon_accent" />
                         </FrameLayout>
 
                         <LinearLayout
@@ -172,7 +172,7 @@
                         android:layout_marginStart="14dp"
                         android:layout_marginEnd="14dp"
                         android:indeterminate="true"
-                        app:indicatorColor="@color/stryker_accent"
+                        app:indicatorColor="@color/opxdemon_accent"
                         app:trackColor="@color/light_lite_contrast"
                         app:trackCornerRadius="2dp" />
 
@@ -256,7 +256,7 @@
                     app:boxCornerRadiusTopStart="14dp"
                     app:endIconDrawable="@drawable/search"
                     app:endIconMode="custom"
-                    app:endIconTint="@color/stryker_accent">
+                    app:endIconTint="@color/opxdemon_accent">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/search"
@@ -278,7 +278,7 @@
                 android:letterSpacing="0.08"
                 android:text="@string/core_mgr_section_packages"
                 android:textAllCaps="true"
-                android:textColor="@color/stryker_accent"
+                android:textColor="@color/opxdemon_accent"
                 android:textSize="12sp"
                 android:textStyle="bold" />
 

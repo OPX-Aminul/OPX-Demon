@@ -103,7 +103,7 @@
             android:focusable="true"
             android:padding="8dp"
             android:src="@drawable/key"
-            app:tint="@color/stryker_accent" />
+            app:tint="@color/opxdemon_accent" />
 
         <ImageView
             android:id="@+id/hs_cancel"

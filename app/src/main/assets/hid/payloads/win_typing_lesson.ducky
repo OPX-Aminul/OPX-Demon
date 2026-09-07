@@ -14,7 +14,7 @@ STRING notepad
 ENTER
 DELAY 1500
 
-STRINGLN Hi! Stryker is acting as a USB keyboard right now.
+STRINGLN Hi! OpxDemon is acting as a USB keyboard right now.
 STRINGLN The PC trusts it like any plugged-in keyboard, so every
 STRINGLN line below was "typed" by the phone over USB HID.
 STRINGLN

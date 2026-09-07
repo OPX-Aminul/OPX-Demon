@@ -68,7 +68,7 @@
                 android:layout_height="16dp"
                 android:layout_marginEnd="6dp"
                 android:src="@drawable/motion_blur"
-                app:tint="@color/stryker_accent" />
+                app:tint="@color/opxdemon_accent" />
 
             <com.google.android.material.textview.MaterialTextView
                 android:id="@+id/arsenal_tab_hub_text"

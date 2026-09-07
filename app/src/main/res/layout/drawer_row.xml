@@ -52,7 +52,7 @@
         android:paddingEnd="6dp"
         android:paddingBottom="1dp"
         android:text="NEW"
-        android:textColor="@color/stryker_accent"
+        android:textColor="@color/opxdemon_accent"
         android:textSize="9sp"
         android:textStyle="bold"
         android:visibility="gone" />

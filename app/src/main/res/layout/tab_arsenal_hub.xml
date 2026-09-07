@@ -35,7 +35,7 @@
                     android:letterSpacing="0.08"
                     android:text="@string/arsenal_hub_section"
                     android:textAllCaps="true"
-                    android:textColor="@color/stryker_accent"
+                    android:textColor="@color/opxdemon_accent"
                     android:textSize="11sp"
                     android:textStyle="bold" />
 
@@ -123,7 +123,7 @@
         android:layout_gravity="end|bottom"
         android:layout_marginEnd="14dp"
         android:layout_marginBottom="14dp"
-        android:backgroundTint="@color/stryker_accent"
+        android:backgroundTint="@color/opxdemon_accent"
         android:contentDescription="@string/add"
         android:text="@string/arsenal_hub_add"
         android:textColor="@android:color/white"

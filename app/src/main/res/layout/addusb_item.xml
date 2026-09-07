@@ -27,7 +27,7 @@
             android:background="@drawable/settings_icon_bg"
             android:padding="9dp"
             android:src="@drawable/usb"
-            app:tint="@color/stryker_accent" />
+            app:tint="@color/opxdemon_accent" />
 
         <LinearLayout
             android:layout_width="0dp"

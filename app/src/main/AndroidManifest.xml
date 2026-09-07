@@ -19,7 +19,7 @@
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
-    <!-- Rootless engine: optional all-files access so captures land in the visible /sdcard/Stryker.
+    <!-- Rootless engine: optional all-files access so captures land in the visible /sdcard/OPX-Demon.
          If not granted, the engine falls back to the app-private external dir (no permission). -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
@@ -37,20 +37,20 @@
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
     <application
-        android:name=".StrykerApp"
+        android:name=".OpxDemonApp"
         android:icon="@mipmap/appicon"
         android:label="@string/app_name"
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/appicon_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Stryker"
+        android:theme="@style/Theme.OpxDemon"
         android:usesCleartextTraffic="true">
 
         <activity
             android:name=".geomac.GeoMacInline"
             android:exported="true"
             android:label="Find MAC cords"
-            android:theme="@style/Theme.StrykerFloatingDialog">
+            android:theme="@style/Theme.OpxDemonFloatingDialog">
             <meta-data
                 android:name="android.app.lib_name"
                 android:value="" />
@@ -67,7 +67,7 @@
             android:name=".macchanger.MACChangerInline"
             android:exported="true"
             android:label="Change device MAC"
-            android:theme="@style/Theme.StrykerFloatingDialog">
+            android:theme="@style/Theme.OpxDemonFloatingDialog">
             <meta-data
                 android:name="android.app.lib_name"
                 android:value="" />
@@ -101,7 +101,7 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
             android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.Stryker" />
+            android:theme="@style/Theme.OpxDemon" />
 
         <service
             android:name=".nuclei.NucleiScanService"
@@ -150,7 +150,7 @@
             android:icon="@mipmap/ic_launcher"
             android:roundIcon="@mipmap/ic_launcher_round"
             android:label="@string/terminal_launcher_label"
-            android:targetActivity="com.stryker.terminal.ui.term.NeoTermActivity">
+            android:targetActivity="com.opx.demon.terminal.ui.term.NeoTermActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

@@ -43,7 +43,7 @@
             android:letterSpacing="0.08"
             android:text="WHAT'S INSIDE"
             android:textAllCaps="true"
-            android:textColor="@color/stryker_accent"
+            android:textColor="@color/opxdemon_accent"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -87,7 +87,7 @@
                                 android:layout_height="28dp"
                                 android:layout_gravity="center"
                                 android:src="@drawable/wifi"
-                                app:tint="@color/stryker_accent" />
+                                app:tint="@color/opxdemon_accent" />
                         </FrameLayout>
 
                         <com.google.android.material.textview.MaterialTextView
@@ -251,7 +251,7 @@
                         android:background="@drawable/settings_icon_bg"
                         android:padding="10dp"
                         android:src="@drawable/shield"
-                        app:tint="@color/stryker_accent" />
+                        app:tint="@color/opxdemon_accent" />
 
                     <com.google.android.material.textview.MaterialTextView
                         android:id="@+id/text1"

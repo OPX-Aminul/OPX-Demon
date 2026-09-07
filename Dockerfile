@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# StrykerOSS Unified Dockerfile
+# OPX-Demon Unified Dockerfile
 # Custom arm64 kernel: Xiaomi/MIUI USB ep0 maxpacket fix + USB-WiFi drivers
 # Docker Buildx GHA mode=max caches ALL layers for fast rebuilds
 # ─────────────────────────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ RUN mkdir -p /work/firmware/rtlwifi /work/firmware/rtw88 /work/firmware/ath9k_ht
        done
 
 # ==============================================================================
-# SECTION 1: Rootfs (Debian Trixie + pentest tools + stryker-agentd)
+# SECTION 1: Rootfs (Debian Trixie + pentest tools + opxdemon-agentd)
 # ==============================================================================
 
 FROM debian:trixie AS rootfs-builder
@@ -84,8 +84,8 @@ WORKDIR /work
 RUN debootstrap --variant=minbase --arch=arm64 \
     trixie /work/rootfs http://deb.debian.org/debian
 
-# Copy guest core payload (pixie.py, checker.py, stryker-agentd, etc.)
-COPY rootless-assets/stryker-guest-core.tar /work/stryker-guest-core.tar
+# Copy guest core payload (pixie.py, checker.py, opxdemon-agentd, etc.)
+COPY rootless-assets/opxdemon-guest-core.tar /work/opxdemon-guest-core.tar
 
 # Install packages (exact match with original dpkg status)
 COPY build-rootfs/build-rootfs.sh /work/build-rootfs.sh
