@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="dialog_background_color">#FFFFFFFF</color>
+    <color name="dialog_background_color">#FFF8EC</color>
     <!-- Golden premium palette: rich gold accent on ivory neutrals. -->
     <color name="opxdemon_accent_contrast">#8B6508</color>
     <color name="opxdemon_accent">#B8860B</color>
@@ -8,10 +8,12 @@
     <color name="yellow">#F9A825</color>
     <color name="red">#C62828</color>
     <color name="green">#2E7D32</color>
-    <color name="light_contrast">#FFFFFF</color>
+    <color name="light_contrast">#F7F1E3</color>
     <color name="night_contrast">#404040</color>
     <color name="night_contrast_2">#1C1C1C</color>
-    <color name="light_lite_contrast">#EDECEC</color>
+    <color name="light_lite_contrast">#E7DFCB</color>
+    <!-- Warm golden wash that sits on top of light_contrast for intro/hero surfaces. -->
+    <color name="intro_scrim">#0FC9A227</color>
     <color name="grey">#757575</color>
     <color name="local_circle">#ffffff</color>
     <color name="device_img">#757575</color>

@@ -20,7 +20,7 @@
             android:layout_width="85dp"
             android:layout_height="85dp"
             android:layout_gravity="center"
-            android:background="@android:color/white"
+            android:background="@color/light_contrast"
             android:src="@drawable/no_image" />
 
         <TextView

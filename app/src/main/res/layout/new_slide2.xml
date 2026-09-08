@@ -3,6 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/intro_scrim"
     android:fillViewport="true"
     android:scrollbars="none">
 
@@ -31,8 +32,8 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
             android:layout_marginTop="4dp"
-            android:layout_marginBottom="18dp"
-            android:text="OPX-Demon needs root and storage access to run its tooling chroot and store scan output."
+            android:layout_marginBottom="16dp"
+            android:text="Grant everything your device allows — the app adapts to what each Android version permits. Nothing blocks the next step."
             android:textColor="@color/grey"
             android:textSize="13sp" />
 
@@ -42,7 +43,7 @@
             android:layout_marginStart="4dp"
             android:layout_marginBottom="10dp"
             android:letterSpacing="0.08"
-            android:text="REQUIRED ACCESS"
+            android:text="DEVICE CAPABILITIES"
             android:textAllCaps="true"
             android:textColor="@color/opxdemon_accent"
             android:textSize="12sp"
@@ -58,220 +59,10 @@
             app:strokeWidth="1dp">
 
             <LinearLayout
+                android:id="@+id/perm_list"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:minHeight="72dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingTop="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingBottom="14dp">
-
-                    <ImageView
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:background="@drawable/settings_icon_bg"
-                        android:padding="10dp"
-                        android:src="@drawable/terminal"
-                        app:tint="@color/opxdemon_accent" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <com.google.android.material.textview.MaterialTextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Root (superuser)"
-                            android:textColor="?android:attr/textColorPrimary"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                        <com.google.android.material.textview.MaterialTextView
-                            android:id="@+id/root_subtitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Required to mount the chroot and run privileged tools"
-                            android:textColor="@color/grey"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <FrameLayout
-                        android:layout_width="32dp"
-                        android:layout_height="32dp">
-
-                        <android.widget.ProgressBar
-                            android:id="@+id/root_spinner"
-                            style="?android:attr/progressBarStyleSmall"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:visibility="gone" />
-
-                        <ImageView
-                            android:id="@+id/root_status"
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/question"
-                            app:tint="@color/grey" />
-                    </FrameLayout>
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
-                    android:background="@color/light_lite_contrast" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:minHeight="72dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingTop="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingBottom="14dp">
-
-                    <ImageView
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:background="@drawable/settings_icon_bg"
-                        android:padding="10dp"
-                        android:src="@drawable/storage"
-                        app:tint="#C9A227" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <com.google.android.material.textview.MaterialTextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Storage"
-                            android:textColor="?android:attr/textColorPrimary"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                        <com.google.android.material.textview.MaterialTextView
-                            android:id="@+id/storage_subtitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Reads/writes wordlists, scans and captured handshakes"
-                            android:textColor="@color/grey"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <FrameLayout
-                        android:layout_width="32dp"
-                        android:layout_height="32dp">
-
-                        <android.widget.ProgressBar
-                            android:id="@+id/storage_spinner"
-                            style="?android:attr/progressBarStyleSmall"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:visibility="gone" />
-
-                        <ImageView
-                            android:id="@+id/storage_status"
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/question"
-                            app:tint="@color/grey" />
-                    </FrameLayout>
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
-                    android:background="@color/light_lite_contrast" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:minHeight="72dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingTop="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingBottom="14dp">
-
-                    <ImageView
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:background="@drawable/settings_icon_bg"
-                        android:padding="10dp"
-                        android:src="@drawable/bolt"
-                        app:tint="#EF6C00" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <com.google.android.material.textview.MaterialTextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Battery whitelist"
-                            android:textColor="?android:attr/textColorPrimary"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                        <com.google.android.material.textview.MaterialTextView
-                            android:id="@+id/battery_subtitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Keeps long scans alive in the background"
-                            android:textColor="@color/grey"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <FrameLayout
-                        android:layout_width="32dp"
-                        android:layout_height="32dp">
-
-                        <android.widget.ProgressBar
-                            android:id="@+id/battery_spinner"
-                            style="?android:attr/progressBarStyleSmall"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:visibility="gone" />
-
-                        <ImageView
-                            android:id="@+id/battery_status"
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/question"
-                            app:tint="@color/grey" />
-                    </FrameLayout>
-                </LinearLayout>
-            </LinearLayout>
+                android:orientation="vertical" />
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
@@ -293,7 +84,7 @@
                 <ImageView
                     android:layout_width="20dp"
                     android:layout_height="20dp"
-                    android:src="@drawable/question"
+                    android:src="@drawable/info_outlined"
                     app:tint="@color/opxdemon_accent" />
 
                 <com.google.android.material.textview.MaterialTextView
@@ -301,7 +92,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="10dp"
                     android:layout_weight="1"
-                    android:text="A su prompt will appear — tap Grant. Storage may open in Settings if All-files-access is needed."
+                    android:text="Grant what you can, skip what you can't. Everything can be changed later from system settings."
                     android:textColor="?android:attr/textColorPrimary"
                     android:textSize="12sp" />
             </LinearLayout>
@@ -312,10 +103,10 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginTop="20dp"
-            android:text="Grant access"
+            android:text="Grant all permissions"
             android:textSize="15sp"
             app:cornerRadius="16dp"
-            app:icon="@drawable/storage"
+            app:icon="@drawable/shield"
             app:iconGravity="textStart"
             app:iconPadding="8dp" />
     </LinearLayout>

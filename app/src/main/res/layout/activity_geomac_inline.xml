@@ -70,7 +70,7 @@
             android:id="@+id/macaddress"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@android:color/white"
+            android:background="@color/light_contrast"
             android:gravity="center"
             android:padding="5dp"
             android:textColor="@android:color/black"

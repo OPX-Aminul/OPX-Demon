@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="dialog_background_color">#2C2C2C</color>
+    <color name="dialog_background_color">#2C2A24</color>
     <!-- Golden premium palette: soft gold on warm charcoal neutrals. -->
     <color name="opxdemon_accent_contrast">#FFD54F</color>
     <color name="opxdemon_accent">#E6C15A</color>
@@ -12,6 +12,7 @@
     <color name="night_contrast">#FFFFFF</color>
     <color name="night_contrast_2">#D9FFFFFF</color>
     <color name="light_lite_contrast">#303030</color>
+    <color name="intro_scrim">#14C9A227</color>
     <color name="grey">#BCBCBC</color>
     <color name="local_circle">#353535</color>
     <color name="device_img">#FFFFFF</color>

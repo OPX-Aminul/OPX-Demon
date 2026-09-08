@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 115,
-    "versionName": "1.1.5",
-    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.5/app-release.apk",
+    "versionCode": 116,
+    "versionName": "1.1.6",
+    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.6/app-release.apk",
     "sha256": "",
     "size": 0,
     "mandatory": false,
-    "changelog": "OPX-Demon 1.1.5 \u2014 crash fix.\n\n- FIXED: app crashed instantly on open (FrameLayout/LinearLayout cast mismatch between bottom_nav.xml and MainActivity).\n- Bottom navigation works again: Home / Tools / Terminal / Logs / Settings.\n- No other changes; backend logic untouched."
+    "changelog": "OPX-Demon 1.1.6 — golden light theme + full permission wizard.\n\n- App-wide golden backgrounds: white screens are now warm ivory (night mode keeps deep charcoal).\n- App intro fully re-skinned: golden header band, gold logo ring, warm wash on every slide.\n- NEW permission wizard: requests every permission Android 6-16 can grant — runtime groups, all-files access, battery exemption.\n- Live status rows show each grant; granting nothing never blocks the next step.\n- Backend logic unchanged."
   },
   "news": [
     {
