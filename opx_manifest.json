@@ -60,7 +60,7 @@
     "sha256": "",
     "size": 0,
     "mandatory": false,
-    "changelog": "OPX-Demon 1.1.6 — golden light theme + full permission wizard.\n\n- App-wide golden backgrounds: white screens are now warm ivory (night mode keeps deep charcoal).\n- App intro fully re-skinned: golden header band, gold logo ring, warm wash on every slide.\n- NEW permission wizard: requests every permission Android 6-16 can grant — runtime groups, all-files access, battery exemption.\n- Live status rows show each grant; granting nothing never blocks the next step.\n- Backend logic unchanged."
+    "changelog": "OPX-Demon 1.1.6 \u2014 golden light theme + full permission wizard.\n\n- App-wide golden backgrounds: white screens are now warm ivory (night mode keeps deep charcoal).\n- App intro fully re-skinned: golden header band, gold logo ring, warm wash on every slide.\n- NEW permission wizard: requests every permission Android 6-16 can grant \u2014 runtime groups, all-files access, battery exemption.\n- Live status rows show each grant; granting nothing never blocks the next step.\n- Backend logic unchanged."
   },
   "news": [
     {
