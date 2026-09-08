@@ -3,6 +3,7 @@
     <color name="dialog_background_color">#FFF8EC</color>
     <!-- Golden premium palette: rich gold accent on ivory neutrals. -->
     <color name="opxdemon_accent_contrast">#8B6508</color>
+    <color name="opxdemon_on_accent">#FFFFFF</color>
     <color name="opxdemon_accent">#B8860B</color>
     <color name="opxdemon_logo_accent">#D4AF37</color>
     <color name="yellow">#F9A825</color>
@@ -66,4 +67,11 @@
     <color name="tile_red">#FFEBEE</color>
     <color name="tile_teal">#E0F2F1</color>
     <color name="tile_stroke">#33B8860B</color>
+
+    <!-- Arsenal status chips: pastel fills in day, low-alpha glows at night. -->
+    <color name="chip_fill_blue">#F6EEDB</color>
+    <color name="chip_fill_green">#E8F5E9</color>
+    <color name="chip_fill_grey">#ECEFF1</color>
+    <color name="chip_fill_orange">#FFF3E0</color>
+    <color name="chip_fill_purple">#F3E5F5</color>
 </resources>

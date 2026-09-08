@@ -1,30 +1,32 @@
-<resources>
-    <style name="Theme.OpxDemon" parent="Theme.Material3.Dark.NoActionBar">
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      Night theme — BLACK + GOLD.
+      Same component styles as the day theme; the colors.xml qualifier swaps the
+      palette (light_contrast -> near-black, accents -> gold), and the dark
+      parent makes every Material surface default to dark instead of white.
+    -->
+    <style name="Theme.OpxDemon" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/opxdemon_accent</item>
-        <item name="colorPrimaryDark">?attr/colorSurface</item>
+        <item name="colorPrimaryDark">@color/light_contrast</item>
         <item name="colorPrimaryVariant">@color/opxdemon_accent</item>
-        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorOnPrimary">@color/opxdemon_on_accent</item>
         <item name="colorSecondary">@color/opxdemon_accent</item>
         <item name="colorSecondaryVariant">@color/opxdemon_accent_contrast</item>
         <item name="colorOnSecondary">@color/opxdemon_accent_contrast</item>
+        <item name="android:windowBackground">@color/light_contrast</item>
+        <item name="android:colorBackground">@color/light_contrast</item>
+        <item name="colorSurface">@color/light_contrast</item>
+        <item name="colorOnSurface">@color/night_contrast</item>
+        <item name="colorOnBackground">@color/night_contrast</item>
         <item name="android:navigationBarColor">@color/toolbar_color</item>
         <item name="android:statusBarColor">@color/toolbar_color</item>
+        <item name="android:windowLightStatusBar">false</item>
         <item name="switchStyle">@style/Widget.OpxDemon.Switch</item>
         <item name="android:textViewStyle">@style/Widget.OpxDemon.TextView</item>
         <item name="android:buttonStyle">@style/Widget.OpxDemon.Button</item>
         <item name="materialCardViewStyle">@style/Widget.OpxDemon.CardView</item>
         <item name="floatingActionButtonStyle">@style/Widget.OpxDemon.FAB</item>
         <item name="materialAlertDialogTheme">@style/Widget.OpxDemon.AlertDialog</item>
-        <item name="backgroundColor">#1e1e1e</item>
+        <item name="backgroundColor">@color/light_contrast</item>
     </style>
-    <style name="Theme.OpxDemonFloatingDialog" parent="Theme.OpxDemon">
-        <item name="android:background">@android:color/transparent</item>
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:colorBackgroundCacheHint">@null</item>
-        <item name="android:windowIsTranslucent">true</item>
-    </style>
-
 </resources>

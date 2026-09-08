@@ -1,21 +1,27 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      Day theme: light parent with the ivory + gold palette.
+      The night variant (values-night/themes.xml) inherits from this and flips to
+      the black + gold AMOLED palette via DayNight dark overrides.
+    -->
     <style name="Theme.OpxDemon" parent="Theme.Material3.Light.NoActionBar">
         <item name="colorPrimary">@color/opxdemon_accent</item>
         <item name="colorPrimaryDark">?attr/colorSurface</item>
         <item name="colorPrimaryVariant">@color/opxdemon_accent</item>
-        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorOnPrimary">@color/opxdemon_on_accent</item>
         <item name="colorSecondary">@color/opxdemon_accent</item>
         <item name="colorSecondaryVariant">@color/opxdemon_accent_contrast</item>
         <item name="colorOnSecondary">@color/opxdemon_accent_contrast</item>
         <item name="android:navigationBarColor">@color/toolbar_color</item>
         <item name="android:statusBarColor">@color/toolbar_color</item>
+        <item name="android:windowLightStatusBar">true</item>
         <item name="switchStyle">@style/Widget.OpxDemon.Switch</item>
         <item name="android:textViewStyle">@style/Widget.OpxDemon.TextView</item>
         <item name="android:buttonStyle">@style/Widget.OpxDemon.Button</item>
         <item name="materialCardViewStyle">@style/Widget.OpxDemon.CardView</item>
         <item name="floatingActionButtonStyle">@style/Widget.OpxDemon.FAB</item>
         <item name="materialAlertDialogTheme">@style/Widget.OpxDemon.AlertDialog</item>
-        <item name="backgroundColor">#fff</item>
+        <item name="backgroundColor">@color/light_contrast</item>
     </style>
     <style name="Theme.OpxDemonFloatingDialog" parent="Theme.OpxDemon">
         <item name="android:background">@android:color/transparent</item>
@@ -26,5 +32,4 @@
         <item name="android:colorBackgroundCacheHint">@null</item>
         <item name="android:windowIsTranslucent">true</item>
     </style>
-
 </resources>

@@ -1,29 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="dialog_background_color">#2C2A24</color>
+    <color name="dialog_background_color">#1A1712</color>
     <!-- Golden premium palette: soft gold on warm charcoal neutrals. -->
     <color name="opxdemon_accent_contrast">#FFD54F</color>
+    <color name="opxdemon_on_accent">#1C1712</color>
     <color name="opxdemon_accent">#E6C15A</color>
     <color name="opxdemon_logo_accent">#FFD54F</color>
     <color name="yellow">#F9A825</color>
     <color name="red">#C62828</color>
     <color name="green">#2E7D32</color>
-    <color name="light_contrast">#121212</color>
+    <!-- AMOLED black + gold: near-black warm surfaces, gold accents. -->
+    <color name="light_contrast">#0A0A08</color>
     <color name="night_contrast">#FFFFFF</color>
     <color name="night_contrast_2">#D9FFFFFF</color>
-    <color name="light_lite_contrast">#303030</color>
+    <color name="light_lite_contrast">#26221A</color>
     <color name="intro_scrim">#14C9A227</color>
     <color name="grey">#BCBCBC</color>
     <color name="local_circle">#353535</color>
     <color name="device_img">#FFFFFF</color>
     <color name="console">#ffffff</color>
-    <color name="itemcolor">#3A352C</color>
-    <color name="toolbar_color">#2B261F</color>
-    <color name="toolbar_darkness_color">#211D17</color>
+    <color name="itemcolor">#1E1A14</color>
+    <color name="toolbar_color">#14110C</color>
+    <color name="toolbar_darkness_color">#0E0C08</color>
 
     <!-- Header / hero / bottom-nav gradients (theme-aware). -->
-    <color name="toolbar_grad_start">#332D24</color>
-    <color name="toolbar_grad_end">#241F18</color>
+    <color name="toolbar_grad_start">#221D15</color>
+    <color name="toolbar_grad_end">#0F0C08</color>
     <color name="hero_grad_start">#C9A227</color>
     <color name="hero_grad_end">#6E5205</color>
     <color name="nav_indicator_start">#F0D060</color>
@@ -53,7 +55,7 @@
     <color name="row_locked">#61BCBCBC</color>
 
     <!-- Icon tile discs: low-alpha hue so they read as a tinted disc on the dark card. -->
-    <color name="icon_tile_neutral">#2E2A22</color>
+    <color name="icon_tile_neutral">#26211A</color>
     <color name="tile_blue">#33D4AF37</color>
     <color name="tile_cyan">#33C9A227</color>
     <color name="tile_green">#334CAF50</color>
@@ -64,4 +66,11 @@
     <color name="tile_red">#33F44336</color>
     <color name="tile_teal">#33009688</color>
     <color name="tile_stroke">#59E6C15A</color>
+
+    <!-- Arsenal status chips: pastel fills in day, low-alpha glows at night. -->
+    <color name="chip_fill_blue">#33D4AF37</color>
+    <color name="chip_fill_green">#334CAF50</color>
+    <color name="chip_fill_grey">#33BCBCBC</color>
+    <color name="chip_fill_orange">#33FF9800</color>
+    <color name="chip_fill_purple">#339C27B0</color>
 </resources>

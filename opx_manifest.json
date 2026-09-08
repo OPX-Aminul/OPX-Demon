@@ -54,18 +54,18 @@
     }
   },
   "app": {
-    "versionCode": 116,
-    "versionName": "1.1.6",
-    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.6/app-release.apk",
+    "versionCode": 117,
+    "versionName": "1.1.7",
+    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.7/app-release.apk",
     "sha256": "",
     "size": 0,
     "mandatory": false,
-    "changelog": "OPX-Demon 1.1.6 \u2014 golden light theme + full permission wizard.\n\n- App-wide golden backgrounds: white screens are now warm ivory (night mode keeps deep charcoal).\n- App intro fully re-skinned: golden header band, gold logo ring, warm wash on every slide.\n- NEW permission wizard: requests every permission Android 6-16 can grant \u2014 runtime groups, all-files access, battery exemption.\n- Live status rows show each grant; granting nothing never blocks the next step.\n- Backend logic unchanged."
+    "changelog": "OPX-Demon 1.1.7 — true black + gold night theme.\n\n- Night mode: AMOLED black surfaces (#0A0A08) with gold accents; day mode stays ivory + gold.\n- FIXED: night background was grey/white (hardcoded theme background, light-parent surfaces, no windowBackground).\n- Status-bar icons now adapt per mode (dark on ivory, light on black).\n- Arsenal chips theme-aware: pastel in day, gold glows at night.\n- Backend logic untouched."
   },
   "news": [
     {
       "id": 2,
-      "title": "OpxDemon 6.0 \u2014 Rootless engine & Debian",
+      "title": "OpxDemon 6.0 — Rootless engine & Debian",
       "description": "The full toolset now runs without root: OpxDemon boots an arm64 QEMU virtual machine and routes tools into the guest. The chroot moved from Alpine to Debian trixie, the same rootfs the VM boots. Also new: a root-free network scanner (mDNS, SSDP, NetBIOS, SNMP), Cameradar RTSP discovery, a reworked dashboard and VM settings. RouterScan has been removed. arm64-v8a only.",
       "newsDate": "2026-08-09",
       "newsUrl": "https://github.com/OPX-Aminul/OPX-Demon/releases/latest",
