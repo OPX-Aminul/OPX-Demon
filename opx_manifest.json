@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 109,
-    "versionName": "1.0.9",
-    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.0/app-release.apk",
-    "sha256": "9c58cdb672406f374569504c818f925396b0955a13d6797b264e3ae26bfff120",
-    "size": 22031245,
+    "versionCode": 111,
+    "versionName": "1.1.1",
+    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.1/app-release.apk",
+    "sha256": "",
+    "size": 0,
     "mandatory": false,
-    "changelog": "OPX-Demon 1.0.9 \u2014 Terminal shortcut gets its own icon and name.\n\n- Home-screen Terminal launcher is now named Terminal (not OPX-Demon).\n- Terminal uses the new neon prompt logo (with-bg / without-bg).\n- Main OPX-Demon app icon and UI are unchanged.\n- Signed with the same release key \u2014 installs cleanly over 1.0.4\u20131.0.8."
+    "changelog": "OPX-Demon 1.1.1 \u2014 Complete OPX-Demon rebrand.\n\n- All Striker/StrykerOSS references removed from codebase.\n- Chroot URLs point to OPX-Aminul/OPX-Demon releases.\n- Signing key alias updated to opx-demon-release."
   },
   "news": [
     {
