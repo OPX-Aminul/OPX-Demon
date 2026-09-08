@@ -97,7 +97,7 @@
             android:layout_marginTop="10dp"
             android:max="100"
             android:visibility="gone"
-            app:indicatorColor="#3949AB"
+            app:indicatorColor="#C9A227"
             app:trackColor="@color/light_lite_contrast"
             app:trackCornerRadius="2dp" />
 
@@ -161,7 +161,7 @@
             android:letterSpacing="0.08"
             android:text="FINDINGS"
             android:textAllCaps="true"
-            android:textColor="#3949AB"
+            android:textColor="#C9A227"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -310,7 +310,7 @@
                     android:layout_width="36dp"
                     android:layout_height="36dp"
                     android:layout_gravity="center"
-                    android:indeterminateTint="#3949AB"
+                    android:indeterminateTint="#C9A227"
                     android:visibility="gone" />
             </FrameLayout>
 

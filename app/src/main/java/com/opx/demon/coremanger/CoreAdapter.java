@@ -63,7 +63,7 @@ public class CoreAdapter extends RecyclerView.Adapter<CoreAdapter.ViewHolder> {
             h.sourceChip.setTextColor(android.graphics.Color.parseColor("#FB8C00"));
         } else {
             h.sourceChip.setText(R.string.core_mgr_chip_apk);
-            h.sourceChip.setTextColor(android.graphics.Color.parseColor("#1E88E5"));
+            h.sourceChip.setTextColor(android.graphics.Color.parseColor("#C9A227"));
         }
 
         if (temp.isInstalled()) {

@@ -71,7 +71,7 @@
                     android:paddingEnd="6dp"
                     android:paddingBottom="2dp"
                     android:text="@string/core_mgr_chip_apk"
-                    android:textColor="#1E88E5"
+                    android:textColor="#B8860B"
                     android:textSize="9sp"
                     android:textStyle="bold" />
 

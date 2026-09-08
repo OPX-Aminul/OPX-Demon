@@ -335,7 +335,7 @@
                 android:id="@+id/bs_gp_save_btn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:backgroundTint="#1565C0"
+                android:backgroundTint="#C9A227"
                 android:text="@string/arsenal_save"
                 android:textColor="@android:color/white"
                 app:cornerRadius="14dp" />

@@ -54,7 +54,7 @@ public class HubAdapter extends RecyclerView.Adapter<HubAdapter.VH> {
             h.badge.setVisibility(View.VISIBLE);
             h.badge.setText(R.string.arsenal_hub_badge_system);
             h.badge.setBackgroundResource(R.drawable.arsenal_chip_blue);
-            h.badge.setTextColor(0xFF0D47A1);
+            h.badge.setTextColor(0xFF8B6508);
         } else {
             h.badge.setVisibility(View.GONE);
         }

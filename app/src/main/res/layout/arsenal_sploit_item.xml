@@ -14,7 +14,7 @@
     app:cardBackgroundColor="@color/light_contrast"
     app:cardCornerRadius="16dp"
     app:cardElevation="0dp"
-    app:rippleColor="#1A1565C0"
+    app:rippleColor="#1AC9A227"
     app:strokeColor="@color/light_lite_contrast"
     app:strokeWidth="1dp">
 
@@ -105,7 +105,7 @@
                 android:paddingEnd="8dp"
                 android:paddingBottom="3dp"
                 android:text="linux"
-                android:textColor="#0D47A1"
+                android:textColor="#B8860B"
                 android:textSize="10sp"
                 android:textStyle="bold" />
 

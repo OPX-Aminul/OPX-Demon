@@ -87,7 +87,7 @@ public final class VmRingView extends View {
         tilePaint.setStyle(Paint.Style.FILL);
         tilePaint.setColor(color(R.color.light_lite_contrast, 0xFFEDECEC));
 
-        bootColor = color(R.color.opxdemon_accent, 0xFF1565C0);
+        bootColor = color(R.color.opxdemon_accent, 0xFFC9A227);
         stopColor = color(R.color.red, 0xFFC62828);
 
         ringPaint.setStyle(Paint.Style.STROKE);

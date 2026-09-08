@@ -41,7 +41,7 @@
                     android:layout_gravity="center"
                     android:scaleType="fitCenter"
                     android:src="@drawable/wpair"
-                    app:tint="#3949AB" />
+                    app:tint="#C9A227" />
             </FrameLayout>
 
             <LinearLayout
@@ -152,7 +152,7 @@
                 android:layout_height="44dp"
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
-                android:backgroundTint="#3949AB"
+                android:backgroundTint="#C9A227"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:minHeight="0dp"
@@ -227,7 +227,7 @@
             android:letterSpacing="0.08"
             android:text="@string/wpair_dlg_section_audio"
             android:textAllCaps="true"
-            android:textColor="#00897B"
+            android:textColor="#B8860B"
             android:textSize="10sp"
             android:textStyle="bold" />
 
@@ -240,14 +240,14 @@
             android:insetBottom="0dp"
             android:minHeight="0dp"
             android:text="@string/wpair_btn_hfp"
-            android:textColor="#00897B"
+            android:textColor="#B8860B"
             android:textSize="13sp"
             app:cornerRadius="14dp"
             app:icon="@drawable/wpair"
             app:iconGravity="textStart"
             app:iconPadding="6dp"
             app:iconSize="16dp"
-            app:iconTint="#00897B"
+            app:iconTint="#B8860B"
             app:strokeColor="@color/light_lite_contrast" />
 
         <LinearLayout

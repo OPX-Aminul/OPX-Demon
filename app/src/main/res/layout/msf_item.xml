@@ -87,7 +87,7 @@
                     android:paddingEnd="6dp"
                     android:paddingBottom="2dp"
                     android:text="@string/msf_rank_normal"
-                    android:textColor="#1E88E5"
+                    android:textColor="#B8860B"
                     android:textSize="9sp"
                     android:textStyle="bold"
                     android:visibility="gone" />

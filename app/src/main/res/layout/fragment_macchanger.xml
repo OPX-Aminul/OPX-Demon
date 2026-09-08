@@ -66,7 +66,7 @@
                             android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:src="@drawable/wifi"
-                            app:tint="#1565C0" />
+                            app:tint="#C9A227" />
                     </FrameLayout>
 
                     <LinearLayout
@@ -182,7 +182,7 @@
                         app:iconPadding="0dp"
                         app:iconSize="18dp"
                         app:iconTint="@color/grey"
-                        app:rippleColor="#1A3949AB"
+                        app:rippleColor="#1AC9A227"
                         app:strokeColor="@color/light_lite_contrast"
                         app:strokeWidth="1dp" />
                 </LinearLayout>
@@ -242,7 +242,7 @@
                         app:iconPadding="0dp"
                         app:iconSize="18dp"
                         app:iconTint="@color/grey"
-                        app:rippleColor="#1A3949AB"
+                        app:rippleColor="#1AC9A227"
                         app:strokeColor="@color/light_lite_contrast"
                         app:strokeWidth="1dp" />
                 </LinearLayout>
@@ -428,7 +428,7 @@
             app:iconPadding="8dp"
             app:iconSize="18dp"
             app:iconTint="@color/opxdemon_accent"
-            app:rippleColor="#1A3949AB"
+            app:rippleColor="#1AC9A227"
             app:strokeColor="@color/light_lite_contrast"
             app:strokeWidth="1dp" />
 
@@ -436,10 +436,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardBackgroundColor="#1A1565C0"
+            app:cardBackgroundColor="#1AC9A227"
             app:cardCornerRadius="14dp"
             app:cardElevation="0dp"
-            app:strokeColor="#331565C0"
+            app:strokeColor="#33C9A227"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -453,7 +453,7 @@
                     android:layout_height="20dp"
                     android:layout_marginTop="1dp"
                     android:src="@drawable/info_outlined"
-                    app:tint="#1565C0" />
+                    app:tint="#C9A227" />
 
                 <com.google.android.material.textview.MaterialTextView
                     android:layout_width="match_parent"

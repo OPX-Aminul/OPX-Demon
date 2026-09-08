@@ -15,7 +15,7 @@ import com.opx.demon.geomac.model.GeoPin;
 
 public final class GeoMarkers {
 
-    public static final int COLOR_LOOKUP = Color.parseColor("#1565C0");
+    public static final int COLOR_LOOKUP = Color.parseColor("#C9A227");
     public static final int COLOR_SCAN = Color.parseColor("#7E57C2");
     public static final int COLOR_CRACKED_HS = Color.parseColor("#F57C00");
     public static final int COLOR_CRACKED_PIXIE = Color.parseColor("#2E7D32");

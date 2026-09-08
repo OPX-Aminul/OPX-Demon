@@ -65,7 +65,7 @@
                             android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:src="@drawable/usb"
-                            app:tint="#1565C0" />
+                            app:tint="#C9A227" />
                     </FrameLayout>
 
                     <LinearLayout

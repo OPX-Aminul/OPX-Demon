@@ -132,7 +132,7 @@ public class TargetsAdapter extends RecyclerView.Adapter<TargetsAdapter.VH> {
         applyPill(h.sevHigh,     "H", counts[3], 0xFFD32F2F);
         applyPill(h.sevMedium,   "M", counts[2], 0xFFEF6C00);
         applyPill(h.sevLow,      "L", counts[1], 0xFFF9A825);
-        applyPill(h.sevInfo,     "I", counts[0], 0xFF1565C0);
+        applyPill(h.sevInfo,     "I", counts[0], 0xFFC9A227);
     }
 
     private void applyPill(VH.Pill pill, String letter, int count, int color) {

@@ -106,7 +106,7 @@ public class SploitAdapter extends RecyclerView.Adapter<SploitAdapter.VH> {
 
     private int platformChipColor(String platform) {
         if (platform.contains("linux") || platform.contains("unix") || platform.contains("freebsd"))
-            return 0xFF0D47A1;
+            return 0xFF8B6508;
         if (platform.contains("windows")) return 0xFF4A148C;
         if (platform.contains("android") || platform.contains("ios") || platform.contains("macos"))
             return 0xFF1B5E20;

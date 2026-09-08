@@ -33,7 +33,7 @@
                     android:layout_height="22dp"
                     android:layout_gravity="center"
                     android:src="@drawable/webscan"
-                    app:tint="#3949AB" />
+                    app:tint="#C9A227" />
             </FrameLayout>
 
             <com.google.android.material.textview.MaterialTextView
@@ -138,7 +138,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:backgroundTint="#3949AB"
+                android:backgroundTint="#C9A227"
                 android:text="@string/nuclei_dialog_start"
                 android:textColor="@color/light_contrast"
                 app:cornerRadius="14dp"

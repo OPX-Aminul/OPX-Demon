@@ -77,7 +77,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardBackgroundColor="#1A2E7D32"
+            app:cardBackgroundColor="#1AD4AF37"
             app:cardCornerRadius="12dp"
             app:cardElevation="0dp"
             app:strokeWidth="0dp">
@@ -161,7 +161,7 @@
             android:letterSpacing="0.08"
             android:text="WIRELESS"
             android:textAllCaps="true"
-            android:textColor="#3949AB"
+            android:textColor="#C9A227"
             android:textSize="11sp"
             android:textStyle="bold" />
 

@@ -71,7 +71,7 @@
                         android:layout_height="20dp"
                         android:layout_gravity="center"
                         android:src="@drawable/webscan"
-                        app:tint="#1565C0" />
+                        app:tint="#C9A227" />
                 </FrameLayout>
 
                 <LinearLayout
@@ -136,7 +136,7 @@
                         android:layout_height="20dp"
                         android:layout_gravity="center"
                         android:src="@drawable/github"
-                        app:tint="#3949AB" />
+                        app:tint="#C9A227" />
                 </FrameLayout>
 
                 <LinearLayout
@@ -216,7 +216,7 @@
                         android:layout_height="20dp"
                         android:layout_gravity="center"
                         android:src="@drawable/shield"
-                        app:tint="#00897B" />
+                        app:tint="#B8860B" />
                 </FrameLayout>
 
                 <com.google.android.material.textview.MaterialTextView

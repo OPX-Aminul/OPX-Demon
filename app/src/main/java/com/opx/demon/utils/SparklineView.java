@@ -27,7 +27,7 @@ public final class SparklineView extends View {
     private final Path linePath = new Path();
     private final Path fillPath = new Path();
 
-    private int accent = 0xFF1E88E5;
+    private int accent = 0xFFD4AF37;
     private boolean gradientReady;
 
     public SparklineView(Context context) {

@@ -241,7 +241,7 @@
                         android:background="@drawable/settings_icon_bg"
                         android:padding="9dp"
                         android:src="@drawable/webscan"
-                        app:tint="#3949AB" />
+                        app:tint="#C9A227" />
 
                     <com.google.android.material.textview.MaterialTextView
                         android:layout_width="0dp"
@@ -295,7 +295,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            app:cardBackgroundColor="#1A1565C0"
+            app:cardBackgroundColor="#1AD4AF37"
             app:cardCornerRadius="14dp"
             app:cardElevation="0dp"
             app:strokeWidth="0dp">

@@ -41,7 +41,7 @@
                     android:layout_height="48dp"
                     android:layout_gravity="center"
                     android:src="@drawable/usb"
-                    app:tint="#3949AB" />
+                    app:tint="#C9A227" />
             </FrameLayout>
 
             <com.google.android.material.textview.MaterialTextView
@@ -88,7 +88,7 @@
                         android:layout_height="30dp"
                         android:layout_gravity="center"
                         android:src="@drawable/usb"
-                        app:tint="#3949AB" />
+                        app:tint="#C9A227" />
                 </FrameLayout>
 
                 <LinearLayout
@@ -184,7 +184,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
                 android:visibility="gone"
-                app:cardBackgroundColor="#1A1565C0"
+                app:cardBackgroundColor="#1AC9A227"
                 app:cardCornerRadius="14dp"
                 app:cardElevation="0dp"
                 app:strokeWidth="0dp">
@@ -471,7 +471,7 @@
                 app:iconPadding="8dp"
                 app:iconSize="18dp"
                 app:iconTint="@color/opxdemon_accent"
-                app:rippleColor="#1A3949AB"
+                app:rippleColor="#1AC9A227"
                 app:strokeColor="@color/light_lite_contrast"
                 app:strokeWidth="1dp" />
         </LinearLayout>
@@ -494,7 +494,7 @@
             android:textSize="13sp"
             app:cornerRadius="12dp"
             app:elevation="0dp"
-            app:rippleColor="#1A3949AB"
+            app:rippleColor="#1AC9A227"
             app:strokeColor="@color/light_lite_contrast"
             app:strokeWidth="1dp" />
     </LinearLayout>

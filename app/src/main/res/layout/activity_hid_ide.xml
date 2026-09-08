@@ -391,7 +391,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="20dp"
-                    android:backgroundTint="#1565C0"
+                    android:backgroundTint="#C9A227"
                     android:text="@string/ide_caps_open_arsenal"
                     android:textColor="@android:color/white"
                     android:visibility="gone"

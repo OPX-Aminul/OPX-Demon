@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 111,
-    "versionName": "1.1.1",
-    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.1/app-release.apk",
+    "versionCode": 112,
+    "versionName": "1.1.2",
+    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.2/app-release.apk",
     "sha256": "",
     "size": 0,
     "mandatory": false,
-    "changelog": "OPX-Demon 1.1.1 \u2014 Complete OPX-Demon rebrand.\n\n- All Striker/StrykerOSS references removed from codebase.\n- Chroot URLs point to OPX-Aminul/OPX-Demon releases.\n- Signing key alias updated to opx-demon-release."
+    "changelog": "OPX-Demon 1.1.2 \u2014 Golden premium UI.\n\n- Full UI redesign: golden accent, warm ivory light mode + warm charcoal dark mode.\n- Golden animations: sweep ring, hero gradient, pulsing glow.\n- All brand-blue accents replaced with gold across 55 UI files.\n- Backend logic and tool behavior unchanged."
   },
   "news": [
     {

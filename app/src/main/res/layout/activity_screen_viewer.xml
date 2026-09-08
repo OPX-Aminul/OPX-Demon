@@ -20,7 +20,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|start"
         android:layout_margin="12dp"
-        android:background="#A01565C0"
+        android:background="#A0C9A227"
         android:fontFamily="monospace"
         android:paddingStart="10dp"
         android:paddingTop="4dp"

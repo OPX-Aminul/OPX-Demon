@@ -77,7 +77,7 @@ public class AboutFragment extends Fragment {
         List<FeatureCardStack.Feature> features = new ArrayList<>();
         features.add(new FeatureCardStack.Feature(
                 R.string.feat_wifi_title, R.string.feat_wifi_desc, R.drawable.wifi,
-                Color.parseColor("#1E88E5"), Color.parseColor("#0D47A1")));
+                Color.parseColor("#D4AF37"), Color.parseColor("#8B6508")));
         features.add(new FeatureCardStack.Feature(
                 R.string.feat_lan_title, R.string.feat_lan_desc, R.drawable.lan,
                 Color.parseColor("#00ACC1"), Color.parseColor("#00695C")));

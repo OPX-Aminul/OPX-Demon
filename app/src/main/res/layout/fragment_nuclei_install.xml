@@ -45,7 +45,7 @@
             android:letterSpacing="0.08"
             android:text="@string/nuclei_section_status"
             android:textAllCaps="true"
-            android:textColor="#3949AB"
+            android:textColor="#C9A227"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -84,14 +84,14 @@
                             android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:src="@drawable/webscan"
-                            app:tint="#3949AB" />
+                            app:tint="#C9A227" />
 
                         <ProgressBar
                             android:id="@+id/nuclei_status_spinner"
                             android:layout_width="22dp"
                             android:layout_height="22dp"
                             android:layout_gravity="center"
-                            android:indeterminateTint="#3949AB"
+                            android:indeterminateTint="#C9A227"
                             android:visibility="gone" />
                     </FrameLayout>
 
@@ -131,7 +131,7 @@
                     android:layout_marginBottom="14dp"
                     android:indeterminate="true"
                     android:visibility="gone"
-                    app:indicatorColor="#3949AB"
+                    app:indicatorColor="#C9A227"
                     app:trackColor="@color/light_lite_contrast"
                     app:trackCornerRadius="2dp" />
             </LinearLayout>
@@ -184,7 +184,7 @@
             android:letterSpacing="0.08"
             android:text="@string/nuclei_section_log"
             android:textAllCaps="true"
-            android:textColor="#3949AB"
+            android:textColor="#C9A227"
             android:textSize="12sp"
             android:textStyle="bold"
             android:visibility="gone" />
@@ -202,7 +202,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:backgroundTint="#3949AB"
+            android:backgroundTint="#C9A227"
             android:maxLines="1"
             android:text="@string/nuclei_btn_install"
             android:textColor="@color/light_contrast"

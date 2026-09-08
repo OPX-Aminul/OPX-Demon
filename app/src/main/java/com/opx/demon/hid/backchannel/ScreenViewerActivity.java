@@ -164,7 +164,7 @@ public class ScreenViewerActivity extends AppCompatActivity {
             mouseMode = true;
             if (mouseIndicator != null) mouseIndicator.setVisibility(View.VISIBLE);
             if (mouseBtn != null) mouseBtn.setBackgroundTintList(
-                    android.content.res.ColorStateList.valueOf(0xFF1565C0));
+                    android.content.res.ColorStateList.valueOf(0xFFC9A227));
         }
     }
 

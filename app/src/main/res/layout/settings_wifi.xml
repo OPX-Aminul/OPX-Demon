@@ -61,7 +61,7 @@
                         android:background="@drawable/settings_icon_bg"
                         android:padding="10dp"
                         android:src="@drawable/wifi"
-                        app:tint="#1565C0" />
+                        app:tint="#C9A227" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -271,7 +271,7 @@
                         android:background="@drawable/settings_icon_bg"
                         android:padding="10dp"
                         android:src="@drawable/autopixie"
-                        app:tint="#1E88E5" />
+                        app:tint="#C9A227" />
 
                     <LinearLayout
                         android:layout_width="0dp"

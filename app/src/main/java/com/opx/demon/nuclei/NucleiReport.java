@@ -248,7 +248,7 @@ public class NucleiReport extends Fragment {
         emptySpinner.setVisibility(View.GONE);
         emptyIconWrap.setBackgroundResource(R.drawable.dashboard_tile_bg_indigo);
         emptyIcon.setImageResource(R.drawable.search);
-        emptyIcon.setColorFilter(0xFF3949AB, PorterDuff.Mode.SRC_IN);
+        emptyIcon.setColorFilter(0xFFC9A227, PorterDuff.Mode.SRC_IN);
         emptyTitle.setText("No matches");
         emptySubtitle.setText("No findings match the current search/filter.");
     }
@@ -341,7 +341,7 @@ public class NucleiReport extends Fragment {
         applyPill(view.findViewById(R.id.report_sev_high), "H", counts[3], 0xFFD32F2F);
         applyPill(view.findViewById(R.id.report_sev_medium), "M", counts[2], 0xFFEF6C00);
         applyPill(view.findViewById(R.id.report_sev_low), "L", counts[1], 0xFFF9A825);
-        applyPill(view.findViewById(R.id.report_sev_info), "I", counts[0], 0xFF1565C0);
+        applyPill(view.findViewById(R.id.report_sev_info), "I", counts[0], 0xFFC9A227);
     }
 
     private void applyPill(View root, String letter, int count, int color) {

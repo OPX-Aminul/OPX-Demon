@@ -268,7 +268,7 @@
                         android:layout_height="40dp"
                         android:layout_gravity="center"
                         android:src="@drawable/webscan"
-                        app:tint="#3949AB" />
+                        app:tint="#C9A227" />
                 </FrameLayout>
 
                 <com.google.android.material.textview.MaterialTextView
@@ -301,7 +301,7 @@
         android:contentDescription="@string/nuclei_fab_new"
         android:text="@string/nuclei_fab_new"
         android:textColor="@color/light_contrast"
-        app:backgroundTint="#3949AB"
+        app:backgroundTint="#C9A227"
         app:icon="@drawable/add"
         app:iconTint="@color/light_contrast" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
