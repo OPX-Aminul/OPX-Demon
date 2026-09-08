@@ -60,7 +60,7 @@
     "sha256": "",
     "size": 0,
     "mandatory": false,
-"changelog": "OPX-Demon 1.1.4 — Bottom navigation fix + full app polish.\n\n- FIXED: bottom navigation buttons were not responding (include-id bug).\n- Bottom nav redesigned: Home / Tools / Terminal / Logs / Settings — all functional.\n- New Tools sheet: every tool listed in one gold-themed grid.\n- Gold theme sweep: logs, chips, handshakes, settings, VNC, dashboard details.\n- Backend logic unchanged."
+    "changelog": "OPX-Demon 1.1.4 \u2014 Bottom navigation fix + full app polish.\n\n- FIXED: bottom navigation buttons were not responding (include-id bug).\n- Bottom nav redesigned: Home / Tools / Terminal / Logs / Settings \u2014 all functional.\n- New Tools sheet: every tool listed in one gold-themed grid.\n- Gold theme sweep: logs, chips, handshakes, settings, VNC, dashboard details.\n- Backend logic unchanged."
   },
   "news": [
     {
