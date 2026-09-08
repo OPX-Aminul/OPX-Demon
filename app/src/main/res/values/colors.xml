@@ -20,6 +20,16 @@
     <color name="toolbar_color">#F6F0E3</color>
     <color name="toolbar_darkness_color">#FDFBF4</color>
 
+    <!-- Header / hero / bottom-nav gradients (theme-aware). -->
+    <color name="toolbar_grad_start">#FDF8EC</color>
+    <color name="toolbar_grad_end">#F1E3C0</color>
+    <color name="hero_grad_start">#C9A227</color>
+    <color name="hero_grad_end">#8B6508</color>
+    <color name="nav_indicator_start">#E8C64A</color>
+    <color name="nav_indicator_end">#B8860B</color>
+    <color name="nav_plus_start">#E8C64A</color>
+    <color name="nav_plus_end">#A67C00</color>
+
     <!-- Per-tool accent tokens (previously scattered hardcoded hex across ~40 layouts). -->
     <color name="accent_wifi">#B8860B</color>
     <color name="accent_local">#AB47BC</color>
@@ -53,4 +63,5 @@
     <color name="tile_purple">#F3E5F5</color>
     <color name="tile_red">#FFEBEE</color>
     <color name="tile_teal">#E0F2F1</color>
+    <color name="tile_stroke">#33B8860B</color>
 </resources>

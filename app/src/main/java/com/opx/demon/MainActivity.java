@@ -78,6 +78,19 @@ public class MainActivity extends AppCompatActivity {
     private static ImageView menu;
     private static ImageView settings;
     private static int lastSelectedItemId = 0;
+
+    // Animated bottom navigation bar
+    private static View bottomNavIndicator;
+    private static LinearLayout bottomNavBar;
+    private static int currentNavSlot = -1;
+    private static final int[] NAV_ITEM_IDS = {
+            R.id.nav_home, R.id.nav_terminal, R.id.nav_add, R.id.nav_logs, R.id.nav_about};
+    private static final int[] NAV_ICON_IDS = {
+            R.id.nav_home_icon, R.id.nav_terminal_icon, R.id.nav_add_icon,
+            R.id.nav_logs_icon, R.id.nav_about_icon};
+    private static final int[] NAV_LABEL_IDS = {
+            R.id.nav_home_label, R.id.nav_terminal_label, R.id.nav_add_label,
+            R.id.nav_logs_label, R.id.nav_about_label};
     private Core core;
     private static FragmentManager fragmentManager;
     private TempFragment tempFragment;
@@ -145,20 +158,8 @@ public class MainActivity extends AppCompatActivity {
 
         logo = findViewById(R.id.opxdemon_main_logo);
         menu = findViewById(R.id.menu_img);
-        menu.setOnClickListener(view -> {
-            if (core != null) {
-                if (core.getBoolean("nav_type")) {
-                    drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
-                } else {
-                    drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED);
-                    if (drawer.isDrawerOpen(GravityCompat.START)) {
-                        drawer.closeDrawer(GravityCompat.START);
-                    } else {
-                        drawer.openDrawer(GravityCompat.START);
-                    }
-                }
-            }
-        });
+        menu.setOnClickListener(view -> openDrawer());
+        wireBottomNav();
 
         View navView = findViewById(R.id.nav_view);
         wireDrawerRows(navView, drawer);
@@ -191,6 +192,90 @@ public class MainActivity extends AppCompatActivity {
         boolean openUpdate = getIntent() != null
                 && getIntent().getBooleanExtra(EXTRA_OPEN_UPDATE, false);
         UpdateManager.checkAndPrompt(this, openUpdate);
+    }
+
+    private void openDrawer() {
+        DrawerLayout drawer = findViewById(R.id.drawerLayout);
+        if (drawer == null) return;
+        if (core != null && core.getBoolean("nav_type")) {
+            drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
+            return;
+        }
+        drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED);
+        if (drawer.isDrawerOpen(GravityCompat.START)) {
+            drawer.closeDrawer(GravityCompat.START);
+        } else {
+            drawer.openDrawer(GravityCompat.START);
+        }
+    }
+
+    /** Wire the animated bottom navigation bar: destinations + sliding gold pill. */
+    private void wireBottomNav() {
+        bottomNavBar = findViewById(R.id.bottom_nav_bar);
+        if (bottomNavBar == null) return;
+        bottomNavIndicator = findViewById(R.id.bottom_nav_indicator);
+        View home = findViewById(R.id.nav_home);
+        View term = findViewById(R.id.nav_terminal);
+        View add = findViewById(R.id.nav_add);
+        View logs = findViewById(R.id.nav_logs);
+        View about = findViewById(R.id.nav_about);
+        if (home != null) home.setOnClickListener(v -> receiver.changeFragment(R.id.dasboard_item));
+        if (term != null) term.setOnClickListener(v -> receiver.changeFragment(R.id.terminal_item));
+        if (add != null) add.setOnClickListener(v -> openDrawer());
+        if (logs != null) logs.setOnClickListener(v -> receiver.changeFragment(R.id.logs_item));
+        if (about != null) about.setOnClickListener(v -> receiver.changeFragment(R.id.about_item));
+    }
+
+    private static int bottomNavSlotFor(int drawerItemId) {
+        if (drawerItemId == R.id.dasboard_item) return 0;
+        if (drawerItemId == R.id.terminal_item) return 1;
+        if (drawerItemId == R.id.logs_item) return 3;
+        if (drawerItemId == R.id.about_item) return 4;
+        return 2; // every other tool highlights the Tools hub button
+    }
+
+    /** Called whenever the active drawer destination changes — syncs the bottom nav. */
+    private static void selectBottomNav(int drawerItemId) {
+        if (bottomNavBar == null || bottomNavIndicator == null) return;
+        animateBottomNav(bottomNavSlotFor(drawerItemId));
+    }
+
+    private static void animateBottomNav(int slot) {
+        if (bottomNavBar == null || bottomNavIndicator == null) return;
+        currentNavSlot = slot;
+        android.content.Context ctx = bottomNavBar.getContext();
+        int activeColor = androidx.core.content.ContextCompat.getColor(ctx, R.color.opxdemon_accent);
+        int idleColor = androidx.core.content.ContextCompat.getColor(ctx, R.color.grey);
+        bottomNavBar.post(() -> {
+            float barWidth = bottomNavBar.getWidth();
+            if (barWidth <= 0) return;
+            float slotWidth = barWidth / NAV_ITEM_IDS.length;
+            float targetX = slot * slotWidth + (slotWidth - bottomNavIndicator.getWidth()) / 2f;
+            bottomNavIndicator.animate()
+                    .translationX(targetX)
+                    .alpha(1f)
+                    .setDuration(320)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f))
+                    .start();
+            for (int i = 0; i < NAV_ITEM_IDS.length; i++) {
+                boolean active = i == slot;
+                View item = bottomNavBar.findViewById(NAV_ITEM_IDS[i]);
+                ImageView icon = item == null ? null : item.findViewById(NAV_ICON_IDS[i]);
+                android.widget.TextView label = item == null ? null : item.findViewById(NAV_LABEL_IDS[i]);
+                if (icon != null) {
+                    if (i != 2) icon.setColorFilter(active ? activeColor : idleColor);
+                    icon.animate().scaleX(active ? 1.18f : 1f).scaleY(active ? 1.18f : 1f)
+                            .setDuration(240)
+                            .setInterpolator(new android.view.animation.OvershootInterpolator(1.6f))
+                            .start();
+                }
+                if (label != null) {
+                    label.setTextColor(active ? activeColor : idleColor);
+                    label.setTypeface(null, active ? android.graphics.Typeface.BOLD
+                            : android.graphics.Typeface.NORMAL);
+                }
+            }
+        });
     }
 
     private void refreshEngineStatus() {
@@ -790,6 +875,7 @@ public class MainActivity extends AppCompatActivity {
             View next = drawerRows.get(itemId);
             if (next != null) styleDrawerRow(next, true, itemId);
             lastSelectedItemId = itemId;
+            MainActivity.selectBottomNav(itemId);
         }
 
         private void styleDrawerRow(View row, boolean active, int itemId) {

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 1dp gold-tinted hairline on top -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/nav_indicator_end" />
+        </shape>
+    </item>
+    <!-- body fills the rest -->
+    <item android:top="1dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/toolbar_color" />
+        </shape>
+    </item>
+</layer-list>
