@@ -4,10 +4,6 @@ name: Build APK
 # Binaries are downloaded at runtime from the all-core-file release.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/build-apk.yml'
   workflow_run:
     workflows: ["Build & Update Release"]
     types: [completed]
@@ -17,7 +13,7 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: write
 

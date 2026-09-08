@@ -8,7 +8,6 @@ name: Build & Update Release
 #
 # A successful run also fires the Build APK workflow (workflow_run) for the
 # version in app/build.gradle, which publishes the signed APK release.
-# Trigger: rebuild binaries + APK for v1.1.1 rebrand release.
 
 on:
   push:
