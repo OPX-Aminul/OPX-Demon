@@ -4,6 +4,10 @@ name: Build APK
 # Binaries are downloaded at runtime from the all-core-file release.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-apk.yml'
   workflow_run:
     workflows: ["Build & Update Release"]
     types: [completed]
