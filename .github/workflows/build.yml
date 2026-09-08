@@ -9,7 +9,7 @@ name: Build & Update Release
 # A successful run also fires the Build APK workflow (workflow_run) for the
 # version in app/build.gradle, which publishes the signed APK release.
 #
-# 1.1.4 trigger bump: nav fix + full polish release.
+# 1.1.5 trigger bump: crash fix release.
 
 on:
   push:

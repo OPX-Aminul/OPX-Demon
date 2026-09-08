@@ -84,6 +84,7 @@ public class MainActivity extends AppCompatActivity {
     // pill indicator over the tab row), so a LinearLayout cast here would crash
     // with ClassCastException the moment the activity inflates it.
     private static View bottomNavBar;
+    private static View bottomNavIndicator;
     private static int currentNavSlot = -1;
     private static final int[] NAV_ITEM_IDS = {
             R.id.nav_home, R.id.nav_tools, R.id.nav_terminal, R.id.nav_logs, R.id.nav_settings};
