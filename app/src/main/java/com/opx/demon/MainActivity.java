@@ -79,9 +79,11 @@ public class MainActivity extends AppCompatActivity {
     private static ImageView settings;
     private static int lastSelectedItemId = 0;
 
-    // Animated bottom navigation bar — five functional destinations
-    private static View bottomNavIndicator;
-    private static LinearLayout bottomNavBar;
+    // Animated bottom navigation bar — five functional destinations.
+    // Typed as View: bottom_nav.xml's root is a FrameLayout (it layers the sliding
+    // pill indicator over the tab row), so a LinearLayout cast here would crash
+    // with ClassCastException the moment the activity inflates it.
+    private static View bottomNavBar;
     private static int currentNavSlot = -1;
     private static final int[] NAV_ITEM_IDS = {
             R.id.nav_home, R.id.nav_tools, R.id.nav_terminal, R.id.nav_logs, R.id.nav_settings};
