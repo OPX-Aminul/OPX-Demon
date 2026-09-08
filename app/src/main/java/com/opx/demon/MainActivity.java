@@ -79,18 +79,18 @@ public class MainActivity extends AppCompatActivity {
     private static ImageView settings;
     private static int lastSelectedItemId = 0;
 
-    // Animated bottom navigation bar
+    // Animated bottom navigation bar — five functional destinations
     private static View bottomNavIndicator;
     private static LinearLayout bottomNavBar;
     private static int currentNavSlot = -1;
     private static final int[] NAV_ITEM_IDS = {
-            R.id.nav_home, R.id.nav_terminal, R.id.nav_add, R.id.nav_logs, R.id.nav_about};
+            R.id.nav_home, R.id.nav_tools, R.id.nav_terminal, R.id.nav_logs, R.id.nav_settings};
     private static final int[] NAV_ICON_IDS = {
-            R.id.nav_home_icon, R.id.nav_terminal_icon, R.id.nav_add_icon,
-            R.id.nav_logs_icon, R.id.nav_about_icon};
+            R.id.nav_home_icon, R.id.nav_tools_icon, R.id.nav_terminal_icon,
+            R.id.nav_logs_icon, R.id.nav_settings_icon};
     private static final int[] NAV_LABEL_IDS = {
-            R.id.nav_home_label, R.id.nav_terminal_label, R.id.nav_add_label,
-            R.id.nav_logs_label, R.id.nav_about_label};
+            R.id.nav_home_label, R.id.nav_tools_label, R.id.nav_terminal_label,
+            R.id.nav_logs_label, R.id.nav_settings_label};
     private Core core;
     private static FragmentManager fragmentManager;
     private TempFragment tempFragment;
@@ -215,23 +215,61 @@ public class MainActivity extends AppCompatActivity {
         if (bottomNavBar == null) return;
         bottomNavIndicator = findViewById(R.id.bottom_nav_indicator);
         View home = findViewById(R.id.nav_home);
+        View tools = findViewById(R.id.nav_tools);
         View term = findViewById(R.id.nav_terminal);
-        View add = findViewById(R.id.nav_add);
         View logs = findViewById(R.id.nav_logs);
-        View about = findViewById(R.id.nav_about);
+        View set = findViewById(R.id.nav_settings);
         if (home != null) home.setOnClickListener(v -> receiver.changeFragment(R.id.dasboard_item));
+        if (tools != null) tools.setOnClickListener(v -> openToolsSheet());
         if (term != null) term.setOnClickListener(v -> receiver.changeFragment(R.id.terminal_item));
-        if (add != null) add.setOnClickListener(v -> openDrawer());
         if (logs != null) logs.setOnClickListener(v -> receiver.changeFragment(R.id.logs_item));
-        if (about != null) about.setOnClickListener(v -> receiver.changeFragment(R.id.about_item));
+        if (set != null) set.setOnClickListener(v -> openSettings());
+    }
+
+    /** Sentinel drawer id that highlights the Settings slot in the bottom nav. */
+    private static final int SETTINGS_SLOT_ITEM = -7;
+
+    /** Bottom sheet listing every tool — mirrors the drawer, gold-themed. */
+    private void openToolsSheet() {
+        BottomSheetDialog sheet = new BottomSheetDialog(this,
+                R.style.ThemeOverlay_OpxDemon_BottomSheetDialog);
+        View content = getLayoutInflater().inflate(R.layout.tools_sheet, null);
+        LinearLayout grid = content.findViewById(R.id.tools_grid);
+        if (grid != null) {
+            android.view.LayoutInflater li = getLayoutInflater();
+            for (java.util.Map.Entry<Integer, DrawerSpec> e : DRAWER_SPECS.entrySet()) {
+                if (e.getKey() == R.id.dasboard_item || e.getKey() == R.id.logs_item
+                        || e.getKey() == R.id.about_item || e.getKey() == R.id.terminal_item) {
+                    continue;
+                }
+                View cell = li.inflate(R.layout.tools_sheet_item, grid, false);
+                ImageView icon = cell.findViewById(R.id.tool_cell_icon);
+                TextView label = cell.findViewById(R.id.tool_cell_label);
+                DrawerSpec spec = e.getValue();
+                if (icon != null) {
+                    icon.setImageResource(spec.iconRes);
+                    icon.setColorFilter(ContextCompat.getColor(this, R.color.opxdemon_accent));
+                }
+                if (label != null) label.setText(spec.title);
+                boolean locked = rootlessEngine && ROOT_ONLY_IDS.contains(e.getKey());
+                cell.setAlpha(locked ? 0.38f : 1f);
+                cell.setOnClickListener(v -> {
+                    sheet.dismiss();
+                    receiver.changeFragment(e.getKey());
+                });
+                grid.addView(cell);
+            }
+        }
+        sheet.setContentView(content);
+        sheet.show();
     }
 
     private static int bottomNavSlotFor(int drawerItemId) {
+        if (drawerItemId == SETTINGS_SLOT_ITEM) return 4;
         if (drawerItemId == R.id.dasboard_item) return 0;
-        if (drawerItemId == R.id.terminal_item) return 1;
+        if (drawerItemId == R.id.terminal_item) return 2;
         if (drawerItemId == R.id.logs_item) return 3;
-        if (drawerItemId == R.id.about_item) return 4;
-        return 2; // every other tool highlights the Tools hub button
+        return 1; // every other tool highlights the Tools hub
     }
 
     /** Called whenever the active drawer destination changes — syncs the bottom nav. */
@@ -263,8 +301,8 @@ public class MainActivity extends AppCompatActivity {
                 ImageView icon = item == null ? null : item.findViewById(NAV_ICON_IDS[i]);
                 android.widget.TextView label = item == null ? null : item.findViewById(NAV_LABEL_IDS[i]);
                 if (icon != null) {
-                    if (i != 2) icon.setColorFilter(active ? activeColor : idleColor);
-                    icon.animate().scaleX(active ? 1.18f : 1f).scaleY(active ? 1.18f : 1f)
+                    icon.setColorFilter(active ? activeColor : idleColor);
+                    icon.animate().scaleX(active ? 1.15f : 1f).scaleY(active ? 1.15f : 1f)
                             .setDuration(240)
                             .setInterpolator(new android.view.animation.OvershootInterpolator(1.6f))
                             .start();
@@ -774,7 +812,7 @@ public class MainActivity extends AppCompatActivity {
                 .setCustomAnimations(R.anim.settings_open_enter, R.anim.settings_open_exit)
                 .replace(R.id.flContent, new SettingsNew())
                 .commit();
-        receiver.changeFragmentQuiet(R.id.dasboard_item);
+        MainActivity.selectBottomNav(SETTINGS_SLOT_ITEM);
     }
 
     private void closeSettings() {
@@ -1007,7 +1045,7 @@ public class MainActivity extends AppCompatActivity {
         m.put(R.id.terminal_item,     new DrawerSpec("Terminal",         R.drawable.terminal,    0xFFC9A227));
         m.put(R.id.logs_item,         new DrawerSpec("Logs",             R.drawable.bug_report,  0xFFC9A227));
         m.put(R.id.wifi_item,         new DrawerSpec("WiFi networks",    R.drawable.wifi,        0xFFC9A227));
-        m.put(R.id.hs_item,           new DrawerSpec("Handshakes",       R.drawable.storage,     0xFF00897B));
+        m.put(R.id.hs_item,           new DrawerSpec("Handshakes",       R.drawable.storage,     0xFFC9A227));
         m.put(R.id.macchanger_item,   new DrawerSpec("MAC changer",      R.drawable.password,    0xFFC9A227));
         m.put(R.id.wpair_item,        new DrawerSpec("WhisperPair (BLE)", R.drawable.wpair,      0xFFC9A227));
         m.put(R.id.lan_item,          new DrawerSpec("Local network",    R.drawable.lan,         0xFFAB47BC));

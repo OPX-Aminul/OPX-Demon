@@ -216,7 +216,7 @@
             android:letterSpacing="0.08"
             android:text="@string/vm_section_autotune"
             android:textAllCaps="true"
-            android:textColor="#00897B"
+            android:textColor="#C9A227"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -242,7 +242,7 @@
                     <ImageView
                         style="@style/VmRowIcon"
                         android:src="@drawable/bolt"
-                        app:tint="#00897B" />
+                        app:tint="#C9A227" />
 
                     <LinearLayout style="@style/VmRowText">
 
@@ -272,7 +272,7 @@
                     <ImageView
                         style="@style/VmRowIcon"
                         android:src="@drawable/rocket_launch"
-                        app:tint="#00897B" />
+                        app:tint="#C9A227" />
 
                     <LinearLayout style="@style/VmRowText">
 

@@ -31,7 +31,7 @@
                 android:layout_height="22dp"
                 android:layout_gravity="center"
                 android:src="@drawable/file"
-                app:tint="#FB8C00" />
+                app:tint="@color/opxdemon_accent" />
         </FrameLayout>
 
         <LinearLayout

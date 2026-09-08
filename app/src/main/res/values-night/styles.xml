@@ -56,7 +56,7 @@
     </style>
 
     <style name="ThemeOverlay.App.Switch" parent="">
-        <item name="colorOnSurface">#3F99FF</item>
+        <item name="colorOnSurface">#B5C9A227</item>
         <item name="colorSecondary">@color/opxdemon_accent</item>
     </style>
 </resources>

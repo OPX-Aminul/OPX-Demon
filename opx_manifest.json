@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 113,
-    "versionName": "1.1.3",
-    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.3/app-release.apk",
+    "versionCode": 114,
+    "versionName": "1.1.4",
+    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.4/app-release.apk",
     "sha256": "",
     "size": 0,
     "mandatory": false,
-    "changelog": "OPX-Demon 1.1.3 \u2014 Full UI redesign.\n\n- New animated bottom navigation bar with gold pill indicator (Home / Terminal / Tools / Logs / About).\n- New gold gradient header with hamburger + settings chips.\n- Redesigned dashboard: gold hero card with glow ring, new tool grid, section markers.\n- Redesigned drawer, loading/error screens, icon tiles across every screen.\n- Backend logic and tool behavior unchanged."
+"changelog": "OPX-Demon 1.1.4 — Bottom navigation fix + full app polish.\n\n- FIXED: bottom navigation buttons were not responding (include-id bug).\n- Bottom nav redesigned: Home / Tools / Terminal / Logs / Settings — all functional.\n- New Tools sheet: every tool listed in one gold-themed grid.\n- Gold theme sweep: logs, chips, handshakes, settings, VNC, dashboard details.\n- Backend logic unchanged."
   },
   "news": [
     {

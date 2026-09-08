@@ -211,7 +211,7 @@
             android:letterSpacing="0.08"
             android:text="BEFORE WE START"
             android:textAllCaps="true"
-            android:textColor="#00897B"
+            android:textColor="#C9A227"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -299,7 +299,7 @@
                         android:background="@drawable/settings_icon_bg"
                         android:padding="10dp"
                         android:src="@drawable/done"
-                        app:tint="#00897B" />
+                        app:tint="#C9A227" />
 
                     <com.google.android.material.textview.MaterialTextView
                         android:id="@+id/text2"

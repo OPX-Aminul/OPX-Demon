@@ -857,7 +857,7 @@
                                 android:layout_height="28dp"
                                 android:layout_gravity="center"
                                 android:src="@drawable/file"
-                                app:tint="#00897B" />
+                                app:tint="#C9A227" />
                         </FrameLayout>
 
                         <com.google.android.material.textview.MaterialTextView

@@ -304,7 +304,7 @@
                         android:background="@drawable/settings_icon_bg"
                         android:padding="10dp"
                         android:src="@drawable/shield"
-                        app:tint="#00897B" />
+                        app:tint="#C9A227" />
 
                     <LinearLayout
                         android:layout_width="0dp"

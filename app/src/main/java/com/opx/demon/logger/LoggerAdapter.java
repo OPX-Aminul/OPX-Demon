@@ -27,15 +27,15 @@ import java.util.Locale;
 
 public class LoggerAdapter extends RecyclerView.Adapter<LoggerAdapter.ViewHolder> {
 
-    private static final int C_CMD = Color.parseColor("#4FC3F7");
+    private static final int C_CMD = Color.parseColor("#FFD54F");
     private static final int C_OUT = Color.parseColor("#CFD8DC");
     private static final int C_ERR = Color.parseColor("#EF5350");
     private static final int C_WARN = Color.parseColor("#FFB74D");
     private static final int C_OK = Color.parseColor("#81C784");
     private static final int C_INFO = Color.parseColor("#90A4AE");
-    private static final int C_TIME = Color.parseColor("#607D8B");
-    private static final int C_TOOL = Color.parseColor("#B39DDB");
-    private static final int C_HIGHLIGHT = Color.parseColor("#664FC3F7");
+    private static final int C_TIME = Color.parseColor("#C9A227");
+    private static final int C_TOOL = Color.parseColor("#D4AF37");
+    private static final int C_HIGHLIGHT = Color.parseColor("#66FFD54F");
 
     private final Context context;
     private final List<LogEntry> items;
