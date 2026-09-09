@@ -9,7 +9,7 @@ name: Build & Update Release
 # A successful run also fires the Build APK workflow (workflow_run) for the
 # version in app/build.gradle, which publishes the signed APK release.
 #
-# 1.1.7 trigger bump: true black + gold night theme.
+# 1.1.8 trigger bump: AMOLED layering — true black window + lifted gold surfaces.
 
 on:
   push:

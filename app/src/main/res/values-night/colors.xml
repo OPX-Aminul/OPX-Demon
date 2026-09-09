@@ -9,8 +9,11 @@
     <color name="yellow">#F9A825</color>
     <color name="red">#C62828</color>
     <color name="green">#2E7D32</color>
-    <!-- AMOLED black + gold: near-black warm surfaces, gold accents. -->
-    <color name="light_contrast">#0A0A08</color>
+    <!-- AMOLED black + gold: TRUE black window base; cards lift one step (#16130D)
+         so every surface reads as a layer instead of vanishing into the window. -->
+    <color name="light_contrast">#16130D</color>
+    <!-- Window base (true black) so lifted cards/sheets (#16130D) read as layers. -->
+    <color name="night_window">#0A0A08</color>
     <color name="night_contrast">#FFFFFF</color>
     <color name="night_contrast_2">#D9FFFFFF</color>
     <color name="light_lite_contrast">#26221A</color>
@@ -55,7 +58,7 @@
     <color name="row_locked">#61BCBCBC</color>
 
     <!-- Icon tile discs: low-alpha hue so they read as a tinted disc on the dark card. -->
-    <color name="icon_tile_neutral">#26211A</color>
+    <color name="icon_tile_neutral">#221E17</color>
     <color name="tile_blue">#33D4AF37</color>
     <color name="tile_cyan">#33C9A227</color>
     <color name="tile_green">#334CAF50</color>
@@ -73,4 +76,8 @@
     <color name="chip_fill_grey">#33BCBCBC</color>
     <color name="chip_fill_orange">#33FF9800</color>
     <color name="chip_fill_purple">#339C27B0</color>
+
+    <!-- Tonal chip: gold-tinted glass at night. -->
+    <color name="tonal_chip_bg">#24C9A227</color>
+    <color name="tonal_chip_fg">#E6C15A</color>
 </resources>

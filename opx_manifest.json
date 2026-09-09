@@ -54,13 +54,13 @@
     }
   },
   "app": {
-    "versionCode": 117,
-    "versionName": "1.1.7",
-    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.7/app-release.apk",
+    "versionCode": 118,
+    "versionName": "1.1.8",
+    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.8/app-release.apk",
     "sha256": "",
     "size": 0,
     "mandatory": false,
-    "changelog": "OPX-Demon 1.1.7 \u2014 true black + gold night theme.\n\n- Night mode: AMOLED black surfaces (#0A0A08) with gold accents; day mode stays ivory + gold.\n- FIXED: night background was grey/white (hardcoded theme background, light-parent surfaces, no windowBackground).\n- Status-bar icons now adapt per mode (dark on ivory, light on black).\n- Arsenal chips theme-aware: pastel in day, gold glows at night.\n- Backend logic untouched."
+    "changelog": "OPX-Demon 1.1.8 \u2014 AMOLED layering for night mode.\n\n- Night mode depth: window base is true black; cards, sheets and tiles now lift one step so every screen has real layering (before, surfaces vanished into the background).\n- Day mode unchanged (ivory + gold).\n- FIXED: two day-only hardcoded leaks — arsenal Add-to-Hub chip and drawer activated row now follow the theme.\n- Backend logic untouched."
   },
   "news": [
     {

@@ -265,11 +265,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:backgroundTint="#FFF3E0"
+            android:backgroundTint="@color/tonal_chip_bg"
             android:text="@string/arsenal_db_add_to_hub"
-            android:textColor="#E65100"
+            android:textColor="@color/tonal_chip_fg"
             app:cornerRadius="14dp"
             app:icon="@drawable/motion_blur"
-            app:iconTint="#E65100" />
+            app:iconTint="@color/tonal_chip_fg" />
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

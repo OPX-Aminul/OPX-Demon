@@ -13,13 +13,13 @@
         <item name="colorSecondary">@color/opxdemon_accent</item>
         <item name="colorSecondaryVariant">@color/opxdemon_accent_contrast</item>
         <item name="colorOnSecondary">@color/opxdemon_accent_contrast</item>
-        <item name="android:windowBackground">@color/light_contrast</item>
-        <item name="android:colorBackground">@color/light_contrast</item>
+        <item name="android:windowBackground">@color/night_window</item>
+        <item name="android:colorBackground">@color/night_window</item>
         <item name="colorSurface">@color/light_contrast</item>
         <item name="colorOnSurface">@color/night_contrast</item>
         <item name="colorOnBackground">@color/night_contrast</item>
-        <item name="android:navigationBarColor">@color/toolbar_color</item>
-        <item name="android:statusBarColor">@color/toolbar_color</item>
+        <item name="android:navigationBarColor">@color/night_window</item>
+        <item name="android:statusBarColor">@color/night_window</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="switchStyle">@style/Widget.OpxDemon.Switch</item>
         <item name="android:textViewStyle">@style/Widget.OpxDemon.TextView</item>
@@ -27,6 +27,6 @@
         <item name="materialCardViewStyle">@style/Widget.OpxDemon.CardView</item>
         <item name="floatingActionButtonStyle">@style/Widget.OpxDemon.FAB</item>
         <item name="materialAlertDialogTheme">@style/Widget.OpxDemon.AlertDialog</item>
-        <item name="backgroundColor">@color/light_contrast</item>
+        <item name="backgroundColor">@color/night_window</item>
     </style>
 </resources>

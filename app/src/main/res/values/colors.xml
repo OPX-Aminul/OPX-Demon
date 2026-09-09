@@ -21,6 +21,9 @@
     <color name="console">#000000</color>
     <color name="itemcolor">#F6EEDB</color>
     <color name="toolbar_color">#F6F0E3</color>
+    <!-- Tonal chip (arsenal sheet): warm pastel in day, gold glow at night. -->
+    <color name="tonal_chip_bg">#FFF3E0</color>
+    <color name="tonal_chip_fg">#E65100</color>
     <color name="toolbar_darkness_color">#FDFBF4</color>
 
     <!-- Header / hero / bottom-nav gradients (theme-aware). -->
