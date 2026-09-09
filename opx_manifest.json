@@ -60,7 +60,7 @@
     "sha256": "",
     "size": 0,
     "mandatory": false,
-    "changelog": "OPX-Demon 1.1.8 \u2014 AMOLED layering for night mode.\n\n- Night mode depth: window base is true black; cards, sheets and tiles now lift one step so every screen has real layering (before, surfaces vanished into the background).\n- Day mode unchanged (ivory + gold).\n- FIXED: two day-only hardcoded leaks — arsenal Add-to-Hub chip and drawer activated row now follow the theme.\n- Backend logic untouched."
+    "changelog": "OPX-Demon 1.1.8 \u2014 AMOLED layering for night mode.\n\n- Night mode depth: window base is true black; cards, sheets and tiles now lift one step so every screen has real layering (before, surfaces vanished into the background).\n- Day mode unchanged (ivory + gold).\n- FIXED: two day-only hardcoded leaks \u2014 arsenal Add-to-Hub chip and drawer activated row now follow the theme.\n- Backend logic untouched."
   },
   "news": [
     {
