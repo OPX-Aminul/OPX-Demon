@@ -90,7 +90,19 @@ public final class QemuInstaller {
                 else if (f.equals("libslirp.so")) l = true;
                 else if (f.equals("initrd.img")) ird = true;
             }
-            return q && k && l && ird && rootfsAssetName(c) != null;
+            if (!(q && k && l && ird && rootfsAssetName(c) != null)) return false;
+            File base = RootlessPaths.base(c);
+            int present = 0;
+            present += new File(RootlessPaths.qemuBin(c)).exists() ? 1 : 0;
+            present += new File(RootlessPaths.kernel(c)).exists() ? 1 : 0;
+            present += new File(RootlessPaths.initrd(c)).exists() ? 1 : 0;
+            present += new File(RootlessPaths.libslirp(c)).exists() ? 1 : 0;
+            present += new File(RootlessPaths.rootfs(c)).exists() ? 1 : 0;
+            if (base.exists() && present == 5) {
+                return true;
+            }
+            // Return true even if partial so repair/resume can run
+            return present > 0;
         } catch (IOException e) {
             return false;
         }
@@ -253,6 +265,14 @@ public final class QemuInstaller {
 
     static boolean fetchAsset(com.opx.demon.ota.RemoteManifest.Asset asset, File dest,
                               String label, Progress p) {
+        if (asset == null || !asset.isUsable()) {
+            log(p, 3, label + ": no download URL in the manifest");
+            return false;
+        }
+        if (dest.exists() && asset.size > 0 && dest.length() == asset.size) {
+            log(p, 2, label + " already present (" + mb(dest.length()) + ") — reusing");
+            return true;
+        }
         return fetch(asset, dest, label, p);
     }
 
@@ -269,10 +289,16 @@ public final class QemuInstaller {
     static void emitStage(Progress p, Stage s) { stage(p, s); }
 
     private static boolean fetch(com.opx.demon.ota.RemoteManifest.Asset asset, File dest,
-                                 String label, Progress p) {
+                                  String label, Progress p) {
         if (asset == null || !asset.isUsable()) {
             log(p, 3, label + ": no download URL in the manifest");
             return false;
+        }
+        if (dest.exists() && asset.size > 0 && dest.length() >= asset.size * 90 / 100) {
+            log(p, 2, label + " partially present (" + mb(dest.length()) + ") — resuming");
+        } else if (dest.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            dest.delete();
         }
         // Reuse files that are already on disk and match the manifest instead of pulling the
         // same bytes again. Retries and re-opened installers otherwise restart from the first

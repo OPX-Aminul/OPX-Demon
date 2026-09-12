@@ -110,14 +110,30 @@ public final class UsbPassthroughManager {
     }
 
     public synchronized boolean attach(UsbDevice device) {
-        if (device == null || qmp == null) return false;
-        if (attached.containsKey(device.getDeviceId())) return true;
-        UsbDeviceConnection connection = usbManager.openDevice(device);
+        if (device == null || qmp == null || usbManager == null) return false;
+        try {
+            if (attached.containsKey(device.getDeviceId())) return true;
+        } catch (Throwable t) {
+            return false;
+        }
+        UsbDeviceConnection connection;
+        try {
+            connection = usbManager.openDevice(device);
+        } catch (Throwable t) {
+            Log.w(TAG, "openDevice threw for " + device.getDeviceName(), t);
+            return false;
+        }
         if (connection == null) {
             Log.w(TAG, "openDevice returned null for " + device.getDeviceName());
             return false;
         }
-        claimInterfaces(device, connection);
+        try {
+            claimInterfaces(device, connection);
+        } catch (Throwable t) {
+            Log.w(TAG, "claimInterfaces threw", t);
+            try { connection.close(); } catch (Throwable ignored) {}
+            return false;
+        }
         ParcelFileDescriptor pfd;
         try {
             pfd = ParcelFileDescriptor.fromFd(connection.getFileDescriptor());
@@ -148,7 +164,10 @@ public final class UsbPassthroughManager {
                 connection.close();
                 return false;
             }
-        } catch (JSONException e) {
+        } catch (Exception e) {
+            try { qmp.removeFd(fdSetId); } catch (Exception ignored) {}
+            try { pfd.close(); } catch (Exception ignored) {}
+            try { connection.close(); } catch (Exception ignored) {}
             return false;
         }
         registerReceiver();
@@ -275,9 +294,20 @@ public final class UsbPassthroughManager {
                     }
                 }
                 if (cb != null) cb.onResult(granted, d);
+            } else if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(intent.getAction())) {
+                UsbDevice d = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                if (d != null && isWifiCandidate(d) && hasPermission(d) && !isAttached(d)) {
+                    try { attach(d); } catch (Throwable t) {
+                        Log.w(TAG, "attach on plug failed", t);
+                    }
+                }
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(intent.getAction())) {
                 UsbDevice d = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-                if (d != null) detach(d.getDeviceId());
+                if (d != null) {
+                    try { detach(d.getDeviceId()); } catch (Throwable t) {
+                        Log.w(TAG, "detach failed", t);
+                    }
+                }
             }
         }
     };
@@ -294,6 +324,7 @@ public final class UsbPassthroughManager {
         }
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_USB_PERMISSION);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(receiver, filter, null, receiverHandler,

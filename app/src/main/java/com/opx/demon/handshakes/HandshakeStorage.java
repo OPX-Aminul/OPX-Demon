@@ -92,6 +92,12 @@ public class HandshakeStorage extends Fragment {
             metaTotal.setText("0");
             metaCracked.setText("0");
             metaSize.setText("0 KB");
+            new Thread(() -> {
+                try {
+                    new File(captureDir()).mkdirs();
+                    core.customCommand("mkdir -p '" + core.getShareRoot() + "/wordlists' 2>/dev/null");
+                } catch (Throwable ignored) {}
+            }).start();
             return;
         }
 

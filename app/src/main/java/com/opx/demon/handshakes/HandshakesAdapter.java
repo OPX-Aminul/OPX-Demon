@@ -263,6 +263,20 @@ public class HandshakesAdapter extends RecyclerView.Adapter<HandshakesAdapter.Vi
         }
     }
 
+    private static int jsonCount(org.json.JSONObject json, String key) {
+        if (json == null || !json.has(key) || json.isNull(key)) return -1;
+        Object v = json.opt(key);
+        if (v instanceof org.json.JSONObject) {
+            return ((org.json.JSONObject) v).optInt("count", -1);
+        }
+        if (v instanceof Number) return ((Number) v).intValue();
+        try {
+            return Integer.parseInt(String.valueOf(v).trim());
+        } catch (Exception ignored) {
+            return -1;
+        }
+    }
+
     private static UploadResult parseUploadResult(ArrayList<String> lines) {
         StringBuilder builder = new StringBuilder();
         if (lines != null) {
@@ -277,11 +291,27 @@ public class HandshakesAdapter extends RecyclerView.Adapter<HandshakesAdapter.Vi
             try {
                 org.json.JSONObject json = new org.json.JSONObject(body.substring(start, end + 1));
                 String message = json.optString("message", "");
-                if (json.optBoolean("success", false)) {
-                    boolean already = message.toLowerCase(java.util.Locale.ROOT).contains("already");
+                if (message.isEmpty()) message = json.optString("error", "");
+                int accepted = jsonCount(json, "accepted");
+                int skipped = jsonCount(json, "skipped");
+                int rejected = jsonCount(json, "rejected");
+                String lowerMsg = message.toLowerCase(java.util.Locale.ROOT);
+                if (accepted > 0) {
+                    return new UploadResult(UploadOutcome.SUCCESS, message);
+                }
+                if (skipped > 0 && accepted <= 0) {
+                    return new UploadResult(UploadOutcome.ALREADY, message);
+                }
+                if (rejected > 0 && accepted <= 0) {
+                    return new UploadResult(UploadOutcome.FAILED, message);
+                }
+                if (json.optBoolean("success", false) || "ok".equalsIgnoreCase(json.optString("status"))) {
+                    boolean already = lowerMsg.contains("already");
                     return new UploadResult(already ? UploadOutcome.ALREADY : UploadOutcome.SUCCESS, message);
                 }
-                return new UploadResult(UploadOutcome.FAILED, message);
+                if (!message.isEmpty() || accepted >= 0 || skipped >= 0 || rejected >= 0) {
+                    return new UploadResult(UploadOutcome.FAILED, message);
+                }
             } catch (org.json.JSONException ignored) {
             }
         }
@@ -289,7 +319,8 @@ public class HandshakesAdapter extends RecyclerView.Adapter<HandshakesAdapter.Vi
         if (lower.contains("already")) {
             return new UploadResult(UploadOutcome.ALREADY, "");
         }
-        if (lower.contains("success") || lower.contains("added") || lower.contains("uploaded")) {
+        if (lower.contains("success") || lower.contains("added") || lower.contains("uploaded")
+                || lower.contains("accepted")) {
             return new UploadResult(UploadOutcome.SUCCESS, "");
         }
         return new UploadResult(UploadOutcome.FAILED, "");

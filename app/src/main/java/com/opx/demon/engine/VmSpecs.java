@@ -231,7 +231,7 @@ public final class VmSpecs {
 
     public static boolean rngEnabled(Core core)   { return !safeBoot(core) && !core.getBoolean(K_NO_RNG); }
     public static boolean usbEnabled(Core core)   { return !core.getBoolean(K_USB_OFF); }
-    public static boolean shareEnabled(Core core) { return !safeBoot(core) && !core.getBoolean(K_NO_SHARE); }
+    public static boolean shareEnabled(Core core) { return core == null || !core.getBoolean(K_NO_SHARE); }
 
 
     public static String humanBytes(long bytes) {

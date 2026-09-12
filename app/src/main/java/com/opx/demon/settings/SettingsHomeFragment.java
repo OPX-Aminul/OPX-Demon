@@ -78,6 +78,9 @@ public class SettingsHomeFragment extends Fragment {
         LinearLayout changeCommands = view.findViewById(R.id.change_commands);
         TextView maxParCount = view.findViewById(R.id.max_par_count);
 
+        switch Material allowInternalDeauth = view.findViewById(R.id.allow_internal_deauth_switch);
+        LinearLayout allowInternalDeauthRow = view.findViewById(R.id.allow_internal_deauth_row);
+
         saveAps.setChecked(core.isStoreEnabled());
         autoBanner.setChecked(core.isBannerScanEnabled());
         pixieIfaceDown.setChecked(core.isPixieIfaceDown());
@@ -85,6 +88,7 @@ public class SettingsHomeFragment extends Fragment {
         autoWifi.setChecked(core.getBoolean("wifi"));
         autoScan.setChecked(core.getBoolean("autoScan"));
         maxParCount.setText(String.valueOf(currentMaxPar()));
+        allowInternalDeauth.setChecked(core.getBoolean("allow_internal_deauth"));
 
         saveAps.setOnCheckedChangeListener((btn, b) -> core.putBoolean("save_aps", b));
         autoBanner.setOnCheckedChangeListener((btn, b) -> core.putBoolean("autoBanner", b));
@@ -92,6 +96,7 @@ public class SettingsHomeFragment extends Fragment {
         hide.setOnCheckedChangeListener((btn, b) -> core.putBoolean("hide", b));
         autoWifi.setOnCheckedChangeListener((btn, b) -> core.putBoolean("wifi", b));
         autoScan.setOnCheckedChangeListener((btn, b) -> core.putBoolean("autoScan", b));
+        allowInternalDeauth.setOnCheckedChangeListener((btn, b) -> core.putBoolean("allow_internal_deauth", b));
 
         bindRowToSwitch(autoWifiRow, autoWifi);
         bindRowToSwitch(saveApsRow, saveAps);
@@ -99,6 +104,7 @@ public class SettingsHomeFragment extends Fragment {
         bindRowToSwitch(autoScanRow, autoScan);
         bindRowToSwitch(bannerRow, autoBanner);
         bindRowToSwitch(hideRow, hide);
+        bindRowToSwitch(allowInternalDeauthRow, allowInternalDeauth);
 
         geoBg.setChecked(core.getBoolean("geomac_bg_scan"));
         geoSatellite.setChecked(core.getBoolean("geomac_satellite"));

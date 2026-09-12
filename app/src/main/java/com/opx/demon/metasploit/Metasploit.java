@@ -167,10 +167,13 @@ public class Metasploit extends Fragment {
                 wireSearchAndFilters();
                 renderConsoleState(metasploitUtils.console.getState(), null);
             });
-            if (metasploitUtils.isInitializedConsole && metasploitUtils.isAliveConsole()) {
-                reloadModules();
-            } else if (!metasploitUtils.isAliveConsole()) {
-                metasploitUtils.initConsole();
+            // Retry loop: attempt console boot up to 3 times with backoff if not ready yet
+            for (int attempt = 0; attempt < 3; attempt++) {
+                if (!isAdded() || !activity.isDestroyed()) break;
+                if (!metasploitUtils.isInitializedConsole) {
+                    metasploitUtils.initConsole();
+                    try { Thread.sleep(2000L * (attempt + 1)); } catch (InterruptedException ignored) {}
+                }
             }
         }, "msf-hub-bootstrap").start();
     }

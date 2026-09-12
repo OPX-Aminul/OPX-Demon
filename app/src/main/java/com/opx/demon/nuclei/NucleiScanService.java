@@ -324,9 +324,13 @@ public class NucleiScanService extends Service {
                 + "if /usr/bin/nuclei -duc -ut >/tmp/nuclei-ut.log 2>&1; then touch "
                 + com.opx.demon.install.InstallService.NUCLEI_TEMPLATES_MARKER + "; fi; "
                 + "tail -5 /tmp/nuclei-ut.log; rm -f /tmp/nuclei-ut.log; fi");
+        lines.add("TPL=/root/nuclei-templates; "
+                + "[ -d \"$TPL\" ] || TPL=/root/.local/share/nuclei/templates; "
+                + "[ -d \"$TPL\" ] || TPL=/root/.config/nuclei/templates");
         StringBuilder cmd = new StringBuilder("/usr/bin/nuclei ");
         cmd.append("-u ").append(shellEscape(target)).append(' ');
         cmd.append("-jsonl -stats -silent -no-color -duc -timeout 8 -retries 1");
+        cmd.append(" -t \"$TPL\"");
         if (severityList != null && !severityList.isEmpty()) {
             cmd.append(" -severity ").append(shellEscape(severityList));
         }

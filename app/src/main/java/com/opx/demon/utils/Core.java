@@ -335,12 +335,29 @@ public class Core {
     public ArrayList<String> getListFiles(String parentDir) {
         String host = hostPath(parentDir);
         if (host != null) {
-            ArrayList<String> names = new ArrayList<>();
-            File[] fs = new File(host).listFiles();
-            if (fs != null) for (File f : fs) names.add(f.getName());
-            return names;
+            File dir = new File(host);
+            File[] fs = dir.listFiles();
+            if (fs != null) {
+                ArrayList<String> names = new ArrayList<>();
+                for (File f : fs) {
+                    if (f == null) continue;
+                    String n = f.getName();
+                    if (n.isEmpty() || n.charAt(0) == '.') continue;
+                    names.add(n);
+                }
+                return names;
+            }
         }
-        return customCommand("ls "+parentDir);
+        ArrayList<String> listed = customCommand("ls " + parentDir);
+        ArrayList<String> names = new ArrayList<>();
+        if (listed == null) return names;
+        for (String s : listed) {
+            if (s == null) continue;
+            String t = s.trim();
+            if (t.isEmpty() || t.startsWith("ls:") || t.equals(".") || t.equals("..")) continue;
+            names.add(new File(t).getName());
+        }
+        return names;
     }
 
 
@@ -951,17 +968,23 @@ public class Core {
         return ok;
     }
     public boolean checkMagiskNotification(){
+        if (isRootless() || getBoolean("offed")) return false;
         reCreateProcess();
-        if (!getBoolean("offed")){
-        String cmd = "/data/data/com.opx.demon/files/sqlite3 /data/adb/magisk.db \"SELECT notification FROM policies WHERE package_name='com.opx.demon';\"";
-        boolean b = Core.contains(customCommand(cmd),"1");
+        boolean b = Core.contains(magiskSql(
+                "SELECT notification FROM policies WHERE package_name='com.opx.demon';"), "1");
         if (!b) {
-            cmd = "/data/data/com.opx.demon/files/sqlite3 /data/adb/magisk.db \"SELECT notification FROM policies WHERE uid='"+android.os.Process.myUid()+"';\"";
-            b = Core.contains(customCommand(cmd),"1");
+            b = Core.contains(magiskSql(
+                    "SELECT notification FROM policies WHERE uid='" + android.os.Process.myUid() + "';"), "1");
         }
-        return b;}else{
-            return false;
-        }
+        return b;
+    }
+
+    private ArrayList<String> magiskSql(String sql) {
+        String q = sql.replace("'", "'\"'\"'");
+        return customCommand(
+                "if command -v magisk >/dev/null 2>&1; then magisk --sqlite '" + q + "'; "
+                        + "elif command -v sqlite3 >/dev/null 2>&1; then sqlite3 /data/adb/magisk.db '" + q + "'; "
+                        + "else /data/data/com.opx.demon/files/sqlite3 /data/adb/magisk.db '" + q + "'; fi");
     }
 
     public boolean checkRoot(){
@@ -1520,17 +1543,13 @@ public class Core {
     }
 
     public void disableMagiskNotification() {
-
-                if (contains(customCommand("/data/data/com.opx.demon/files/sqlite3 "
-                        + "/data/adb/magisk.db"
-                        + " \"UPDATE policies SET logging='0',notification='0' WHERE package_name='"
-                        + "com.opx.demon"
-                        + "';\""), "no such"))
-                {customCommand("/data/data/com.opx.demon/files/sqlite3 "
-                                        + "/data/adb/magisk.db"
-                                        + " \"UPDATE policies SET logging='0',notification='0' WHERE uid='"
-                                        + android.os.Process.myUid()
-                                        + "';\"");}
+        if (isRootless()) return;
+        ArrayList<String> out = magiskSql(
+                "UPDATE policies SET logging='0',notification='0' WHERE package_name='com.opx.demon';");
+        if (contains(out, "no such")) {
+            magiskSql("UPDATE policies SET logging='0',notification='0' WHERE uid='"
+                    + android.os.Process.myUid() + "';");
+        }
     }
 
 

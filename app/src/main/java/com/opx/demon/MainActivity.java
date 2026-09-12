@@ -113,6 +113,7 @@ public class MainActivity extends AppCompatActivity {
     private ArrayList<WiFINetwork> networks;
     private ArrayList<Device> devices = new ArrayList<>();
     private boolean usbState = false;
+    private Timer usbPollTimer;
     private BottomSheetDialog usbDialog;
     private com.opx.demon.netdetect.UsbDialogRenderer usbRenderer;
     private final Receiver receiver = new Receiver();
@@ -447,6 +448,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void usbDialog() {
+        if (isFinishing() || isDestroyed()) return;
         if (usbDialog != null && usbDialog.isShowing()) {
             if (usbRenderer != null) scanUsb(usbRenderer);
             return;
@@ -471,7 +473,11 @@ public class MainActivity extends AppCompatActivity {
         if (changeListen != null) changeListen.setOnClickListener(v -> changeInterface(true));
         if (changeDeauth != null) changeDeauth.setOnClickListener(v -> changeInterface(false));
         if (refresh != null) refresh.setOnClickListener(v -> scanUsb(renderer));
-        usbDialog.show();
+        try {
+            usbDialog.show();
+        } catch (Exception e) {
+            return;
+        }
 
         scanUsb(renderer);
     }
@@ -492,6 +498,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void autoAttachToVm(com.opx.demon.netdetect.UsbDeviceReport report) {
+        if (isFinishing() || isDestroyed()) return;
         if (usbDialog == null || !usbDialog.isShowing()) return;
         View card = usbDialog.findViewById(R.id.usb_attach_card);
         if (card == null || report == null) return;
@@ -543,7 +550,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showAttachState(int mode, String msg, String actionLabel, View.OnClickListener action) {
-        if (usbDialog == null) return;
+        if (isFinishing() || isDestroyed() || usbDialog == null) return;
         android.widget.ProgressBar spinner = usbDialog.findViewById(R.id.usb_attach_spinner);
         ImageView icon = usbDialog.findViewById(R.id.usb_attach_icon);
         TextView text = usbDialog.findViewById(R.id.usb_attach_text);
@@ -788,23 +795,40 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void checkForUsb() {
-        Timer usb = new Timer();
-        usb.scheduleAtFixedRate(new TimerTask() {
+        if (usbPollTimer != null) return;
+        usbPollTimer = new Timer("usb-poll", true);
+        usbPollTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
+                if (isFinishing() || isDestroyed()) return;
                 boolean temp = usbState;
-                usbState = isConnected();
+                try {
+                    usbState = isConnected();
+                } catch (Throwable t) {
+                    return;
+                }
                 if (temp != usbState && usbState) {
-                    runOnUiThread(() -> usbDialog());
+                    runOnUiThread(() -> {
+                        try { usbDialog(); } catch (Exception ignored) {}
+                    });
                 } else if (temp != usbState) {
                     runOnUiThread(() -> {
-                        if (usbDialog != null) {
-                            usbDialog.dismiss();
-                        }
+                        try {
+                            if (usbDialog != null) usbDialog.dismiss();
+                        } catch (Exception ignored) {}
                     });
                 }
             }
-        }, 0, 300);
+        }, 0, 1500);
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (usbPollTimer != null) {
+            usbPollTimer.cancel();
+            usbPollTimer = null;
+        }
+        super.onDestroy();
     }
 
     private void openSettings() {

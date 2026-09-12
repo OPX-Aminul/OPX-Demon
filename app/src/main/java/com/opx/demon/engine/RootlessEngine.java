@@ -18,7 +18,7 @@ import java.util.concurrent.Executors;
 public final class RootlessEngine {
 
     private static final String TAG = "RootlessEngine";
-    private static final int BOOT_TIMEOUT_MS = 600_000;
+    private static final int BOOT_TIMEOUT_MS = 900_000;
     /** Minimum spacing between console-bootstrap attempts inside one boot. */
     private static final long CONSOLE_RETRY_MS = 30_000;
     private volatile long lastConsoleBootstrapMs;
@@ -1161,6 +1161,10 @@ public final class RootlessEngine {
         new File(base, "captured").mkdirs();
         //noinspection ResultOfMethodCallIgnored
         new File(base, "reports").mkdirs();
+        //noinspection ResultOfMethodCallIgnored
+        new File(base, "wordlists").mkdirs();
+        //noinspection ResultOfMethodCallIgnored
+        new File(base, "exploits").mkdirs();
         return base;
     }
 

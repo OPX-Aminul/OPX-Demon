@@ -629,7 +629,7 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                         })
                         .show();
               }else{
-                outputtext.append("No wordlist found!\nPlease put worldlist in OpxDemon/wordlists/ and try again!\n");
+                outputtext.append("No wordlist found!\nDrop wordlists into /sdcard/OPX-Demon/wordlists and try again.\n");
             }
 
         }
@@ -1295,10 +1295,13 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
             if (dialogCanceled.get()) return;
             String deauthIface = core.getDeauthInterface();
             boolean ok = false;
-            if (core.isRootless() || !MonitorManager.isInternalRadio(deauthIface)){
+            boolean internalBlocked = !core.isRootless()
+                    && MonitorManager.isInternalRadio(deauthIface)
+                    && !core.getBoolean("allow_internal_deauth");
+            if (!internalBlocked){
                 ok = core.enableMonitorMode(deauthIface, String.valueOf(network.getChannel()));
             }else{
-                activity.runOnUiThread(() -> outputtext.append("Internal wifi adapter (wlan0) does not support packet injection! Please use external wifi adapter!\n"));
+                activity.runOnUiThread(() -> outputtext.append("Internal wifi adapter (wlan0) does not support packet injection! Enable it in Settings or use an external wifi adapter.\n"));
             }
             if (dialogCanceled.get()) return;
             final String monIface = core.getDeauthInterface();

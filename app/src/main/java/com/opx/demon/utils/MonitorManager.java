@@ -272,28 +272,29 @@ public class MonitorManager {
         ArrayList<UsbDev> devices = getDevices();
         String pid = getPid();
         ArrayList<String> pids = getPids();
-        if (pid==null||pid.equals("Unknown")||pid.length()<6){
+        String base = ifc.replace("mon", "");
+        if (pid==null||pid.equals("Unknown")||pid.length()<4){
             for (UsbDev d : devices){
                 if (d.getIfc().equals(ifc)){
                     core.logger.writeLine("Found device: "+d.getIfc()+" with command: "+d.getCommandMon(),2);
-                    return d.getCommandMon().replace("$ch","");
+                    return d.getCommandMon().replace("$ch","").replace("$ifc", ifc).replace("$iface", base);
                 }
             }}
         else{
             for (UsbDev d : devices){
                 if (d.getIfc().equals(ifc)&&pids.contains(d.getPid())){
                     core.logger.writeLine("Found device: "+d.getIfc()+" with command: "+d.getCommandMon(),2);
-                    return d.getCommandMon().replace("$ch","");
+                    return d.getCommandMon().replace("$ch","").replace("$ifc", ifc).replace("$iface", base);
                 }
             }
         }
         if(ifc.equals("wlan0")){
             core.logger.writeLine("Found device: "+internalUsbDev.getIfc()+" with command: "+internalUsbDev.getCommandMon(),2);
-            return internalUsbDev.getCommandMon().replace("$ch","");
+            return internalUsbDev.getCommandMon().replace("$ch","").replace("$ifc", ifc).replace("$iface", base);
         }
         if(ifc.equals("swlan0")){
             core.logger.writeLine("Found device: "+internalUsbSamsung.getIfc()+" with command: "+internalUsbSamsung.getCommandMon(),2);
-            return internalUsbSamsung.getCommandMon().replace("$ch","");
+            return internalUsbSamsung.getCommandMon().replace("$ch","").replace("$ifc", ifc).replace("$iface", base);
         }
         return "airmon-ng start "+ifc;
     }
@@ -303,24 +304,25 @@ public class MonitorManager {
         ArrayList<UsbDev> devices = getDevices();
         String pid = getPid();
         ArrayList<String> pids = getPids();
+        String base = ifc.replace("mon", "");
         if (pid==null||pid.equals("Unknown")||pid.length()<6){
             for (UsbDev d : devices){
                 if (d.getIfc().equals(ifc)){
-                    return d.getCommandMon().replace("$ch",ch);
+                    return d.getCommandMon().replace("$ch",ch).replace("$ifc", ifc).replace("$iface", base);
                 }
             }
         }else{
             for (UsbDev d : devices){
                 if (d.getIfc().equals(ifc)&&pids.contains(d.getPid())){
-                    return d.getCommandMon().replace("$ch",ch);
+                    return d.getCommandMon().replace("$ch",ch).replace("$ifc", ifc).replace("$iface", base);
                 }
             }
         }
         if(ifc.equals("wlan0")){
-            return internalUsbDev.getCommandMon().replace("$ch",ch);
+            return internalUsbDev.getCommandMon().replace("$ch",ch).replace("$ifc", ifc).replace("$iface", base);
         }
         if(ifc.equals("swlan0")){
-            return internalUsbSamsung.getCommandMon().replace("$ch",ch);
+            return internalUsbSamsung.getCommandMon().replace("$ch",ch).replace("$ifc", ifc).replace("$iface", base);
         }
         return "airmon-ng start "+ifc + " " + ch;
     }
@@ -330,26 +332,27 @@ public class MonitorManager {
         if (ifc != null && ifc.endsWith("mon") && isInternalRadio(ifc)) {
             ifc = ifc.substring(0, ifc.length() - 3);
         }
+        String base = ifc.replace("mon", "");
         ArrayList<UsbDev> devices = getDevices();
         String pid = getPid();
         ArrayList<String> pids = getPids();
         if (pid==null||pid.equals("Unknown")||pid.length()<6){
             for (UsbDev d : devices){
                 if (d.getIfc().equals(ifc)){
-                    return d.getCommandDis();
+                    return d.getCommandDis().replace("$ifc", ifc).replace("$iface", base);
                 }
             }}else{
             for (UsbDev d : devices){
                 if (d.getIfc().equals(ifc)&&pids.contains(d.getPid())){
-                    return d.getCommandDis();
+                    return d.getCommandDis().replace("$ifc", ifc).replace("$iface", base);
                 }
             }
         }
         if(ifc.equals("wlan0")){
-            return internalUsbDev.getCommandDis();
+            return internalUsbDev.getCommandDis().replace("$ifc", ifc).replace("$iface", base);
         }
         if(ifc.equals("swlan0")){
-            return internalUsbSamsung.getCommandDis();
+            return internalUsbSamsung.getCommandDis().replace("$ifc", ifc).replace("$iface", base);
         }
         return "airmon-ng stop "+ifc;
     }

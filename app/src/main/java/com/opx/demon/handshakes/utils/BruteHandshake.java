@@ -77,6 +77,7 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
                 guestSession = core.rootless().openStream(guestCmd);
                 BufferedReader gbr = guestSession.reader;
                 while ((line = gbr.readLine()) != null) {
+                    if (stopped || isCancelled()) break;
                     if (line.startsWith(GuestExec.Session.SENTINEL)) break;
                     logger.writeLine(line,2);
                     onProgressUpdate(line);
@@ -121,13 +122,13 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
             }
             br.close();
             br = new BufferedReader(new InputStreamReader(stderr));
-            while ((line = br.readLine()) != null) {
-
+            while ((line = br.readLine()) != null && !stopped && !isCancelled()) {
                 logger.writeLine(line,3);
             }
             br.close();
             process.waitFor();
             process.destroy();
+            try { Runtime.getRuntime().exec(new String[]{"pkill", "-f", "aircrack-ng"}); } catch (Throwable ignored) {}
             }
 
         } catch (IOException | InterruptedException e) {
@@ -148,11 +149,14 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
     }
 
     public void kill() {
+        stopped = true;
         if (process != null) {
-            process.destroy();
+            try { process.destroyForcibly(); } catch (Throwable ignored) {}
+            process = null;
         }
         if (guestSession != null) {
-            guestSession.close();
+            try { guestSession.close(); } catch (Throwable ignored) {}
+            guestSession = null;
         }
     }
 

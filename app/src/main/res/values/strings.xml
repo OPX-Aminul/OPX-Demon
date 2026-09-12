@@ -168,7 +168,10 @@ Storage is only consumed as the guest writes, and space freed inside the VM is r
     <string name="settings_change_interfaces_title">Network interfaces</string>
     <string name="settings_change_interfaces_subtitle">Pick which adapter handles scan, handshake, deauth, WPS</string>
     <string name="settings_pixie_iface_down_title">Turn interface down</string>
-    <string name="settings_pixie_iface_down_subtitle">Disable Wi‑Fi and drop the adapter during Pixie/WPS attacks. Needed for most internal adapters; turn off for external adapters that must stay up</string>
+    <string name="settings_pixie_iface_down_subtitle">Disable Wi‐Fi and drop the adapter during Pixie/WPS attacks. Needed for most internal adapters; turn off for external adapters that must stay up</string>
+
+    <string name="settings_allow_internal_deauth_title">Allow internal adapter deauth</string>
+    <string name="settings_allow_internal_deauth_subtitle">Enable internal WiFi (wlan0) for deauth attacks. Default is blocked due to injection support</string>
 
     <string name="settings_change_commands_title">Custom monitor commands</string>
     <string name="settings_change_commands_subtitle">Override how monitor mode is enabled per adapter</string>
