@@ -108,7 +108,7 @@ credentials live in `gradle.properties` (already active for every Gradle run) an
 project properties in `app/build.gradle`. To sign with a different key, override those properties
 via `~/.gradle/gradle.properties`, `-P`, or environment variables.
 
-> Security note: the release key is committed so CI and contributors can reproduce installable
+> Security note: the release key is committed so CI can reproduce installable
 > signed builds. It is intended for sideloaded builds, not store-distributed apps that need update
 > integrity.
 
