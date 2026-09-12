@@ -93,11 +93,11 @@ public final class QemuInstaller {
             if (!(q && k && l && ird && rootfsAssetName(c) != null)) return false;
             File base = RootlessPaths.base(c);
             int present = 0;
-            present += new File(RootlessPaths.qemuBin(c)).exists() ? 1 : 0;
-            present += new File(RootlessPaths.kernel(c)).exists() ? 1 : 0;
-            present += new File(RootlessPaths.initrd(c)).exists() ? 1 : 0;
-            present += new File(RootlessPaths.libslirp(c)).exists() ? 1 : 0;
-            present += new File(RootlessPaths.rootfs(c)).exists() ? 1 : 0;
+            present += RootlessPaths.qemuBin(c).exists() ? 1 : 0;
+            present += RootlessPaths.kernel(c).exists() ? 1 : 0;
+            present += RootlessPaths.initrd(c).exists() ? 1 : 0;
+            present += RootlessPaths.libslirp(c).exists() ? 1 : 0;
+            present += RootlessPaths.rootfs(c).exists() ? 1 : 0;
             if (base.exists() && present == 5) {
                 return true;
             }

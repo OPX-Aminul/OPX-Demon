@@ -45,6 +45,7 @@ public class BruteHandshake extends AsyncTask<Void, String, WiFINetwork> {
     public Process process;
     public GuestExec.Session guestSession;
     public Logger logger;
+    public volatile boolean stopped = false;
 
     public BruteHandshake(String p, String w, Core c, Activity a, Context con, TextView pr, TextView t, int i) {
         core = c;

@@ -78,7 +78,7 @@ public class SettingsHomeFragment extends Fragment {
         LinearLayout changeCommands = view.findViewById(R.id.change_commands);
         TextView maxParCount = view.findViewById(R.id.max_par_count);
 
-        switch Material allowInternalDeauth = view.findViewById(R.id.allow_internal_deauth_switch);
+        SwitchMaterial allowInternalDeauth = view.findViewById(R.id.allow_internal_deauth_switch);
         LinearLayout allowInternalDeauthRow = view.findViewById(R.id.allow_internal_deauth_row);
 
         saveAps.setChecked(core.isStoreEnabled());
