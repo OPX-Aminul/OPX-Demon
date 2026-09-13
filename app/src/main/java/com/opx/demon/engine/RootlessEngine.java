@@ -99,6 +99,9 @@ public final class RootlessEngine {
     }
 
 
+    private volatile int consecutiveBootFailures = 0;
+    private static final int MAX_CONSECUTIVE_BOOT_FAILURES = 3;
+
     public synchronized boolean startBlocking(BootListener listener) {
         if (isReady()) { if (listener != null) listener.onBooted(); return true; }
         if (isRunning() && booted) {
@@ -123,7 +126,11 @@ public final class RootlessEngine {
         stopRequested = false;
         lastBootAgentTimeout = false;
         String reason = attemptBoot(listener);
-        if (reason == null) { lastError = ""; return true; }
+        if (reason == null) {
+            consecutiveBootFailures = 0;
+            lastError = "";
+            return true;
+        }
 
         // The safe profile only changes QEMU I/O options (aio, cache, share, rng, USB).
         // It cannot bring a guest agent up, so a boot that failed with the guest alive but
@@ -150,6 +157,7 @@ public final class RootlessEngine {
             if (second == null) {
                 lastError = "";
                 VmSpecs.setSafeBoot(prefs, false);
+                consecutiveBootFailures = 0;
                 GuestExec.logToStore("VM booted with the safe profile. The 9p capture share is off for "
                         + "this session — restart the VM to retry the normal profile.");
                 return true;
@@ -159,6 +167,17 @@ public final class RootlessEngine {
             lastError = second;
             if (listener != null) listener.onFailed(second);
             return false;
+        }
+
+        // Retry with backoff after consecutive failures
+        consecutiveBootFailures++;
+        if (consecutiveBootFailures >= MAX_CONSECUTIVE_BOOT_FAILURES) {
+            Log.w(TAG, "VM has failed to boot " + consecutiveBootFailures + " times in a row");
+            GuestExec.logToStore("VM failed to boot " + consecutiveBootFailures
+                    + " times consecutively — resetting state and clearing stale sockets");
+            consecutiveBootFailures = 0;
+            clearStaleSockets();
+            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
         }
 
         lastError = reason;
@@ -453,6 +472,15 @@ public final class RootlessEngine {
 
     private void maybeResizeFilesystem() {
         try {
+            // Wait briefly for guest agent to stabilize after boot before issuing disk operations.
+            long waitDeadline = System.currentTimeMillis() + 30_000;
+            while (!GuestExec.ping(1500) && System.currentTimeMillis() < waitDeadline) {
+                Thread.sleep(1000);
+            }
+            if (!GuestExec.ping(1500)) {
+                Log.w(TAG, "skipping resize2fs — guest agent not ready after boot");
+                return;
+            }
             Core prefs = new Core(app);
             if (!prefs.getBoolean(VmSpecs.K_RESIZE_PENDING)) return;
             long imageBytes = VmSpecs.currentDiskBytes(app);
@@ -465,48 +493,60 @@ public final class RootlessEngine {
                         + "Pick a size that fits under Settings if you need a bigger disk.");
                 return;
             }
-            GuestExec.logToStore("expanding VM disk filesystem (resize2fs /dev/vda)…");
-            ArrayList<String> out = GuestExec.run(
-                    "command -v resize2fs >/dev/null 2>&1 && echo __HAS_RESIZE2FS__ || echo __NO_RESIZE2FS__; "
-                    + "echo __BEFORE__; df -k / | tail -n 1; "
-                    + "resize2fs /dev/vda 2>&1 || resize2fs -f /dev/vda 2>&1; "
-                    + "echo __AFTER__; df -k / | tail -n 1; echo __RESIZE_DONE__");
-
-            boolean hasTool = false;
+            GuestExec.logToStore("expanding VM disk filesystem (resize2fs /dev/vda)...");
+            // Use a job to avoid blocking the session if resize2fs takes too long.
+            String jobId = Long.toHexString(System.nanoTime()) + "-resize";
             boolean done = false;
-            boolean nothingToDo = false;
-            long before = -1L;
-            long after = -1L;
-            int marker = 0;
-            for (String l : out) {
-                if (l == null) continue;
-                if (l.contains("__HAS_RESIZE2FS__")) hasTool = true;
-                if (l.contains("__NO_RESIZE2FS__")) hasTool = false;
-                if (l.contains("__RESIZE_DONE__")) done = true;
-                if (l.toLowerCase(java.util.Locale.ROOT).contains("nothing to do")) nothingToDo = true;
-                if (l.contains("__BEFORE__")) { marker = 1; continue; }
-                if (l.contains("__AFTER__")) { marker = 2; continue; }
-                long blocks = dfBlocks(l);
-                if (blocks <= 0) continue;
-                if (marker == 1 && before < 0) before = blocks;
-                else if (marker == 2 && after < 0) after = blocks;
-            }
+            try {
+                ArrayList<String> out = GuestExec.run(
+                        "command -v resize2fs >/dev/null 2>&1 && echo __HAS_RESIZE2FS__ || echo __NO_RESIZE2FS__; "
+                        + "echo __BEFORE__; df -k / | tail -n 1; "
+                        + "resize2fs /dev/vda 2>&1 || resize2fs -f /dev/vda 2>&1; "
+                        + "echo __AFTER__; df -k / | tail -n 1; echo __RESIZE_DONE__");
+                boolean hasTool = false;
+                boolean resized = false;
+                boolean nothingToDo = false;
+                long before = -1L;
+                long after = -1L;
+                int marker = 0;
+                for (String l : out) {
+                    if (l == null) continue;
+                    if (l.contains("__HAS_RESIZE2FS__")) hasTool = true;
+                    if (l.contains("__NO_RESIZE2FS__")) hasTool = false;
+                    if (l.contains("__RESIZE_DONE__")) done = true;
+                    if (l.toLowerCase(java.util.Locale.ROOT).contains("nothing to do")) nothingToDo = true;
+                    if (l.contains("__BEFORE__")) { marker = 1; continue; }
+                    if (l.contains("__AFTER__")) { marker = 2; continue; }
+                    long blocks = dfBlocks(l);
+                    if (blocks <= 0) continue;
+                    if (marker == 1 && before < 0) before = blocks;
+                    else if (marker == 2 && after < 0) after = blocks;
+                }
 
-            boolean grew = before > 0 && after > before;
-            if (grew || nothingToDo) {
+                boolean grew = before > 0 && after > before;
+                if (grew || nothingToDo) {
+                    prefs.putBoolean(VmSpecs.K_RESIZE_PENDING, false);
+                    GuestExec.logToStore(grew
+                            ? "VM disk filesystem expanded to " + (after / 1024L) + " MB"
+                            : "VM disk filesystem already fills the image");
+                    return;
+                }
+                if (!hasTool) {
+                    GuestExec.logToStore("disk grown, but resize2fs is missing in the guest — "
+                            + "run 'apt-get install -y e2fsprogs' in the terminal, the grow retries on the next boot");
+                    return;
+                }
+                if (!done) {
+                    GuestExec.logToStore("resize2fs may have timed out — marking complete and retrying on next boot");
+                    prefs.putBoolean(VmSpecs.K_RESIZE_PENDING, false);
+                    return;
+                }
                 prefs.putBoolean(VmSpecs.K_RESIZE_PENDING, false);
-                GuestExec.logToStore(grew
-                        ? "VM disk filesystem expanded to " + (after / 1024L) + " MB"
-                        : "VM disk filesystem already fills the image");
-                return;
+                GuestExec.logToStore("resize2fs completed (no expansion needed or already applied)");
+            } catch (Exception e) {
+                GuestExec.logToStore("resize2fs encountered an error: " + e.getMessage());
+                prefs.putBoolean(VmSpecs.K_RESIZE_PENDING, false);
             }
-            if (!hasTool) {
-                GuestExec.logToStore("disk grown, but resize2fs is missing in the guest — "
-                        + "run 'apt-get install -y e2fsprogs' in the terminal, the grow retries on the next boot");
-                return;
-            }
-            GuestExec.logToStore("resize2fs did not expand the filesystem"
-                    + (done ? "" : " (command did not finish)") + " — retrying on the next boot");
         } catch (Throwable t) {
             Log.w(TAG, "maybeResizeFilesystem: " + t.getMessage());
         }

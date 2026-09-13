@@ -63,16 +63,33 @@ public final class GuestExec {
         ArrayList<String> out = new ArrayList<>();
         Session s = null;
         try {
-            s = open(command);
-            s.socket.setSoTimeout(READ_TIMEOUT_MS);
-            String line;
-            while ((line = s.reader.readLine()) != null) {
-                if (line.startsWith(EXIT_SENTINEL)) {
-                    try { s.exitCode = Integer.parseInt(line.substring(EXIT_SENTINEL.length()).trim()); }
-                    catch (NumberFormatException ignored) {}
+            // Retry once on Connection reset to handle transient VM hiccups
+            for (int attempt = 0; attempt < 2; attempt++) {
+                try {
+                    s = open(command);
+                    s.socket.setSoTimeout(READ_TIMEOUT_MS);
+                    String line;
+                    while ((line = s.reader.readLine()) != null) {
+                        if (line.startsWith(EXIT_SENTINEL)) {
+                            try { s.exitCode = Integer.parseInt(line.substring(EXIT_SENTINEL.length()).trim()); }
+                            catch (NumberFormatException ignored) {}
+                            break;
+                        }
+                        out.add(line);
+                    }
                     break;
+                } catch (java.net.SocketException e) {
+                    if (attempt == 0 && e.getMessage() != null
+                            && e.getMessage().contains("Connection reset")) {
+                        Log.w(TAG, "Connection reset during guest exec — retrying");
+                        logToStore("VM connection reset — attempting reconnect");
+                        if (s != null) s.close();
+                        s = null;
+                        try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+                        continue;
+                    }
+                    throw e;
                 }
-                out.add(line);
             }
         } catch (java.net.SocketTimeoutException te) {
             Log.w(TAG, "run timed out: " + shortCmd(command));
