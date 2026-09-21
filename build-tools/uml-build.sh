@@ -63,7 +63,7 @@ fi
 log "Using config fragment: ${CONFIG_SRC} ($(wc -l < "${CONFIG_SRC}") lines)"
 cp "${CONFIG_SRC}" "${SRC}/.config"
 
-make -C "${SRC}" ARCH=um SUBARCH=arm64 olddefconfig
+make -C "${SRC}" ARCH=um SUBARCH=arm64 LLVM= olddefconfig
 # The fragment must still describe the exact engine we ship.
 grep -q '^CONFIG_UML=y'                "${SRC}/.config" || die "CONFIG_UML missing"
 grep -q '^CONFIG_UML_ARM64=y'          "${SRC}/.config" || die "CONFIG_UML_ARM64 missing"
@@ -74,15 +74,14 @@ grep -q '^CONFIG_ATH9K_HTC=y'          "${SRC}/.config" || die "ATH9K_HTC missin
 grep -q '^CONFIG_BLK_DEV_LOOP=y'       "${SRC}/.config" || die "LOOP missing (.img/.iso mount)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
-# UML builds the kernel as a userspace binary; "linux" is a hardlink to the
-# vmlinux ELF.
-#
-# CC carries the full Android target (--target + NDK sysroot) so the kernel
-# compiles against bionic headers and links statically against bionic libc
-# (CONFIG_STATIC_LINK=y adds -static -no-pie) — exactly how the released
-# linux-uml runs on stock devices. LLVM=1 selects the LLVM binutils family
-# (ld.lld matches CONFIG_LD_IS_LLD=y); HOSTCC stays the Debian host gcc for
-# kbuild's own host tools.
+# The UML kernel is built as a userspace binary. CC carries the full Android
+# target (--target + NDK sysroot) so the kernel compiles against the NDK
+# sysroot and links statically against bionic libc (CONFIG_STATIC_LINK=y adds
+# -static -no-pie) — exactly how the released linux-uml runs on stock devices.
+# LLVM=1 selects the LLVM binutils family (ld.lld matches CONFIG_LD_IS_LLD=y);
+# HOSTCC stays the Debian host gcc for kbuild's own host tools. LLVM is also
+# explicitly reset here: an LLVM variable leaked from the environment makes
+# kbuild abort with "Invalid value for LLVM".
 log "make -j${JOBS} ARCH=um SUBARCH=arm64 (clang/LLD, android${API})"
 make -j"${JOBS}" -C "${SRC}" ARCH=um SUBARCH=arm64 \
     CC="${CLANG} ${CC_TARGET}" \
