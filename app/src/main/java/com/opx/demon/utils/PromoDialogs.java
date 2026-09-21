@@ -8,6 +8,7 @@ import android.net.Uri;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.opx.demon.R;
+import com.opx.demon.ota.OpxDemonEndpoints;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,8 +21,8 @@ public final class PromoDialogs {
     private static final String KEY_GITHUB = "github_done";
     private static final String KEY_BLOG = "blog_done";
 
-    private static final String GITHUB_URL = "https://github.com/OPX-Aminul/OPX-Demon";
-    private static final String BLOG_URL = "https://zalexdev.com";
+    private static final String GITHUB_URL = OpxDemonEndpoints.GITHUB_REPO;
+    private static final String SITE_URL = OpxDemonEndpoints.SITE_URL;
 
     private static final int MIN_LAUNCHES = 3;
     private static final int SHOW_PERCENT = 30;
@@ -65,7 +66,7 @@ public final class PromoDialogs {
                     R.string.promo_github_message, R.string.promo_github_action, GITHUB_URL);
         } else {
             show(activity, prefs, KEY_BLOG, R.string.promo_blog_title,
-                    R.string.promo_blog_message, R.string.promo_blog_action, BLOG_URL);
+                    R.string.promo_blog_message, R.string.promo_blog_action, SITE_URL);
         }
     }
 

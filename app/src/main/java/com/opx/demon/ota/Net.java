@@ -64,10 +64,13 @@ public final class Net {
         if (url == null || !url.startsWith("https://")) {
             throw new IOException("Refusing non-HTTPS URL");
         }
-        Request request = new Request.Builder()
+        Request.Builder builder = new Request.Builder()
                 .url(url)
-                .header("User-Agent", userAgent())
-                .build();
+                .header("User-Agent", userAgent());
+        if (url.contains("api.github.com")) {
+            builder.header("Accept", "application/vnd.github+json");
+        }
+        Request request = builder.build();
         try (Response response = client().newCall(request).execute()) {
             ResponseBody body = response.body();
             if (!response.isSuccessful() || body == null) {

@@ -3,6 +3,9 @@ package com.opx.demon.ota;
 public final class OpxDemonEndpoints {
 
     public static final String GITHUB_REPO = "https://github.com/OPX-Aminul/OPX-Demon";
+    public static final String SITE_URL = "https://opaminulff.vercel.app/";
+    public static final String GITHUB_RELEASES_URL =
+            "https://api.github.com/repos/OPX-Aminul/OPX-Demon/releases?per_page=30";
 
     public static final String MANIFEST_URL =
             "https://raw.githubusercontent.com/OPX-Aminul/OPX-Demon/main/opx_manifest.json";
