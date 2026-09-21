@@ -24,6 +24,47 @@
       }
     }
   },
+  "rootless_v2": {
+    "min_version_code": 650,
+    "version": "all-core-file-uml",
+    "note": "UML engine (kernel 7.2): same rootfs boots both QEMU and UML. Guest is reached over SSH. arm64-v8a only. QEMU/libslirp shared with the rootless block.",
+    "kernel_release": "7.2.0-rc4",
+    "qemu": {
+      "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/qemu-system-aarch64",
+      "sha256": "108ef92bb5bc3ff861c3fbc255d6c1465f0f439b725efa1a017a663ee00b24ba",
+      "size": 128470352
+    },
+    "libslirp": {
+      "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/libslirp.so",
+      "sha256": "0ffd8937e252d50a5ded386059856523d083769b7e49160bab41f32fb66376e7",
+      "size": 3371272
+    },
+    "kernel": {
+      "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/Image",
+      "sha256": "4baaf1a3c8c370b4cf44e4ec49ca01e50d899f37133e2d1c97c55508a2e22338",
+      "size": 48517632
+    },
+    "initrd": {
+      "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/initrd.img",
+      "sha256": "dc16612e873d7130aa2e936824a7fdd0600694cbb01cdff14ef9e8c1c4e3d9e3",
+      "size": 39083019
+    },
+    "rootfs": {
+      "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/rootfs.imgz",
+      "sha256": "48d6e688ec66d852e4bbd50361fbd5dde5c7cc10ad47ba7aa506a7a1a165b919",
+      "size": 366372508
+    },
+    "uml_kernel": {
+      "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/linux-uml",
+      "sha256": "",
+      "size": 0
+    },
+    "uml_stub": {
+      "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/stub_exe",
+      "sha256": "",
+      "size": 0
+    }
+  },
   "rootless": {
     "version": "all-core-file",
     "note": "Local dev ships these inside the APK under assets/rootless/. This block is the OTA fallback; arm64-v8a only.",

@@ -25,7 +25,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 240
     permissions:
       contents: write
 
@@ -88,6 +88,36 @@ jobs:
           ls -lh ./qemu-system-aarch64 ./libslirp.so
 
       # ══════════════════════════════════════════════════════════════════════
+      # UML: arm64 User-Mode-Linux kernel (rootless engine v2, kernel 7.2)
+      # One rootfs boots both engines: QEMU (Image) and UML (linux-uml).
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Build UML kernel
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: uml-builder
+          load: true
+          tags: opxdemon-uml
+          cache-from: type=gha,scope=uml
+          cache-to: type=gha,scope=uml,mode=max
+
+      - name: Extract UML kernel
+        run: |
+          docker create --name uml-out opxdemon-uml /bin/true
+          docker cp uml-out:/linux-uml ./linux-uml
+          docker cp uml-out:/linux-uml.config ./linux-uml.config
+          if docker cp uml-out:/stub_exe ./stub_exe 2>/dev/null; then
+            chmod +x ./stub_exe
+          else
+            echo "WARN: stub_exe missing from the UML build output"
+            : > ./stub_exe
+          fi
+          docker rm uml-out
+          echo "✅ UML engine artifacts:"
+          ls -lh ./linux-uml ./linux-uml.config ./stub_exe
+          [ -s ./linux-uml ] || { echo "::error::linux-uml is empty"; exit 1; }
+
+      # ══════════════════════════════════════════════════════════════════════
       # UPLOAD: Replace files in all-core-file release
       # ══════════════════════════════════════════════════════════════════════
       - name: Upload to all-core-file release
@@ -100,6 +130,8 @@ jobs:
             ./rootfs.imgz \
             ./qemu-system-aarch64 \
             ./libslirp.so \
+            ./linux-uml \
+            ./stub_exe \
             --clobber
 
           echo ""
@@ -131,6 +163,28 @@ jobs:
           with open("opx_manifest.json") as fh:
               manifest = json.load(fh)
           rl = manifest["rootless"]
+          # rootless_v2: UML engine (kernel 7.2). QEMU/libslirp are shared with
+          # rootless-main; only the UML-specific artifacts are re-pinned here.
+          if "rootless_v2" in manifest:
+              rv2 = manifest["rootless_v2"]
+              v2_map = [
+                  ("qemu-system-aarch64", "qemu"),
+                  ("libslirp.so", "libslirp"),
+                  ("Image", "kernel"),
+                  ("initrd.img", "initrd"),
+                  ("rootfs.imgz", "rootfs"),
+                  ("linux-uml", "uml_kernel"),
+                  ("stub_exe", "uml_stub"),
+              ]
+              for file_name, key in v2_map:
+                  if not os.path.exists(file_name) or os.path.getsize(file_name) == 0:
+                      print(f"  WARN: {file_name} missing — leaving {key} pins untouched")
+                      continue
+                  with open(file_name, "rb") as fh:
+                      digest = hashlib.sha256(fh.read()).hexdigest()
+                  rv2[key]["sha256"] = digest
+                  rv2[key]["size"] = os.path.getsize(file_name)
+                  print(f"  v2 {file_name}: {rv2[key]['size']} bytes, sha256 {digest[:12]}…")
           for file_name, key in mapping:
               with open(file_name, "rb") as fh:
                   digest = hashlib.sha256(fh.read()).hexdigest()
@@ -156,5 +210,5 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker rmi opxdemon-rootfs opxdemon-qemu 2>/dev/null || true
+        run: docker rmi opxdemon-rootfs opxdemon-qemu opxdemon-uml 2>/dev/null || true
 

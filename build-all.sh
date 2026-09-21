@@ -1,7 +1,8 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────────────────────────────
 # OPX-Demon Exact-Match Build Script
-# Builds: Rootfs + QEMU (uses Debian Trixie stock kernel)
+# Builds: Rootfs + QEMU + arm64 UML kernel (rootless v2)
+# (uses Debian Trixie stock kernel for the QEMU engine)
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -23,9 +24,10 @@ OPX-Demon Exact-Match Build Tool
 Usage: $0 [command]
 
 Commands:
-  all       Build rootfs + QEMU
+  all       Build rootfs + QEMU + UML kernel (full engine)
   rootfs    Build Debian Trixie rootfs only (rootfs.imgz)
   qemu      Build QEMU + libslirp only
+  uml       Build the arm64 UML kernel (linux-uml + stub_exe) only
   clean     Remove build artifacts
 
 EOF
@@ -58,19 +60,38 @@ build_qemu() {
     ls -lh "$SCRIPT_DIR/output/qemu-system-aarch64" "$SCRIPT_DIR/output/libslirp.so"
 }
 
+build_uml() {
+    log "Building arm64 UML kernel 7.2 (linux-uml + stub_exe)..."
+    docker build \
+        --build-arg "UML_REF=master" \
+        -t opxdemon-uml-builder --target uml-builder "$SCRIPT_DIR"
+    docker rm -f opxdemon-uml-extract 2>/dev/null || true
+    docker create --name opxdemon-uml-extract opxdemon-uml-builder
+    mkdir -p "$SCRIPT_DIR/output"
+    docker cp opxdemon-uml-extract:/linux-uml "$SCRIPT_DIR/output/"
+    docker cp opxdemon-uml-extract:/linux-uml.config "$SCRIPT_DIR/output/"
+    docker cp opxdemon-uml-extract:/stub_exe "$SCRIPT_DIR/output/stub_exe" 2>/dev/null || \
+        log "stub_exe missing — UML tree revision did not emit it"
+    docker rm opxdemon-uml-extract >/dev/null
+    success "UML engine ready."
+    ls -lh "$SCRIPT_DIR/output/linux-uml" "$SCRIPT_DIR/output/linux-uml.config"
+}
+
 [ $# -eq 0 ] && { show_help; exit 1; }
 
 case "$1" in
     rootfs)    build_rootfs ;;
     qemu)      build_qemu ;;
+    uml)       build_uml ;;
     all)
         build_rootfs
         build_qemu
+        build_uml
         ;;
     clean)
         log "Cleaning..."
         rm -rf "$SCRIPT_DIR/output"
-        docker rmi opxdemon-rootfs-builder opxdemon-qemu-builder 2>/dev/null || true
+        docker rmi opxdemon-rootfs-builder opxdemon-qemu-builder opxdemon-uml-builder 2>/dev/null || true
         success "Cleaned."
         ;;
     *)
