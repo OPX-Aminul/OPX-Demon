@@ -638,6 +638,47 @@ code {
   align-items: center; gap: 7px; }
 .dl-checks span::before { content: "✓"; color: var(--teal); font-weight: 700; }
 
+.dl-changelog {
+  max-width: 62ch; margin: 0 auto 28px; text-align: left;
+  color: var(--ink-2); font-size: 0.9rem;
+}
+.dl-changelog ul, .rel-notes {
+  list-style: none; display: grid; gap: 8px;
+}
+.dl-changelog li, .rel-notes li {
+  padding-left: 18px; position: relative;
+}
+.dl-changelog li::before, .rel-notes li::before {
+  content: "▸"; position: absolute; left: 0; color: var(--teal); font-size: 0.75rem;
+}
+
+.release-list { display: grid; gap: 14px; }
+.release-skel {
+  padding: 22px 24px; text-align: center; color: var(--ink-2); font-size: 0.92rem;
+}
+.release-skel a { color: var(--teal); font-weight: 600; }
+.release-card { padding: 22px 24px; text-align: left;
+  transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s; }
+.release-card:hover { transform: translateY(-4px);
+  border-color: rgba(0,229,192,0.35); box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+.rel-top { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.release-card h3 { font-size: 1.08rem; font-weight: 800; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rel-badge {
+  font-family: var(--mono); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em;
+  color: #03110d; background: linear-gradient(135deg, var(--teal), var(--aqua));
+  border-radius: 999px; padding: 3px 9px;
+}
+.rel-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px;
+  font-family: var(--mono); font-size: 0.74rem; color: var(--ink-3); }
+.rel-meta span { color: var(--ink-2); }
+.rel-dl { padding: 11px 18px; font-size: 0.82rem; border-radius: 12px; }
+.rel-notes { margin-top: 14px; color: var(--ink-2); font-size: 0.86rem; }
+
+@media (max-width: 760px) {
+  .rel-top { flex-direction: column; }
+  .rel-dl { width: 100%; justify-content: center; }
+}
+
 /* ============================================================
    Requirements
    ============================================================ */

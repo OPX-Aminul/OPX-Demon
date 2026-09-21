@@ -6,7 +6,7 @@
 
   <!-- Primary SEO -->
   <title>OPX-Demon — Mobile Pentest Suite for Android | OP AMINUL FF</title>
-  <meta name="description" content="OPX-Demon is a free, open-source mobile pentest suite for Android: WiFi attacks (deauth, handshake, WPS Pixie Dust), Nmap, Nuclei web scanning, Metasploit, HID & USB arsenal, MAC changer, BLE WhisperPair and more — running a full Debian trixie chroot or rootless QEMU VM on your device. Download the latest APK v1.0.8 free.">
+  <meta name="description" content="OPX-Demon is a free, open-source mobile pentest suite for Android: WiFi attacks (deauth, handshake, WPS Pixie Dust), Nmap, Nuclei web scanning, Metasploit, HID & USB arsenal, MAC changer, BLE WhisperPair and more — running a full Debian trixie chroot or rootless QEMU VM on your device. Download the latest APK free from GitHub Releases.">
   <meta name="keywords" content="OP Aminul Left, OPX Aminul, OP Aminul FF, OPX, OPX-Demon, OPX Demon, opx demon download, opx aminul left, op aminul ff app, android pentest suite, wifi pentesting android, pixie dust wps attack apk, nmap android apk, metasploit android apk, nuclei android, hid attack android, usb arsenal android, mac changer android, opx tools, opaminulff">
   <meta name="author" content="OPX-AMINUL (OP AMINUL FF)">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
@@ -47,7 +47,7 @@
   <link rel="manifest" href="manifest.json">
 
   <!-- Structured data: SoftwareApplication -->
-  <script type="application/ld+json">
+  <script type="application/ld+json" id="ld-app">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
@@ -55,7 +55,7 @@
     "alternateName": ["OPX Demon", "OP Aminul Left", "OPX Aminul", "OPX Aminul Left"],
     "operatingSystem": "Android 7.0+",
     "applicationCategory": "SecurityApplication",
-    "softwareVersion": "1.0.8",
+    "softwareVersion": "1.1.10",
     "fileSize": "~120MB",
     "license": "https://www.gnu.org/licenses/gpl-3.0.html",
     "author": {
@@ -142,14 +142,14 @@
     <section class="view" id="view-home">
       <div class="hero">
         <div class="hero-copy">
-          <span class="hero-badge"><span class="pulse-dot"></span> v1.0.8 · LATEST RELEASE OUT NOW</span>
+          <span class="hero-badge"><span class="pulse-dot"></span> <span id="hero-version">Latest · live from GitHub</span></span>
           <h1>Demon-grade<br><span class="grad">pentest power</span><br>in your pocket.</h1>
           <p class="tagline"><b>OPX-Demon</b> is a free, open-source mobile penetration-testing suite for Android.
             WiFi attacks, Nmap, Nuclei, Metasploit, HID &amp; USB gadgets — all running from a real
             <b>Debian trixie arm64 chroot</b>, or a <b>rootless QEMU VM</b> when root is unavailable.</p>
           <div class="hero-cta">
-            <a class="btn btn-primary dl-link" href="https://github.com/OPX-Aminul/OPX-Demon/releases/latest/download/app-release.apk">
-              &#11015;&#65039; Download APK — Free
+            <a class="btn btn-primary dl-link" id="hero-dl" href="https://github.com/OPX-Aminul/OPX-Demon/releases/latest">
+              Download latest APK — Free
             </a>
             <a class="btn btn-ghost" href="#/modules">Explore 16 modules &#8594;</a>
           </div>
@@ -236,7 +236,7 @@
         <div class="cta-band glass reveal">
           <h2>Ready to unleash the demon?</h2>
           <p>Grab the latest signed APK straight from GitHub Releases — always current, always free.</p>
-          <a class="btn btn-primary dl-link" href="https://github.com/OPX-Aminul/OPX-Demon/releases/latest/download/app-release.apk">&#11015;&#65039; Download OPX-Demon v1.0.8</a>
+          <a class="btn btn-primary dl-link" href="https://github.com/OPX-Aminul/OPX-Demon/releases/latest" id="cta-dl"><span id="cta-version">Download latest APK</span></a>
         </div>
       </div>
     </section>
@@ -391,16 +391,15 @@
         <div class="sec-head reveal">
           <span class="sec-kicker">get the app</span>
           <h2>Download OPX-Demon.</h2>
-          <p>One button, always the newest build — the link resolves to the latest GitHub release every time you click it.</p>
+          <p>Version, changelog and APK link are fetched live from GitHub Releases every time this page loads. A new release on GitHub shows up here automatically.</p>
         </div>
         <div class="download-panel glass reveal">
           <div class="dl-icon" aria-hidden="true">&#11015;&#65039;</div>
-          <h2>OPX-Demon <span class="ver">v1.0.8 · build 108</span></h2>
-          <p class="dl-note">Signed release APK (minified, R8). Installs alongside any stock launcher.
-            On first launch the in-app installer fetches the Debian trixie arm64 core (~1 GB) —
-            Wi-Fi is recommended.</p>
-          <a class="btn btn-primary dl-big dl-link" href="https://github.com/OPX-Aminul/OPX-Demon/releases/latest/download/app-release.apk">
-            &#11015;&#65039; Download latest APK — Free
+          <h2>OPX-Demon <span class="ver" id="dl-version">fetching latest…</span></h2>
+          <p class="dl-note" id="dl-note">Loading the newest GitHub release. On first launch the in-app installer fetches the Debian trixie arm64 core (~1 GB) — Wi-Fi is recommended.</p>
+          <div class="dl-changelog" id="dl-changelog">Connecting to GitHub…</div>
+          <a class="btn btn-primary dl-big dl-link" href="https://github.com/OPX-Aminul/OPX-Demon/releases/latest" id="dl-main">
+            Download latest APK — Free
           </a>
           <div class="dl-alt">
             <a href="https://github.com/OPX-Aminul/OPX-Demon/releases" target="_blank" rel="noopener">All releases</a>
@@ -410,6 +409,17 @@
           </div>
           <div class="dl-checks">
             <span>No ads</span><span>No trackers</span><span>GPLv3 licensed</span><span>Reproducible signing</span><span>Android 7.0+</span>
+          </div>
+        </div>
+
+        <div class="section" id="releases-live">
+          <div class="sec-head reveal">
+            <span class="sec-kicker">github live</span>
+            <h2>Every app release, live.</h2>
+            <p>Pulled from the GitHub Releases API. New tags appear here as soon as they are published — no site rebuild required.</p>
+          </div>
+          <div class="release-list" id="release-list">
+            <div class="release-skel glass">Loading releases from GitHub…</div>
           </div>
         </div>
 
