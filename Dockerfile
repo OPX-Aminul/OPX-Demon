@@ -92,8 +92,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN wget -q https://dl.google.com/android/repository/android-ndk-r27c-linux.zip -O /tmp/ndk.zip \
     && unzip -q /tmp/ndk.zip -d /opt && mv /opt/android-ndk-r27c /opt/ndk && rm /tmp/ndk.zip
 ENV NDK=/opt/ndk
-ENV LLVM=${NDK}/toolchains/llvm/prebuilt/linux-x86_64
-ENV PATH=${LLVM}/bin:${PATH}
+# NOTE: this must NOT be exported as "LLVM" — kbuild treats LLVM as a build
+# parameter (only empty, "1", or a trailing-slash path is valid) and aborts
+# with "Invalid value for LLVM" if it sees a plain path in the environment.
+ENV NDK_LLVM=${NDK}/toolchains/llvm/prebuilt/linux-x86_64
+ENV PATH=${NDK_LLVM}/bin:${PATH}
 
 RUN git clone --depth=1 --branch "${UML_REF}" "${UML_REPO}" linux-um
 
