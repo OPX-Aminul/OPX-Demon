@@ -142,8 +142,8 @@ jobs:
               fh.write("\n")
           PY
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "OPX-Aminul"
+          git config user.email "305739020+OPX-Aminul@users.noreply.github.com"
           git add opx_manifest.json
           if git diff --cached --quiet; then
             echo "✅ Manifest already in sync — nothing to commit"
