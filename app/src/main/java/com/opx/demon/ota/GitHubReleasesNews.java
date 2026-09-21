@@ -13,6 +13,7 @@ public final class GitHubReleasesNews {
 
     private static final int MAX_RELEASES = 20;
     private static final int MAX_BODY_CHARS = 900;
+    private static final String NEWS_SINCE = "2026-09-21T00:00:00Z";
 
     private GitHubReleasesNews() {
     }
@@ -22,7 +23,7 @@ public final class GitHubReleasesNews {
             String json = Net.getString(OpxDemonEndpoints.GITHUB_RELEASES_URL, 1024 * 1024);
             return fromJson(json);
         } catch (Exception e) {
-            return new ArrayList<>();
+            return null;
         }
     }
 
@@ -35,7 +36,7 @@ public final class GitHubReleasesNews {
                 continue;
             }
             String tag = o.optString("tag_name", "");
-            if (!isAppRelease(tag)) {
+            if (!isAppRelease(tag) || !isNewRelease(o.optString("published_at", ""))) {
                 continue;
             }
             News news = toNews(o, list.size());
@@ -58,6 +59,10 @@ public final class GitHubReleasesNews {
             return false;
         }
         return !lower.startsWith("chroot");
+    }
+
+    static boolean isNewRelease(String publishedAt) {
+        return publishedAt != null && publishedAt.compareTo(NEWS_SINCE) > 0;
     }
 
     private static News toNews(JSONObject o, int index) {

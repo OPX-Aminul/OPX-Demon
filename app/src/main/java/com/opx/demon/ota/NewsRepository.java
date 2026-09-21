@@ -32,7 +32,7 @@ public final class NewsRepository {
         Handler main = new Handler(Looper.getMainLooper());
         new Thread(() -> {
             List<News> list = GitHubReleasesNews.fetch();
-            if (list.isEmpty()) {
+            if (list == null) {
                 list = cachedReleases(appContext);
             } else {
                 cacheReleases(appContext, list);
@@ -47,7 +47,7 @@ public final class NewsRepository {
         }).start();
     }
 
-    private static final String KEY_RELEASES_CACHE = "github_releases_news_cache";
+    private static final String KEY_RELEASES_CACHE = "github_releases_news_cache_v2";
 
     private static void cacheReleases(Context context, List<News> list) {
         try {
