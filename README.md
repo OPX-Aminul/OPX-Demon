@@ -50,6 +50,25 @@ rate-limit-free download URL when the GitHub API is blocked.
 
 ---
 
+## Rootless engine v2 — UML on arm64 (reproduced build)
+
+The original developer's `rootless-650` test release changed the rootless engine: kernel **7.2**
+(7.2.0-rc4), **one rootfs boots both QEMU and UML**, and the guest is reached over **SSH**. OPX-Demon
+carries its own build scripts that reproduce that engine from public sources:
+
+| Artifact | What it is | How this repo builds it |
+|---|---|---|
+| `linux-uml` | arm64 **User-Mode Linux** kernel — a normal userspace ELF (`CONFIG_UML=y`, `CONFIG_UML_ARM64=y`, `CONFIG_STATIC_LINK=y`), kernel 7.2-rc4 lineage, USB-WiFi drivers built in | `build-tools/uml-build.sh` inside the `uml-builder` Docker stage: Linux 7.2-rc UML tree, `make ARCH=um SUBARCH=arm64` with the Android NDK (clang/LLD) toolchain and `build-tools/uml-arm64.config` |
+| `stub_exe` | ~1.9 KB static arm64 ELF carrying a `uml-userspace` build note — the UML build tree's stub binary | collected from the same UML build output |
+| `Image` / `initrd.img` / `rootfs.imgz` | the shared 7.2 QEMU-boot kernel and rootfs (one image boots both engines) | existing `rootfs-builder` / `kernel-builder` stages |
+
+Run the UML stage alone with `./build-all.sh uml` (or the full engine with `./build-all.sh all`); CI
+uploads `linux-uml` + `stub_exe` to the `all-core-file` release and re-pins their hashes into the
+`rootless_v2` block of `opx_manifest.json`. The rootfs kernel side now targets the 7.2 series to
+match: keep `KERNEL_VERSION` in sync with the UML tree when bumping either.
+
+---
+
 ## Capabilities
 
 | Module | Description |
@@ -138,7 +157,7 @@ app/
 ├── src/main/jni/                         # native code (ndk-build)
 ├── src/main/assets/                      # chroot scripts, wordlists, busybox
 └── src/main/res/                         # layouts, drawables, strings, themes
-build-tools/                              # kernel patching + firmware build assets
+build-tools/                              # kernel patching + firmware + UML build assets
 build-rootfs/                             # rootfs build scripts (CI)
 .github/workflows/                        # core rebuild + signed APK pipelines
 ```
