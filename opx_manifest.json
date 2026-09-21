@@ -29,18 +29,18 @@
     "note": "Local dev ships these inside the APK under assets/rootless/. This block is the OTA fallback; arm64-v8a only.",
     "qemu": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/qemu-system-aarch64",
-      "sha256": "108ef92bb5bc3ff861c3fbc255d6c1465f0f439b725efa1a017a663ee00b24ba",
-      "size": 128470352
+      "sha256": "c0e16921459b19c769534acc89eaca117375026c40da162413f22eeb1486be07",
+      "size": 128404816
     },
     "kernel": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/Image",
-      "sha256": "4baaf1a3c8c370b4cf44e4ec49ca01e50d899f37133e2d1c97c55508a2e22338",
+      "sha256": "0157332aaa6b70b6bdc49aec31337cf7834dc2e4317c017f91da49090b475b73",
       "size": 48517632
     },
     "initrd": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/initrd.img",
-      "sha256": "dc16612e873d7130aa2e936824a7fdd0600694cbb01cdff14ef9e8c1c4e3d9e3",
-      "size": 39083019
+      "sha256": "ee410d1256f0da318bd88e61e3579ccbd9a5ea5b953ee4b428d4bcc6d113b825",
+      "size": 39100336
     },
     "libslirp": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/libslirp.so",
@@ -49,8 +49,8 @@
     },
     "rootfs": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/rootfs.imgz",
-      "sha256": "48d6e688ec66d852e4bbd50361fbd5dde5c7cc10ad47ba7aa506a7a1a165b919",
-      "size": 366372508
+      "sha256": "432781f869c997e5ab7c9923f076e0651bc106bfa9d46ef8b699ef2f210c50eb",
+      "size": 366473517
     }
   },
   "app": {
