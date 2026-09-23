@@ -27,8 +27,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # install the exact SDK packages the project needs (same recipe as
+      # android.yml). setup-android@v3's default package list still includes
+      # the long-obsolete "tools" package, which sdkmanager no longer serves
+      # ("Failed to find package 'tools'") — so it fails before gradle runs.
+      - name: Install SDK platform, build-tools, NDK and CMake
+        run: |
+          SDKMANAGER="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" "platforms;android-33" "build-tools;34.0.0" "ndk;25.1.8937393" "cmake;3.22.1"
 
       - name: Build APK (lightweight — no bundled binaries)
         run: |
