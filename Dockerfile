@@ -72,12 +72,14 @@ RUN mkdir -p /work/firmware/rtlwifi /work/firmware/rtw88 /work/firmware/ath9k_ht
 #                 One rootfs boots both this UML binary and the QEMU Image.
 #   • stub_exe  : the ~1.9 KB static "uml-userspace" ELF emitted by the same
 #                 UML build tree, shipped as a separate release asset.
-# The public arm64-UML source tree used here is g0l4/uml-for-aarch64
-# (7.1/7.2-rc lineage; `make ARCH=um SUBARCH=arm64`), which is the only public
-# tree matching the released UML config family.
+# The source tree is the original developer's own arm64-UML port —
+# zalexdev/linux-um-arm64, branch um-arm64 — whose tip commit is exactly the
+# released build commit 8897487c5223 (the linux-uml banner says
+# "7.2.0-rc4-g8897487c5223" and g8897487c5223 is that branch's HEAD).
+# https://github.com/zalexdev/linux-um-arm64/tree/um-arm64
 FROM debian:bookworm AS uml-builder
-ARG UML_REPO=https://github.com/g0l4/uml-for-aarch64.git
-ARG UML_REF=master
+ARG UML_REPO=https://github.com/zalexdev/linux-um-arm64.git
+ARG UML_REF=um-arm64
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /usr/src
 
