@@ -201,7 +201,13 @@ if command -v readelf >/dev/null 2>&1; then
         die "linux-uml is dynamically linked — CONFIG_STATIC_LINK did not hold"
     fi
     # Banner parity: same kernel revision, same pinned build env.
-    BANNER="$(strings "${OUT}/linux-uml" | grep -m1 '^Linux version 7\.')"
+    # Do NOT use "strings | grep -m1": grep exiting early after the match makes
+    # strings die on SIGPIPE, and with set -o pipefail the whole pipeline exits
+    # 141 — this killed an otherwise fully linked build (main's post-merge CI).
+    # Read the banner straight from the file instead: vmlinux embeds the
+    # banner verbatim as a NUL-terminated C string (linux_banner[]), so match
+    # up to the first control byte — no pipes, no SIGPIPE, no megabyte match.
+    BANNER="$(grep -aom1 'Linux version 7\.[^"[:cntrl:]]*' "${OUT}/linux-uml" || true)"
     case "${BANNER}" in
         "Linux version ${KVER_BASELINE}-g8897487c5223 (stryker@images)"*)
             log "Banner matches the original release: ${BANNER}" ;;
