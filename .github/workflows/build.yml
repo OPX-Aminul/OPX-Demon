@@ -104,18 +104,21 @@ jobs:
       - name: Extract UML kernel
         run: |
           docker create --name uml-out opxdemon-uml /bin/true
-          docker cp uml-out:/linux-uml ./linux-uml
-          docker cp uml-out:/linux-uml.config ./linux-uml.config
-          if docker cp uml-out:/stub_exe ./stub_exe 2>/dev/null; then
-            chmod +x ./stub_exe
-          else
-            echo "WARN: stub_exe missing from the UML build output"
-            : > ./stub_exe
-          fi
+          # uml-build.sh writes its artifacts to the OUT dir (/out), not the
+          # image root — copying from / would never find them.
+          docker run --rm opxdemon-uml ls -lh /out
+          docker cp uml-out:/out/linux-uml ./linux-uml
+          docker cp uml-out:/out/linux-uml.config ./linux-uml.config
+          # uml-build.sh hard-fails without the stub, so a missing/empty copy
+          # here is a real pipeline error — fail loudly instead of uploading
+          # a 0-byte stub that installs would verify-forever-loop on.
+          docker cp uml-out:/out/stub_exe ./stub_exe
+          chmod +x ./stub_exe
           docker rm uml-out
           echo "✅ UML engine artifacts:"
           ls -lh ./linux-uml ./linux-uml.config ./stub_exe
           [ -s ./linux-uml ] || { echo "::error::linux-uml is empty"; exit 1; }
+          [ -s ./stub_exe ] || { echo "::error::stub_exe is empty"; exit 1; }
 
       # ══════════════════════════════════════════════════════════════════════
       # UPLOAD: Replace files in all-core-file release
