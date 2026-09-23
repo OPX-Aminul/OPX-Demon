@@ -101,12 +101,14 @@ ENV PATH=${NDK_LLVM}/bin:${PATH}
 RUN git clone --depth=1 --branch "${UML_REF}" "${UML_REPO}" linux-um
 
 COPY build-tools/uml-arm64.config /usr/src/uml-arm64.config
+COPY build-tools/uml-kconfig-prompts.patch /usr/src/uml-kconfig-prompts.patch
 COPY build-tools/uml-build.sh /usr/src/uml-build.sh
 RUN chmod +x /usr/src/uml-build.sh
 
 # The UML kernel is a normal userspace program: no cross headers beyond what
 # the NDK provides, no modules (CONFIG_MODULES=n), no initramfs, no dtb.
-RUN UML_CONFIG=/usr/src/uml-arm64.config /usr/src/uml-build.sh /usr/src/linux-um /out
+RUN UML_CONFIG=/usr/src/uml-arm64.config UML_PATCH=/usr/src/uml-kconfig-prompts.patch \
+    /usr/src/uml-build.sh /usr/src/linux-um /out
 
 # ==============================================================================
 # SECTION 1: Rootfs (Debian Trixie + pentest tools + opxdemon-agentd)
