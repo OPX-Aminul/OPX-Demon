@@ -72,15 +72,23 @@ LLVM="${LLVM:-${NDK}/toolchains/llvm/prebuilt/linux-x86_64}"
 CLANG="${CLANG:-${LLVM}/bin/clang}"
 API="${API:-26}"
 SYSROOT="${LLVM}/sysroot"
-# Argument order matters: kbuild appends its own CLANG_FLAGS
-# (--target=aarch64-linux-gnu, from scripts/Makefile.clang) AFTER our CC, and
-# clang applies the LAST --target. The NDK sysroot only exposes <asm/*.h> to
-# android triples — a linux-gnu target drops the triple multiarch include dir
-# (usr/include/aarch64-linux-android), which is exactly where asm/types.h
-# lives, so archprepare dies with "'asm/types.h' file not found". Passing our
-# target LAST in CC lets the compiler command line re-override kbuild's.
+# kbuild appends its own CLANG_FLAGS (--target=aarch64-linux-gnu, from
+# scripts/Makefile.clang) AFTER our CC — clang applies the LAST --target, and
+# both KBUILD_CPPFLAGS (kernel objects) and USER_CFLAGS (arch/um user objects,
+# via arch/um/scripts/Makefile.rules) carry it. Re-asserting the target in CC
+# does NOT win, because USER_CFLAGS lands inside c_flags after everything on
+# the CC command line: arch/arm64/um still dies at archprepare with
+# "'asm/types.h' file not found" (the linux-gnu triple drops the NDK's
+# usr/include/aarch64-linux-android multiarch dir where asm/types.h lives).
+# The clean override is the variable scripts/Makefile.clang itself consults:
+#   CLANG_TARGET_FLAGS_um := $(CLANG_TARGET_FLAGS_$(SUBARCH))
+# Passing CLANG_TARGET_FLAGS_arm64=... on the make command line (command-line
+# variables beat every Makefile assignment, per GNU make) resolves the um
+# target to the android triple too, so KBUILD_CPPFLAGS and USER_CFLAGS both
+# carry --target=aarch64-linux-androidN. --sysroot stays in CC: it only needs
+# to win the command line, and nothing else adds one.
 CC_TARGET="--target=aarch64-linux-android${API} --sysroot=${SYSROOT}"
-CC_OVERRIDES="--target=aarch64-linux-android${API}"
+CLANG_TARGET="aarch64-linux-android${API}"
 
 # ── Config ───────────────────────────────────────────────────────────────
 # Resolve the checked-in released-config fragment: repo checkouts keep it in
@@ -124,11 +132,13 @@ log "make -j${JOBS} ARCH=um SUBARCH=arm64 (clang/LLD, android${API})"
 # runner's hostname/timestamp into the artifact.
 # archprepare compiles USER_OBJS with USER_CFLAGS, which intentionally drops
 # KBUILD_CPPFLAGS — so --sysroot only reaches the compiler through CC itself,
-# and USER_CFLAGS re-appends $(CLANG_FLAGS) whose --target must lose to ours.
+# while the --target kbuild appends is redirected to the android triple via
+# CLANG_TARGET_FLAGS_arm64 (see the toolchain comment above).
 KBUILD_BUILD_USER=stryker KBUILD_BUILD_HOST=images \
 KBUILD_BUILD_TIMESTAMP="Thu Jan  1 00:00:00 UTC 1970" \
 make -j"${JOBS}" -C "${SRC}" ARCH=um SUBARCH=arm64 \
-    CC="${CLANG} ${CC_TARGET} ${CC_OVERRIDES}" \
+    CC="${CLANG} ${CC_TARGET}" \
+    CLANG_TARGET_FLAGS_arm64="${CLANG_TARGET}" \
     LLVM=1 PATH="${LLVM}/bin:${PATH}" \
     linux
 # ── Collect ──────────────────────────────────────────────────────────────────
