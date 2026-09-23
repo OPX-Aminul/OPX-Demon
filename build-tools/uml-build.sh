@@ -70,7 +70,14 @@ log "Building arm64 UML kernel (baseline ${KVER_BASELINE}, ${JOBS} jobs)"
 NDK="${NDK:-/opt/ndk}"
 LLVM="${LLVM:-${NDK}/toolchains/llvm/prebuilt/linux-x86_64}"
 CLANG="${CLANG:-${LLVM}/bin/clang}"
-API="${API:-26}"
+# API 34, not the QEMU stage's 26: the released linux-uml compiles the UML
+# user objects cleanly, and those call memfd_create (bionic API 29+) and
+# statx (API 30+) — an API-26 sysroot lacks both declarations and dies with
+# -Wimplicit-function-declaration (as PR #11's CI run proved). API ≥ 30 is
+# therefore the released build's own constraint; 34 is the modern choice
+# within the same NDK r27c, and bionic's syscall wrappers are runtime calls,
+# so the static binary still runs on older kernels.
+API="${API:-34}"
 SYSROOT="${LLVM}/sysroot"
 # kbuild appends its own CLANG_FLAGS (--target=aarch64-linux-gnu, from
 # scripts/Makefile.clang) AFTER our CC — clang applies the LAST --target, and
