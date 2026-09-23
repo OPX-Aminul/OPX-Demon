@@ -33,33 +33,38 @@ die()     { printf "${RED}ERROR:${NC} %s\n" "$*" >&2; exit 1; }
 
 [ -f "${SRC}/Makefile" ] || die "Linux source tree not found at ${SRC}"
 
-# ── Tree patch: expose UML IOMEM/DMA emulation prompts ──────────────────────
+# ── Tree fix: expose UML IOMEM/DMA emulation prompts ─────────────────────────
 # The public arm64-UML tree keeps UML_IOMEM_EMULATION / UML_DMA_EMULATION
 # invisible — they can only be enabled via UML_PCI's selects. The released
 # rootless-650 Image.config sets both directly (with INDIRECT_IOMEM, USB,
 # RTL8XXXU/ATH9K_HTC and no PCI machinery), so the original tree exposed
-# prompts for them. Without this patch olddefconfig silently drops
+# prompts for them. Without this fix olddefconfig silently drops
 # CONFIG_UML_IOMEM_EMULATION, NO_IOMEM stays on, HAS_IOMEM/USB_SUPPORT become
-# unreachable, and the USB-WiFi drivers fall out of the config. Apply the
-# checked-in patch (idempotent — skipped if already applied or unavailable).
-UM_PATCH=""
-for cand in "${UML_PATCH:-}" \
-    "$(dirname "$(readlink -f "$0")")/uml-kconfig-prompts.patch"; do
-    [ -n "${cand}" ] && [ -f "${cand}" ] && UM_PATCH="${cand}" && break
-done
-if [ -n "${UM_PATCH}" ] && ! grep -A1 '^config UML_IOMEM_EMULATION' "${SRC}/arch/um/Kconfig" | grep -q 'bool "'; then
-    log "Applying UML Kconfig prompts patch: ${UM_PATCH}"
-    if patch -d "${SRC}" -p1 --forward --silent < "${UM_PATCH}" 2>/dev/null \
-        || patch -d "${SRC}" -p0 --forward --silent < "${UM_PATCH}" 2>/dev/null; then
-        log "Kconfig patch applied"
-    else
-        die "Failed to apply ${UM_PATCH} to ${SRC}/arch/um/Kconfig — tree drifted?"
-    fi
+# unreachable, and the USB-WiFi drivers fall out of the config.
+# Edited in place with python3 (the builder image has no `patch` binary and
+# an external .patch blob proved fragile). Idempotent: skipped when the
+# prompts are already present.
+KCONFIG="${SRC}/arch/um/Kconfig"
+[ -f "${KCONFIG}" ] || die "${KCONFIG} not found — unexpected tree layout"
+if ! grep -A1 '^config UML_IOMEM_EMULATION' "${KCONFIG}" | grep -q 'bool "'; then
+    log "Exposing UML IOMEM/DMA emulation prompts in ${KCONFIG}"
+    python3 - "${KCONFIG}" <<'PYEOF'
+import sys
+path = sys.argv[1]
+s = open(path).read()
+s = s.replace("config UML_DMA_EMULATION\n\tbool\n",
+              "config UML_DMA_EMULATION\n\tbool \"UML DMA emulation\"\n")
+s = s.replace("config UML_IOMEM_EMULATION\n\tbool\n",
+              "config UML_IOMEM_EMULATION\n\tbool \"UML IOMEM emulation\"\n")
+open(path, "w").write(s)
+PYEOF
 fi
 # Fail hard if the prompts are still missing: proceeding silently would ship
 # an engine without USB-WiFi drivers.
-grep -A1 '^config UML_IOMEM_EMULATION' "${SRC}/arch/um/Kconfig" | grep -q 'bool "' \
-    || die "arch/um/Kconfig lacks UML_IOMEM_EMULATION prompt — patch did not apply"
+grep -A1 '^config UML_IOMEM_EMULATION' "${KCONFIG}" | grep -q 'bool "' \
+    || die "${KCONFIG} lacks UML_IOMEM_EMULATION prompt — tree drifted, update the inline edit"
+grep -A1 '^config UML_DMA_EMULATION' "${KCONFIG}" | grep -q 'bool "' \
+    || die "${KCONFIG} lacks UML_DMA_EMULATION prompt — tree drifted, update the inline edit"
 
 JOBS="$(nproc)"
 KVER_BASELINE="7.2.0-rc4"
