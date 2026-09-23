@@ -33,6 +33,34 @@ die()     { printf "${RED}ERROR:${NC} %s\n" "$*" >&2; exit 1; }
 
 [ -f "${SRC}/Makefile" ] || die "Linux source tree not found at ${SRC}"
 
+# ── Tree patch: expose UML IOMEM/DMA emulation prompts ──────────────────────
+# The public arm64-UML tree keeps UML_IOMEM_EMULATION / UML_DMA_EMULATION
+# invisible — they can only be enabled via UML_PCI's selects. The released
+# rootless-650 Image.config sets both directly (with INDIRECT_IOMEM, USB,
+# RTL8XXXU/ATH9K_HTC and no PCI machinery), so the original tree exposed
+# prompts for them. Without this patch olddefconfig silently drops
+# CONFIG_UML_IOMEM_EMULATION, NO_IOMEM stays on, HAS_IOMEM/USB_SUPPORT become
+# unreachable, and the USB-WiFi drivers fall out of the config. Apply the
+# checked-in patch (idempotent — skipped if already applied or unavailable).
+UM_PATCH=""
+for cand in "${UML_PATCH:-}" \
+    "$(dirname "$(readlink -f "$0")")/uml-kconfig-prompts.patch"; do
+    [ -n "${cand}" ] && [ -f "${cand}" ] && UM_PATCH="${cand}" && break
+done
+if [ -n "${UM_PATCH}" ] && ! grep -A1 '^config UML_IOMEM_EMULATION' "${SRC}/arch/um/Kconfig" | grep -q 'bool "'; then
+    log "Applying UML Kconfig prompts patch: ${UM_PATCH}"
+    if patch -d "${SRC}" -p1 --forward --silent < "${UM_PATCH}" 2>/dev/null \
+        || patch -d "${SRC}" -p0 --forward --silent < "${UM_PATCH}" 2>/dev/null; then
+        log "Kconfig patch applied"
+    else
+        die "Failed to apply ${UM_PATCH} to ${SRC}/arch/um/Kconfig — tree drifted?"
+    fi
+fi
+# Fail hard if the prompts are still missing: proceeding silently would ship
+# an engine without USB-WiFi drivers.
+grep -A1 '^config UML_IOMEM_EMULATION' "${SRC}/arch/um/Kconfig" | grep -q 'bool "' \
+    || die "arch/um/Kconfig lacks UML_IOMEM_EMULATION prompt — patch did not apply"
+
 JOBS="$(nproc)"
 KVER_BASELINE="7.2.0-rc4"
 log "Building arm64 UML kernel (baseline ${KVER_BASELINE}, ${JOBS} jobs)"
@@ -101,6 +129,7 @@ cp "${SRC}/.config" "${OUT}/linux-uml.config"
 # the arm64 port may place it under arch/um or arch/arm64/um):
 STUB=""
 for cand in \
+    "${SRC}/arch/um/kernel/skas/stub_exe" \
     "${SRC}/arch/um/kernel/stub_exe" \
     "${SRC}/arch/um/stub_exe" \
     "${SRC}/arch/arm64/um/stub_exe" \
