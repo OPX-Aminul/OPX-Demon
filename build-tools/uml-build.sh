@@ -13,9 +13,10 @@
 #                  build-id note; it is the UML build tree's stub binary,
 #                  collected out of the same build output.
 #
-# Public arm64-UML source tree (matches the released 7.2-rc4 lineage):
-#   https://github.com/g0l4/uml-for-aarch64   (make ARCH=um SUBARCH=arm64,
-#                                              arch/um/configs/arm64_defconfig)
+# Public source tree (the original developer's own arm64-UML port — the
+# released 7.2.0-rc4-g8897487c5223 banner pins its um-arm64 branch tip):
+#   https://github.com/zalexdev/linux-um-arm64   (make ARCH=um SUBARCH=arm64,
+#                                                  branch um-arm64)
 #
 # Usage: uml-build.sh <linux-src-dir> <out-dir>
 #        Expects the Android NDK clang toolchain already set up in the env
@@ -33,79 +34,39 @@ die()     { printf "${RED}ERROR:${NC} %s\n" "$*" >&2; exit 1; }
 
 [ -f "${SRC}/Makefile" ] || die "Linux source tree not found at ${SRC}"
 
-# ── Tree fix: expose UML IOMEM/DMA emulation prompts ─────────────────────────
-# The public arm64-UML tree keeps UML_IOMEM_EMULATION / UML_DMA_EMULATION
-# invisible — they can only be enabled via UML_PCI's selects. The released
-# rootless-650 Image.config sets both directly (with INDIRECT_IOMEM, USB,
-# RTL8XXXU/ATH9K_HTC and no PCI machinery), so the original tree exposed
-# prompts for them. Without this fix olddefconfig silently drops
-# CONFIG_UML_IOMEM_EMULATION, NO_IOMEM stays on, HAS_IOMEM/USB_SUPPORT become
-# unreachable, and the USB-WiFi drivers fall out of the config.
-# Edited in place with python3 (the builder image has no `patch` binary and
-# an external .patch blob proved fragile). Idempotent: skipped when the
-# prompts are already present.
+# ── Tree sanity: the original tree already has everything we need ────────────
+# The um-arm64 tip (the released build commit 8897487c5223) exposes
+# UML_IOMEM_EMULATION / UML_DMA_EMULATION prompts and no longer adds the
+# GCC-only -mabi=lp64 flag, so no source edits are needed — the script only
+# hard-fails if it is pointed at a drifted/different tree.
 KCONFIG="${SRC}/arch/um/Kconfig"
 [ -f "${KCONFIG}" ] || die "${KCONFIG} not found — unexpected tree layout"
-if ! grep -A1 '^config UML_IOMEM_EMULATION' "${KCONFIG}" | grep -q 'bool "'; then
-    log "Exposing UML IOMEM/DMA emulation prompts in ${KCONFIG}"
-    python3 - "${KCONFIG}" <<'PYEOF'
-import sys
-path = sys.argv[1]
-s = open(path).read()
-s = s.replace("config UML_DMA_EMULATION\n\tbool\n",
-              "config UML_DMA_EMULATION\n\tbool \"UML DMA emulation\"\n")
-s = s.replace("config UML_IOMEM_EMULATION\n\tbool\n",
-              "config UML_IOMEM_EMULATION\n\tbool \"UML IOMEM emulation\"\n")
-open(path, "w").write(s)
-PYEOF
-fi
-# Fail hard if the prompts are still missing: proceeding silently would ship
-# an engine without USB-WiFi drivers.
 grep -A1 '^config UML_IOMEM_EMULATION' "${KCONFIG}" | grep -q 'bool "' \
-    || die "${KCONFIG} lacks UML_IOMEM_EMULATION prompt — tree drifted, update the inline edit"
+    || die "${KCONFIG} lacks UML_IOMEM_EMULATION prompt — this is not the um-arm64 tree the original release was built from"
 grep -A1 '^config UML_DMA_EMULATION' "${KCONFIG}" | grep -q 'bool "' \
-    || die "${KCONFIG} lacks UML_DMA_EMULATION prompt — tree drifted, update the inline edit"
-
-# ── Tree fix: drop the GCC-only -mabi=lp64 flag for clang builds ─────────────
-# arch/arm64/Makefile.um (the arm64 UML flags fragment) adds -mabi=lp64 to
-# KBUILD_AFLAGS, KBUILD_CPPFLAGS and LINK-y unguarded. GCC's aarch64 backend
-# accepts -mabi=lp64 (the only ABI it has), but clang's aarch64 target rejects
-# it outright with "error: unknown target ABI 'lp64'" — and because the flag
-# rides in KBUILD_CPPFLAGS it bypasses kbuild's cc-option filtering, so every
-# compile dies. LP64 is clang's default aarch64 ABI, so dropping the flag is
-# a no-op semantically. Edited in place with python3, idempotently: the two
-# cc-option-guarded copies in arch/arm64/Makefile are left alone (clang filters
-# them out by itself), and a GCC build of the same tree keeps working.
+    || die "${KCONFIG} lacks UML_DMA_EMULATION prompt — this is not the um-arm64 tree the original release was built from"
 MAKEFILE_UM="${SRC}/arch/arm64/Makefile.um"
 [ -f "${MAKEFILE_UM}" ] || die "${MAKEFILE_UM} not found — unexpected tree layout"
-if grep -q -- '-mabi=lp64' "${MAKEFILE_UM}"; then
-    log "Removing GCC-only -mabi=lp64 from ${MAKEFILE_UM} (clang rejects it)"
-    python3 - "${MAKEFILE_UM}" <<'PYEOF'
-import sys
-path = sys.argv[1]
-s = open(path).read()
-s = s.replace("KBUILD_AFLAGS += -mabi=lp64\n",
-              "# -mabi=lp64 removed: GCC-only spelling, clang's aarch64 target rejects it\n")
-s = s.replace("KBUILD_CPPFLAGS += -mabi=lp64\n", "")
-s = s.replace("LINK-y += -mabi=lp64\n", "")
-open(path, "w").write(s)
-PYEOF
-fi
-# Fail hard if the flag is still there (comments don't count): it kills every
-# compile under clang.
 if grep -Eq '^[^#]*-mabi=lp64' "${MAKEFILE_UM}"; then
-    die "${MAKEFILE_UM} still has -mabi=lp64 — tree drifted, update the inline edit"
+    die "${MAKEFILE_UM} still has -mabi=lp64 — GCC-only flag kills every clang compile; use the zalexdev/linux-um-arm64 um-arm64 branch"
 fi
+# The stub binary the engine exec's is built and embedded here; the plain
+# ELF file is left in the tree, and this script must collect it as stub_exe.
+[ -f "${SRC}/arch/um/kernel/skas/Makefile" ] \
+    || die "${SRC}/arch/um/kernel/skas/Makefile not found — stub_exe build glue missing"
+grep -q 'stub_exe_embed' "${SRC}/arch/um/kernel/skas/Makefile" \
+    || die "stub_exe embedding missing from arch/um/kernel/skas/Makefile — wrong tree revision"
 
 JOBS="$(nproc)"
 KVER_BASELINE="7.2.0-rc4"
 log "Building arm64 UML kernel (baseline ${KVER_BASELINE}, ${JOBS} jobs)"
 
 # ── Toolchain ────────────────────────────────────────────────────────────────
-# The released config was generated by Android clang 18 / LLD 18
-# (CONFIG_CC_VERSION_TEXT / CONFIG_LD_IS_LLD in uml-arm64.config), and the
-# binary runs as a userspace process on Android, so it must link against the
-# bionic static libc from the NDK sysroot.
+# The released config was generated by Android clang 18.0.3 / LLD 18.0.3
+# (CONFIG_CC_VERSION_TEXT / CONFIG_LD_IS_LLD in uml-arm64.config). clang
+# 18.0.3 (build 12470979) is the NDK r27c toolchain, and the binary runs as a
+# userspace process on Android, so it must link against the bionic static libc
+# from the NDK sysroot.
 NDK="${NDK:-/opt/ndk}"
 LLVM="${LLVM:-${NDK}/toolchains/llvm/prebuilt/linux-x86_64}"
 CLANG="${CLANG:-${LLVM}/bin/clang}"
@@ -133,6 +94,7 @@ grep -q '^CONFIG_UML=y'                "${SRC}/.config" || die "CONFIG_UML missi
 grep -q '^CONFIG_UML_ARM64=y'          "${SRC}/.config" || die "CONFIG_UML_ARM64 missing"
 grep -q '^CONFIG_STATIC_LINK=y'        "${SRC}/.config" || die "CONFIG_STATIC_LINK missing"
 grep -q '^CONFIG_HOSTFS=y'             "${SRC}/.config" || die "CONFIG_HOSTFS missing (rootfs bind)"
+grep -q '^CONFIG_UML_NET_VECTOR=y'     "${SRC}/.config" || die "UML_NET_VECTOR missing (original release ships it on)"
 grep -q '^CONFIG_RTL8XXXU=y'           "${SRC}/.config" || die "RTL8XXXU missing (USB-WiFi parity)"
 grep -q '^CONFIG_ATH9K_HTC=y'          "${SRC}/.config" || die "ATH9K_HTC missing (USB-WiFi parity)"
 grep -q '^CONFIG_BLK_DEV_LOOP=y'       "${SRC}/.config" || die "LOOP missing (.img/.iso mount)"
@@ -147,6 +109,13 @@ grep -q '^CONFIG_BLK_DEV_LOOP=y'       "${SRC}/.config" || die "LOOP missing (.i
 # explicitly reset here: an LLVM variable leaked from the environment makes
 # kbuild abort with "Invalid value for LLVM".
 log "make -j${JOBS} ARCH=um SUBARCH=arm64 (clang/LLD, android${API})"
+# KBUILD_BUILD_USER/HOST/TIMESTAMP reproduce the released banner exactly:
+#   Linux version 7.2.0-rc4-g8897487c5223 (stryker@images) ... # SMP Thu Jan  1 00:00:00 UTC 1970
+# The released binary embeds this exact string (extracted from rootless-650's
+# linux-uml), so the builder environment is pinned instead of leaking the CI
+# runner's hostname/timestamp into the artifact.
+KBUILD_BUILD_USER=stryker KBUILD_BUILD_HOST=images \
+KBUILD_BUILD_TIMESTAMP="Thu Jan  1 00:00:00 UTC 1970" \
 make -j"${JOBS}" -C "${SRC}" ARCH=um SUBARCH=arm64 \
     CC="${CLANG} ${CC_TARGET}" \
     LLVM=1 PATH="${LLVM}/bin:${PATH}" \
@@ -179,7 +148,7 @@ if [ -n "${STUB}" ]; then
 else
     # Original stub_exe is 1920 bytes and carries a "uml-userspace" build note.
     # Fall back to a search anywhere in the build tree.
-    STUB="$(find "${SRC}/arch/um" "${SRC}/arch/arm64" -type f -name 'stub*' -size -16k 2>/dev/null | head -n1 || true)"
+    STUB="$(find "${SRC}/arch/um" "${SRC}/arch/arm64" -type f -name 'stub*' -size -16k ! -name '*.o' ! -name '*.S' ! -name '*.c' 2>/dev/null | head -n1 || true)"
     if [ -n "${STUB}" ]; then
         cp "${STUB}" "${OUT}/stub_exe"
         chmod +x "${OUT}/stub_exe"
@@ -199,6 +168,18 @@ if command -v readelf >/dev/null 2>&1; then
     # UML kernels are normal executables, not Image boot payloads.
     readelf -h "${OUT}/linux-uml" | grep -q 'Type:.*EXEC' \
         || die "linux-uml is not an EXEC ELF"
+    # Parity with the released binary: statically linked (no PT_INTERP / no
+    # dynamic section), exactly like rootless-650's linux-uml.
+    if readelf -d "${OUT}/linux-uml" 2>/dev/null | grep -q 'There is no dynamic section'; then :; else
+        die "linux-uml is dynamically linked — CONFIG_STATIC_LINK did not hold"
+    fi
+    # Banner parity: same kernel revision, same pinned build env.
+    BANNER="$(strings "${OUT}/linux-uml" | grep -m1 '^Linux version 7\.')"
+    case "${BANNER}" in
+        "Linux version ${KVER_BASELINE}-g8897487c5223 (stryker@images)"*)
+            log "Banner matches the original release: ${BANNER}" ;;
+        *) die "Banner mismatch — got '${BANNER}', expected the 7.2.0-rc4-g8897487c5223 (stryker@images) lineage" ;;
+    esac
 fi
 success "arm64 UML kernel built (${SIZE} bytes) → ${OUT}/linux-uml"
 success "Config dump → ${OUT}/linux-uml.config"
