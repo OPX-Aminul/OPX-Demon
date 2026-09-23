@@ -72,7 +72,15 @@ LLVM="${LLVM:-${NDK}/toolchains/llvm/prebuilt/linux-x86_64}"
 CLANG="${CLANG:-${LLVM}/bin/clang}"
 API="${API:-26}"
 SYSROOT="${LLVM}/sysroot"
+# Argument order matters: kbuild appends its own CLANG_FLAGS
+# (--target=aarch64-linux-gnu, from scripts/Makefile.clang) AFTER our CC, and
+# clang applies the LAST --target. The NDK sysroot only exposes <asm/*.h> to
+# android triples — a linux-gnu target drops the triple multiarch include dir
+# (usr/include/aarch64-linux-android), which is exactly where asm/types.h
+# lives, so archprepare dies with "'asm/types.h' file not found". Passing our
+# target LAST in CC lets the compiler command line re-override kbuild's.
 CC_TARGET="--target=aarch64-linux-android${API} --sysroot=${SYSROOT}"
+CC_OVERRIDES="--target=aarch64-linux-android${API}"
 
 # ── Config ───────────────────────────────────────────────────────────────
 # Resolve the checked-in released-config fragment: repo checkouts keep it in
@@ -114,13 +122,15 @@ log "make -j${JOBS} ARCH=um SUBARCH=arm64 (clang/LLD, android${API})"
 # The released binary embeds this exact string (extracted from rootless-650's
 # linux-uml), so the builder environment is pinned instead of leaking the CI
 # runner's hostname/timestamp into the artifact.
+# archprepare compiles USER_OBJS with USER_CFLAGS, which intentionally drops
+# KBUILD_CPPFLAGS — so --sysroot only reaches the compiler through CC itself,
+# and USER_CFLAGS re-appends $(CLANG_FLAGS) whose --target must lose to ours.
 KBUILD_BUILD_USER=stryker KBUILD_BUILD_HOST=images \
 KBUILD_BUILD_TIMESTAMP="Thu Jan  1 00:00:00 UTC 1970" \
 make -j"${JOBS}" -C "${SRC}" ARCH=um SUBARCH=arm64 \
-    CC="${CLANG} ${CC_TARGET}" \
+    CC="${CLANG} ${CC_TARGET} ${CC_OVERRIDES}" \
     LLVM=1 PATH="${LLVM}/bin:${PATH}" \
     linux
-
 # ── Collect ──────────────────────────────────────────────────────────────────
 mkdir -p "${OUT}"
 # Kernel binary (the released name is "linux-uml")
