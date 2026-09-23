@@ -31,8 +31,8 @@
     "kernel_release": "7.2.0-rc4",
     "qemu": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/qemu-system-aarch64",
-      "sha256": "c0e16921459b19c769534acc89eaca117375026c40da162413f22eeb1486be07",
-      "size": 128404816
+      "sha256": "74add153c4c8c3096618fc57d68b1b94a93b4f8b7421cb232b48315845a3349b",
+      "size": 128470352
     },
     "libslirp": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/libslirp.so",
@@ -41,28 +41,28 @@
     },
     "kernel": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/Image",
-      "sha256": "0157332aaa6b70b6bdc49aec31337cf7834dc2e4317c017f91da49090b475b73",
+      "sha256": "1070d2c7d0c26e6cdd2bcf97ad850e9d97788d7a37a60222d88dd04dcbf80ef0",
       "size": 48517632
     },
     "initrd": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/initrd.img",
-      "sha256": "ee410d1256f0da318bd88e61e3579ccbd9a5ea5b953ee4b428d4bcc6d113b825",
-      "size": 39100336
+      "sha256": "fea5820e95ce2b6857180331686488b0eb7750b3464825d921e5b61c46967ec1",
+      "size": 39100555
     },
     "rootfs": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/rootfs.imgz",
-      "sha256": "432781f869c997e5ab7c9923f076e0651bc106bfa9d46ef8b699ef2f210c50eb",
-      "size": 366473517
+      "sha256": "dabcd8780c9e0396d3a9539d68167da5b41472f790b3a223e5522bfcd921a37b",
+      "size": 366485212
     },
     "uml_kernel": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/linux-uml",
-      "sha256": "",
-      "size": 0
+      "sha256": "614b833a6ec1f8d4ae88d71b78a125911a62ded0d377a3b140f4aee60d98f205",
+      "size": 24689832
     },
     "uml_stub": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/stub_exe",
-      "sha256": "",
-      "size": 0
+      "sha256": "83f51f7c45133daa135b595562b09c5e2829f1d0f1e00b7fce2a7695370781fc",
+      "size": 1920
     }
   },
   "rootless": {
@@ -70,18 +70,18 @@
     "note": "Local dev ships these inside the APK under assets/rootless/. This block is the OTA fallback; arm64-v8a only.",
     "qemu": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/qemu-system-aarch64",
-      "sha256": "c0e16921459b19c769534acc89eaca117375026c40da162413f22eeb1486be07",
-      "size": 128404816
+      "sha256": "74add153c4c8c3096618fc57d68b1b94a93b4f8b7421cb232b48315845a3349b",
+      "size": 128470352
     },
     "kernel": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/Image",
-      "sha256": "0157332aaa6b70b6bdc49aec31337cf7834dc2e4317c017f91da49090b475b73",
+      "sha256": "1070d2c7d0c26e6cdd2bcf97ad850e9d97788d7a37a60222d88dd04dcbf80ef0",
       "size": 48517632
     },
     "initrd": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/initrd.img",
-      "sha256": "ee410d1256f0da318bd88e61e3579ccbd9a5ea5b953ee4b428d4bcc6d113b825",
-      "size": 39100336
+      "sha256": "fea5820e95ce2b6857180331686488b0eb7750b3464825d921e5b61c46967ec1",
+      "size": 39100555
     },
     "libslirp": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/libslirp.so",
@@ -90,8 +90,8 @@
     },
     "rootfs": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/rootfs.imgz",
-      "sha256": "432781f869c997e5ab7c9923f076e0651bc106bfa9d46ef8b699ef2f210c50eb",
-      "size": 366473517
+      "sha256": "dabcd8780c9e0396d3a9539d68167da5b41472f790b3a223e5522bfcd921a37b",
+      "size": 366485212
     }
   },
   "app": {
