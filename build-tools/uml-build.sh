@@ -66,6 +66,37 @@ grep -A1 '^config UML_IOMEM_EMULATION' "${KCONFIG}" | grep -q 'bool "' \
 grep -A1 '^config UML_DMA_EMULATION' "${KCONFIG}" | grep -q 'bool "' \
     || die "${KCONFIG} lacks UML_DMA_EMULATION prompt — tree drifted, update the inline edit"
 
+# ── Tree fix: drop the GCC-only -mabi=lp64 flag for clang builds ─────────────
+# arch/arm64/Makefile.um (the arm64 UML flags fragment) adds -mabi=lp64 to
+# KBUILD_AFLAGS, KBUILD_CPPFLAGS and LINK-y unguarded. GCC's aarch64 backend
+# accepts -mabi=lp64 (the only ABI it has), but clang's aarch64 target rejects
+# it outright with "error: unknown target ABI 'lp64'" — and because the flag
+# rides in KBUILD_CPPFLAGS it bypasses kbuild's cc-option filtering, so every
+# compile dies. LP64 is clang's default aarch64 ABI, so dropping the flag is
+# a no-op semantically. Edited in place with python3, idempotently: the two
+# cc-option-guarded copies in arch/arm64/Makefile are left alone (clang filters
+# them out by itself), and a GCC build of the same tree keeps working.
+MAKEFILE_UM="${SRC}/arch/arm64/Makefile.um"
+[ -f "${MAKEFILE_UM}" ] || die "${MAKEFILE_UM} not found — unexpected tree layout"
+if grep -q -- '-mabi=lp64' "${MAKEFILE_UM}"; then
+    log "Removing GCC-only -mabi=lp64 from ${MAKEFILE_UM} (clang rejects it)"
+    python3 - "${MAKEFILE_UM}" <<'PYEOF'
+import sys
+path = sys.argv[1]
+s = open(path).read()
+s = s.replace("KBUILD_AFLAGS += -mabi=lp64\n",
+              "# -mabi=lp64 removed: GCC-only spelling, clang's aarch64 target rejects it\n")
+s = s.replace("KBUILD_CPPFLAGS += -mabi=lp64\n", "")
+s = s.replace("LINK-y += -mabi=lp64\n", "")
+open(path, "w").write(s)
+PYEOF
+fi
+# Fail hard if the flag is still there (comments don't count): it kills every
+# compile under clang.
+if grep -Eq '^[^#]*-mabi=lp64' "${MAKEFILE_UM}"; then
+    die "${MAKEFILE_UM} still has -mabi=lp64 — tree drifted, update the inline edit"
+fi
+
 JOBS="$(nproc)"
 KVER_BASELINE="7.2.0-rc4"
 log "Building arm64 UML kernel (baseline ${KVER_BASELINE}, ${JOBS} jobs)"
