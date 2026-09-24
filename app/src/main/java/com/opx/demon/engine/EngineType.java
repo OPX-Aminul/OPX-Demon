@@ -7,18 +7,31 @@ import com.opx.demon.utils.Core;
 
 public enum EngineType {
     CHROOT,
-    ROOTLESS;
+    ROOTLESS,
+    ROOTLESS_UML;
 
     public static final String PREF_KEY = "engine_type";
 
     public static EngineType active(Core core) {
         if (core == null) return CHROOT;
         String v = core.getString(PREF_KEY);
+        if (v != null && v.equals(ROOTLESS_UML.name())) return ROOTLESS_UML;
         if (v != null && v.equals(ROOTLESS.name())) return ROOTLESS;
         return CHROOT;
     }
 
+    /** Any in-process VM engine (QEMU rootless or UML rootless). */
     public static boolean isRootless(Core core) {
+        EngineType t = active(core);
+        return t == ROOTLESS || t == ROOTLESS_UML;
+    }
+
+    public static boolean isUml(Core core) {
+        return active(core) == ROOTLESS_UML;
+    }
+
+    /** True when a legacy build's stored "ROOTLESS" must mean the QEMU engine. */
+    public static boolean isQemu(Core core) {
         return active(core) == ROOTLESS;
     }
 
@@ -32,7 +45,7 @@ public enum EngineType {
         core.putString(PREF_KEY, type.name());
         try {
             java.io.File flag = RootlessPaths.activeFlag(core.context);
-            if (type == ROOTLESS) {
+            if (type == ROOTLESS || type == ROOTLESS_UML) {
                 java.io.File dir = flag.getParentFile();
                 if (dir != null && !dir.exists()) //noinspection ResultOfMethodCallIgnored
                     dir.mkdirs();

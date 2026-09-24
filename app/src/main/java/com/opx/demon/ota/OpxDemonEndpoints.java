@@ -21,6 +21,12 @@ public final class OpxDemonEndpoints {
     public static final String FALLBACK_ROOTLESS_INITRD   = ROOTLESS_BASE + "initrd.img";
     public static final String FALLBACK_ROOTLESS_ROOTFS   = ROOTLESS_BASE + "rootfs.imgz";
 
+    /** UML engine core files live in their own release (uml-mode-all-file). */
+    private static final String UML_BASE =
+            "https://github.com/OPX-Aminul/OPX-Demon/releases/download/uml-mode-all-file/";
+    public static final String FALLBACK_UML_KERNEL = UML_BASE + "linux-uml";
+    public static final String FALLBACK_UML_STUB   = UML_BASE + "stub_exe";
+
     // IMPORTANT: these must match the qemu-system-aarch64 currently uploaded to the
     // all-core-file release. The Dockerfile pipeline patches the QEMU binary (links
     // libslirp.so), so a core rebuild changes its size/hash — build.yml re-pins

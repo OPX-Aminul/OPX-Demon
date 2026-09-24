@@ -352,6 +352,14 @@ public class Dashboard extends Fragment {
         vmUsbExpand = view.findViewById(R.id.vm_usb_expand);
         vmUsbDetails = view.findViewById(R.id.vm_usb_details);
 
+        // USB passthrough is a QEMU-only feature: attach goes through QMP (device_add
+        // usb-host), which the UML engine has no equivalent of. Hide the whole USB
+        // section for UML so users don't chase an option that can never attach.
+        if (com.opx.demon.engine.EngineType.isUml(core)) {
+            if (vmUsb != null) vmUsb.setVisibility(View.GONE);
+            hide(view, R.id.vm_divider_usb, R.id.vm_usb_header, R.id.vm_usb_expand);
+        }
+
         vmLogsChevron = view.findViewById(R.id.vm_logs_chevron);
         vmLogText = view.findViewById(R.id.vm_log_text);
         vmLogScroll = view.findViewById(R.id.vm_log_scroll);

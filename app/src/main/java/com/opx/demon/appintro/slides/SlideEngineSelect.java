@@ -28,8 +28,10 @@ public class SlideEngineSelect extends Fragment {
     private ViewPager2 mPager;
 
     private MaterialCardView cardRootless;
+    private MaterialCardView cardUml;
     private MaterialCardView cardChroot;
     private ImageView checkRootless;
+    private ImageView checkUml;
     private ImageView checkChroot;
 
     private EngineType selected = EngineType.CHROOT;
@@ -45,10 +47,13 @@ public class SlideEngineSelect extends Fragment {
         mPager = activity.findViewById(R.id.view_pager);
 
         cardRootless = view.findViewById(R.id.card_rootless);
+        cardUml = view.findViewById(R.id.card_uml);
         cardChroot = view.findViewById(R.id.card_chroot);
         checkRootless = view.findViewById(R.id.check_rootless);
+        checkUml = view.findViewById(R.id.check_uml);
         checkChroot = view.findViewById(R.id.check_chroot);
         View rootlessNote = view.findViewById(R.id.rootless_note);
+        View umlNote = view.findViewById(R.id.uml_note);
         MaterialButton continueBtn = view.findViewById(R.id.login);
 
         rootlessSupported = EngineType.rootlessSupported(context);
@@ -56,9 +61,12 @@ public class SlideEngineSelect extends Fragment {
         if (rootlessSupported) {
             selected = EngineType.ROOTLESS;
             cardRootless.setOnClickListener(v -> select(EngineType.ROOTLESS));
+            cardUml.setOnClickListener(v -> select(EngineType.ROOTLESS_UML));
         } else {
             rootlessNote.setVisibility(View.VISIBLE);
+            umlNote.setVisibility(View.VISIBLE);
             cardRootless.setAlpha(0.5f);
+            cardUml.setAlpha(0.5f);
             selected = EngineType.CHROOT;
         }
         cardChroot.setOnClickListener(v -> select(EngineType.CHROOT));
@@ -74,19 +82,24 @@ public class SlideEngineSelect extends Fragment {
     }
 
     private void select(EngineType type) {
-        if (type == EngineType.ROOTLESS && !rootlessSupported) return;
+        if ((type == EngineType.ROOTLESS || type == EngineType.ROOTLESS_UML)
+                && !rootlessSupported) return;
         selected = type;
         applySelectionUi();
     }
 
     private void applySelectionUi() {
         boolean rootless = selected == EngineType.ROOTLESS;
+        boolean uml = selected == EngineType.ROOTLESS_UML;
+        boolean vm = rootless || uml;
         checkRootless.setVisibility(rootless ? View.VISIBLE : View.INVISIBLE);
-        checkChroot.setVisibility(rootless ? View.INVISIBLE : View.VISIBLE);
+        checkUml.setVisibility(uml ? View.VISIBLE : View.INVISIBLE);
+        checkChroot.setVisibility(vm ? View.INVISIBLE : View.VISIBLE);
         int accent = ContextCompat.getColor(context, R.color.opxdemon_accent);
         int idle = ContextCompat.getColor(context, R.color.light_lite_contrast);
         styleCard(cardRootless, rootless, accent, idle);
-        styleCard(cardChroot, !rootless, accent, idle);
+        styleCard(cardUml, uml, accent, idle);
+        styleCard(cardChroot, !vm, accent, idle);
     }
 
     private void styleCard(MaterialCardView card, boolean selectedCard, int accent, int idle) {

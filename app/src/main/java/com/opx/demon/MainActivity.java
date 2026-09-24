@@ -491,7 +491,11 @@ public class MainActivity extends AppCompatActivity {
                 if (pick == null) renderer.renderEmpty();
                 else {
                     renderer.render(pick);
-                    if (core != null && core.isRootless()) autoAttachToVm(pick);
+                    // QMP-based USB attach only exists on the QEMU engine; UML has
+                    // no usb-host device to route the file descriptor into.
+                    if (core != null && core.isRootless()
+                            && !com.opx.demon.engine.EngineType.isUml(core))
+                        autoAttachToVm(pick);
                 }
             });
         }).start();

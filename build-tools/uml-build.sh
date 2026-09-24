@@ -153,6 +153,24 @@ mkdir -p "${OUT}"
 # Kernel binary (the released name is "linux-uml")
 cp "${SRC}/linux" "${OUT}/linux-uml"
 chmod +x "${OUT}/linux-uml"
+# Parity with the released artifact: rootless-650's linux-uml ships STRIPPED
+# (readelf shows zero .debug_* sections there, 19,763,856 bytes, vs 24,689,832
+# unstripped here). NDK's llvm-strip removes exactly those sections; the link
+# itself is byte-reproducible (stub_exe already matches the original 1:1), so
+# stripping is what closes the last gap to the original bytes.
+STRIP_BIN="${LLVM}/bin/llvm-strip"
+if [ -x "${STRIP_BIN}" ]; then
+    log "Stripping debug sections (parity with the released linux-uml)"
+    "${STRIP_BIN}" "${OUT}/linux-uml"
+else
+    STRIP_BIN="$(command -v llvm-strip || true)"
+    if [ -n "${STRIP_BIN}" ]; then
+        log "Stripping debug sections (host llvm-strip)"
+        "${STRIP_BIN}" "${OUT}/linux-uml"
+    else
+        log "WARN: llvm-strip not found — shipping unstripped linux-uml (larger than the original)"
+    fi
+fi
 # Kernel config dump (parity artifact — the original release ships Image.config)
 cp "${SRC}/.config" "${OUT}/linux-uml.config"
 

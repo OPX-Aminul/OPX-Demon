@@ -54,6 +54,9 @@ public final class RootlessEngine {
     private static final String NETDEV_ID = "net0";
     private volatile UsbPassthroughManager usb;
 
+    /** True while the running VM process is the UML kernel (not QEMU). */
+    private volatile boolean umlProcess;
+
     public interface BootListener {
         void onBootLine(String line);
         void onBooted();
@@ -77,6 +80,12 @@ public final class RootlessEngine {
 
 
     public boolean isInstalled() {
+        if (EngineType.isUml(prefs())) {
+            // UML engine: linux-uml + stub_exe + the shared rootfs. No QEMU chain.
+            return RootlessPaths.umlKernel(app).isFile()
+                    && RootlessPaths.umlStub(app).isFile()
+                    && RootlessPaths.rootfs(app).isFile();
+        }
         RootlessPaths.ensureSlirpSoname(app);
         return RootlessPaths.qemuBin(app).isFile()
                 && RootlessPaths.kernel(app).isFile()
@@ -190,8 +199,11 @@ public final class RootlessEngine {
             killAndAwait(12_000);
             clearStaleSockets();
             ensureExecutable();
-            RootlessPaths.ensureLibslirpNames(app);
             autoGrowDisk();
+            if (EngineType.isUml(prefs())) {
+                return attemptBootUml(listener);
+            }
+            RootlessPaths.ensureLibslirpNames(app);
             VmProbe.ensureCpuProfileVerified(app, prefs());
             List<String> cmd = buildCommand();
             Log.i(TAG, "QEMU: " + join(cmd));
@@ -204,6 +216,7 @@ public final class RootlessEngine {
 
             final Process proc = pb.start();
             qemuProcess = proc;
+            umlProcess = false;
             booted = false;
 
             new Thread(() -> pumpBootLog(proc, listener), "opxdemon-qemu-log").start();
@@ -411,6 +424,7 @@ public final class RootlessEngine {
         final QmpClient oldQmp = qmp;
         usb = null;
         qmp = null;
+        umlProcess = false;
         final Process p = qemuProcess;
         qemuProcess = null;
         if (p != null) dyingProcess = p;
@@ -776,7 +790,10 @@ public final class RootlessEngine {
      */
     public boolean bootstrapAgentOverConsole() {
         String sock = RootlessPaths.serialSock(app).getAbsolutePath();
-        if (!new File(sock).exists()) return false;
+        // UML has no QEMU serial unix socket — its console is a TCP port: channel.
+        // GuestConsole.run(null, …) routes to that TCP backend.
+        if (EngineType.isUml(prefs())) sock = null;
+        else if (!new File(sock).exists()) return false;
 
         GuestExec.logToStore("guest agent unreachable — bootstrapping it over the serial console");
         // deployGuestCore() removes the payload after itself, so put a fresh copy in the share
@@ -1038,6 +1055,109 @@ public final class RootlessEngine {
     }
 
 
+    /**
+     * Boots the UML engine: the linux-uml userspace ELF IS the kernel.
+     *
+     * Process-shaped command line (no QEMU devices): mem/ubd root + the shared
+     * Debian Trixie rootfs + a vector-net tap transport for guest networking +
+     * one port: channel for the serial console that backs GuestExec. The stub
+     * binary the kernel needs is looked up relative to the kernel executable,
+     * which is why it is installed beside linux-uml as stub_exe.
+     */
+    private String attemptBootUml(BootListener listener) {
+        try {
+            File kern = RootlessPaths.umlKernel(app);
+            File stub = RootlessPaths.umlStub(app);
+            if (!kern.isFile()) return "linux-uml is missing";
+            if (!stub.isFile()) return "stub_exe is missing";
+            File rootfs = RootlessPaths.rootfs(app);
+            if (!rootfs.isFile()) return "rootfs.img is missing";
+            kern.setExecutable(true, false);
+            stub.setExecutable(true, false);
+
+            List<String> a = buildUmlCommand(kern, stub, rootfs);
+            Log.i(TAG, "UML: " + join(a));
+            ProcessBuilder pb = new ProcessBuilder(a);
+            pb.directory(RootlessPaths.base(app));
+            pb.redirectErrorStream(true);
+            final Process proc = pb.start();
+            qemuProcess = proc;
+            umlProcess = true;
+            booted = false;
+
+            new Thread(() -> pumpBootLog(proc, listener), "opxdemon-uml-log").start();
+
+            long deadline = System.currentTimeMillis() + BOOT_TIMEOUT_MS;
+            int bootstraps = 0;
+            while (System.currentTimeMillis() < deadline) {
+                if (stopRequested) return "stopped";
+                if (!isAlive(proc)) {
+                    return "UML exited during boot (code " + safeExit(proc) + "): " + lastLogProblem();
+                }
+                if (GuestExec.ping(1500) && guestShellReady()) {
+                    markBooted();
+                    if (listener != null) listener.onBooted();
+                    return null;
+                }
+                // Same agent bootstrap contract as the QEMU path: the rootfs ships
+                // opxdemon-agentd, and only the transport underneath it differs.
+                if (VmBootStage.detect(tailLog(120)) >= VmBootStage.AGENT
+                        && (bootstraps == 0 || lastConsoleBootstrapMs + CONSOLE_RETRY_MS
+                                <= System.currentTimeMillis())) {
+                    bootstraps++;
+                    lastConsoleBootstrapMs = System.currentTimeMillis();
+                    note(listener, bootstraps == 1
+                            ? "Guest is up but the agent is not answering — starting it"
+                            : "Agent still not answering — retrying the console bootstrap ("
+                              + bootstraps + ")");
+                    bootstrapAgentOverConsole();
+                }
+                sleep(1000);
+            }
+            lastBootAgentTimeout = bootstraps > 0;
+            return "Boot timed out after " + (BOOT_TIMEOUT_MS / 1000) + "s"
+                    + (bootstraps > 0 ? " — the guest booted but opxdemon-agentd never came up"
+                                      : " — the UML console never produced a guest shell");
+        } catch (Exception e) {
+            Log.e(TAG, "UML start failed", e);
+            return e.getMessage() == null ? e.toString() : e.getMessage();
+        }
+    }
+
+    private List<String> buildUmlCommand(File kern, File stub, File rootfs) {
+        int cpus = VmSpecs.DEFAULT_CPUS;
+        int ramMb = VmSpecs.DEFAULT_RAM_MB;
+        try {
+            Core prefs = prefs();
+            if (prefs != null) {
+                cpus = VmSpecs.effectiveCpus(app, prefs);
+                ramMb = VmSpecs.effectiveRamMb(app, prefs);
+            }
+        } catch (Throwable ignored) {}
+        String base = RootlessPaths.base(app).getAbsolutePath();
+
+        List<String> a = new ArrayList<>();
+        a.add(kern.getAbsolutePath());
+        // ubd0 = the shared Debian Trixie rootfs, rw (matches the QEMU -append root=/dev/vda)
+        a.add("ubd0=" + rootfs.getAbsolutePath());
+        a.add("root=/dev/ubda");
+        a.add("rw");
+        // Same console contract as QEMU's ttyAMA0: getty/autologin root, app drives commands.
+        a.add("console=tty0");
+        a.add("mem=" + ramMb + "M");
+        // SMP: the released kernel is CONFIG_SMP=y (NR_CPUS up to 64).
+        a.add(String.valueOf(cpus));
+        // One port channel: the UML serial console is served over TCP 127.0.0.1:1050 —
+        // the exact port GuestExec/GuestConsole already talk to.
+        a.add("port=1050");
+        // Vector-net eth0 over a host tap (CONFIG_UML_NET_VECTOR=y is set in the
+        // released config). Requires /dev/net/tun on the host; without it the UML
+        // kernel logs a transport error and boots without networking.
+        a.add("eth0=tap,,,10.0.2.15");
+        a.add("umid=opxdemon-uml");
+        return a;
+    }
+
     private List<String> buildCommand() {
         int cpus = VmSpecs.DEFAULT_CPUS, ramMb = VmSpecs.DEFAULT_RAM_MB;
         boolean usbEnabled = true, shareEnabled = true, rngEnabled = true, mttcg = true;
@@ -1156,6 +1276,7 @@ public final class RootlessEngine {
 
     private void ensureExecutable() {
         try { RootlessPaths.qemuBin(app).setExecutable(true, false); } catch (Exception ignored) {}
+        try { RootlessPaths.umlKernel(app).setExecutable(true, false); } catch (Exception ignored) {}
         RootlessPaths.ensureSlirpSoname(app);
     }
 

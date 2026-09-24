@@ -109,6 +109,9 @@ public final class QemuInstaller {
     }
 
     public static boolean install(Context context, Progress p) {
+        if (EngineType.isUml(new com.opx.demon.utils.Core(context))) {
+            return installUml(context, p);
+        }
         if (RootlessCoreFiles.anyPresent(context) && !RootlessEngine.get(context).isInstalled()) {
             log(p, 1, "Partial install detected — downloading only the missing files");
             return RootlessCoreFiles.repair(context, p);
@@ -118,6 +121,78 @@ public final class QemuInstaller {
             return installFromNetwork(context, p);
         }
         return installFromAssets(context, p);
+    }
+
+    /**
+     * UML engine install: linux-uml + stub_exe from the uml-mode-all-file release,
+     * plus the shared Debian Trixie rootfs. QEMU/Image/initrd/libslirp are not
+     * downloaded — the UML kernel is a self-contained userspace ELF.
+     */
+    private static boolean installUml(Context context, Progress p) {
+        File base = RootlessPaths.base(context);
+        try {
+            stage(p, Stage.PREPARING);
+            if (!base.exists() && !base.mkdirs()) {
+                log(p, 3, "Cannot create " + base.getAbsolutePath());
+                return false;
+            }
+            QemuDownloader.Bundle b = QemuDownloader.resolve(context);
+            if (!b.hasUml()) {
+                log(p, 3, "UML engine files are missing from the manifest (uml-mode-all-file)");
+                return false;
+            }
+
+            stage(p, Stage.EXTRACTING_QEMU);
+            if (!fetchIfNeeded(b.umlKernel, RootlessPaths.umlKernel(context), "UML kernel", p, 1))
+                return false;
+            if (!RootlessPaths.umlKernel(context).setExecutable(true, false)) {
+                log(p, 3, "Could not make linux-uml executable");
+                return false;
+            }
+            if (!fetchIfNeeded(b.umlStub, RootlessPaths.umlStub(context), "UML stub", p, 1))
+                return false;
+            //noinspection ResultOfMethodCallIgnored
+            RootlessPaths.umlStub(context).setExecutable(true, false);
+
+            stage(p, Stage.DECOMPRESSING_ROOTFS);
+            File rootfs = RootlessPaths.rootfs(context);
+            boolean compressed = b.rootfs != null && b.rootfs.url != null
+                    && (b.rootfs.url.endsWith(".imgz") || b.rootfs.url.endsWith(".gz"));
+            if (rootfs.isFile() && rootfs.length() >= 50L * 1024 * 1024) {
+                log(p, 1, "rootfs.img already present (" + mb(rootfs.length()) + ") — shared with QEMU, skipping");
+            } else if (b.rootfs == null) {
+                log(p, 3, "rootfs.img is missing from the manifest — the UML engine cannot boot without it");
+                return false;
+            } else if (!compressed) {
+                if (!fetch(b.rootfs, rootfs, "rootfs.img", p)) return false;
+            } else {
+                File archive = new File(base, "rootfs.download");
+                if (!fetch(b.rootfs, archive, "rootfs", p)) return false;
+                log(p, 1, "Decompressing rootfs (this can take a minute)");
+                if (!gunzipFile(archive, rootfs, p)) {
+                    //noinspection ResultOfMethodCallIgnored
+                    archive.delete();
+                    return false;
+                }
+                //noinspection ResultOfMethodCallIgnored
+                archive.delete();
+            }
+
+            stage(p, Stage.FINALIZING);
+            ensureMinimumDisk(context, p);
+            boolean ok = RootlessEngine.get(context).isInstalled();
+            if (ok) {
+                stage(p, Stage.DONE);
+                log(p, 2, "UML engine installed");
+            } else {
+                log(p, 3, "Post-install verification failed");
+            }
+            return ok;
+        } catch (Exception e) {
+            Log.e(TAG, "UML install failed", e);
+            log(p, 3, "Install error: " + e.getMessage());
+            return false;
+        }
     }
 
     public static boolean repair(Context context, Progress p) {

@@ -106,6 +106,8 @@ public class SlideQemuInstall extends Fragment {
 
     private void startInstall() {
         started = true;
+        boolean uml = com.opx.demon.engine.EngineType.isUml(core);
+        String engineTitle = uml ? "UML engine" : "Rootless engine";
         installButton.setVisibility(View.INVISIBLE);
         stagesHeader.setVisibility(View.VISIBLE);
         stagesContainer.setVisibility(View.VISIBLE);
@@ -113,9 +115,10 @@ public class SlideQemuInstall extends Fragment {
         logHeader.setVisibility(View.VISIBLE);
         logCard.setVisibility(View.VISIBLE);
         logRecycler.setVisibility(View.VISIBLE);
-        setStatus(StatusKind.RUNNING, "Rootless engine", "Starting...");
+        setStatus(StatusKind.RUNNING, engineTitle, "Starting...");
         log(LogLevel.INFO, "OPX-Demon " + BuildConfig.VERSION_NAME + " · build " + BuildConfig.VERSION_CODE);
-        log(LogLevel.INFO, "Engine: rootless (QEMU aarch64)");
+        log(LogLevel.INFO, uml ? "Engine: rootless (User-Mode Linux arm64)"
+                               : "Engine: rootless (QEMU aarch64)");
 
         runOnUi(() -> {
             downloadBlock.setVisibility(View.VISIBLE);
@@ -162,8 +165,9 @@ public class SlideQemuInstall extends Fragment {
                     + core.getInt("rootless_cpus", VmSpecs.DEFAULT_CPUS) + " vCPU, "
                     + core.getInt("rootless_ram", VmSpecs.DEFAULT_RAM_MB) + " MB)");
 
-            setStatus(StatusKind.RUNNING, "Rootless engine", "Booting VM (first boot is slow)...");
-            log(LogLevel.STEP, "Booting QEMU VM for the first time");
+            setStatus(StatusKind.RUNNING, engineTitle, "Booting VM (first boot is slow)...");
+            log(LogLevel.STEP, uml ? "Booting the UML kernel for the first time"
+                                   : "Booting QEMU VM for the first time");
             boolean booted = RootlessEngine.get(context).startBlocking(new RootlessEngine.BootListener() {
                 @Override public void onBootLine(String line) {
                     if (line != null && (line.contains("opxdemon") || line.contains("login")
@@ -176,7 +180,7 @@ public class SlideQemuInstall extends Fragment {
             });
 
             if (booted) {
-                log(LogLevel.SUCCESS, "Rootless engine ready");
+                log(LogLevel.SUCCESS, uml ? "UML engine ready" : "Rootless engine ready");
                 log(LogLevel.STEP, "Deploying built-in scripts (CORE, exploits)");
                 boolean coreOk = RootlessEngine.get(context).ensureGuestCore();
                 log(coreOk ? LogLevel.SUCCESS : LogLevel.WARN,
@@ -185,7 +189,7 @@ public class SlideQemuInstall extends Fragment {
                 log(LogLevel.WARN, "VM did not report ready — it will retry on first use");
             }
 
-            setStatus(StatusKind.SUCCESS, "Rootless engine", "Installation complete — moving on...");
+            setStatus(StatusKind.SUCCESS, engineTitle, "Installation complete — moving on...");
             runOnUi(() -> {
                 progress.setVisibility(View.INVISIBLE);
                 core.moveNext(mPager);
@@ -205,7 +209,8 @@ public class SlideQemuInstall extends Fragment {
     }
 
     private void failWith(String reason) {
-        setStatus(StatusKind.FAILED, "Rootless engine", reason);
+        setStatus(StatusKind.FAILED,
+                com.opx.demon.engine.EngineType.isUml(core) ? "UML engine" : "Rootless engine", reason);
         log(LogLevel.ERROR, reason);
         runOnUi(() -> {
             progress.setIndeterminate(false);

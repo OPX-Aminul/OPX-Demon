@@ -20,7 +20,9 @@ public final class RootlessCoreFiles {
         INITRD("initrd.img", "initrd", QemuInstaller.Stage.EXTRACTING_KERNEL),
         LIBSLIRP("libslirp.so", "libslirp.so", QemuInstaller.Stage.EXTRACTING_LIBS),
         LIBSLIRP_SONAME("libslirp.so.0", "libslirp.so.0", QemuInstaller.Stage.EXTRACTING_LIBS),
-        ROOTFS("rootfs.img", "rootfs.img", QemuInstaller.Stage.DECOMPRESSING_ROOTFS);
+        ROOTFS("rootfs.img", "rootfs.img", QemuInstaller.Stage.DECOMPRESSING_ROOTFS),
+        UML_KERNEL("linux-uml", "UML kernel", QemuInstaller.Stage.EXTRACTING_QEMU),
+        UML_STUB("stub_exe", "UML stub", QemuInstaller.Stage.EXTRACTING_QEMU);
 
         public final String fileName;
         public final String label;
@@ -59,14 +61,16 @@ public final class RootlessCoreFiles {
                 || ready(RootlessPaths.kernel(c), 1)
                 || ready(RootlessPaths.initrd(c), 1)
                 || ready(RootlessPaths.libslirp(c), 1)
-                || ready(RootlessPaths.rootfs(c), ROOTFS_MIN_BYTES);
+                || ready(RootlessPaths.rootfs(c), ROOTFS_MIN_BYTES)
+                || ready(RootlessPaths.umlKernel(c), 1);
     }
 
     public static List<Gap> missing(Context c) {
         return missing(c, null);
     }
 
-    private static List<Gap> missing(Context c, QemuDownloader.Bundle b) {
+    /** Gaps for the QEMU engine: the five Debian Trixie boot-chain files. */
+    private static List<Gap> missingQemu(Context c, QemuDownloader.Bundle b) {
         List<Gap> out = new ArrayList<>();
         addIfNeeded(out, Kind.QEMU, RootlessPaths.qemuBin(c), asset(b, Kind.QEMU), false);
         addIfNeeded(out, Kind.KERNEL, RootlessPaths.kernel(c), asset(b, Kind.KERNEL), false);
@@ -82,6 +86,24 @@ public final class RootlessCoreFiles {
         return out;
     }
 
+    /**
+     * Gaps for the UML engine: linux-uml + stub_exe (from the uml-mode-all-file
+     * release) plus the same shared rootfs. No QEMU/libslirp/Image/initrd needed —
+     * the UML kernel is a userspace ELF with everything built in.
+     */
+    private static List<Gap> missingUml(Context c, QemuDownloader.Bundle b) {
+        List<Gap> out = new ArrayList<>();
+        addIfNeeded(out, Kind.UML_KERNEL, RootlessPaths.umlKernel(c), asset(b, Kind.UML_KERNEL), false);
+        addIfNeeded(out, Kind.UML_STUB, RootlessPaths.umlStub(c), asset(b, Kind.UML_STUB), false);
+        addIfNeeded(out, Kind.ROOTFS, RootlessPaths.rootfs(c), asset(b, Kind.ROOTFS), true);
+        return out;
+    }
+
+    private static List<Gap> missing(Context c, QemuDownloader.Bundle b) {
+        return EngineType.isUml(new com.opx.demon.utils.Core(c))
+                ? missingUml(c, b) : missingQemu(c, b);
+    }
+
     private static RemoteManifest.Asset asset(QemuDownloader.Bundle b, Kind kind) {
         if (b == null) return null;
         switch (kind) {
@@ -91,6 +113,8 @@ public final class RootlessCoreFiles {
             case LIBSLIRP:
             case LIBSLIRP_SONAME: return b.libslirp;
             case ROOTFS: return b.rootfs;
+            case UML_KERNEL: return b.umlKernel;
+            case UML_STUB: return b.umlStub;
             default: return null;
         }
     }
@@ -161,6 +185,12 @@ public final class RootlessCoreFiles {
                 continue;
             }
             if (!g.download) continue;
+            if (g.kind == Kind.UML_KERNEL || g.kind == Kind.UML_STUB) {
+                if (!QemuInstaller.fetchAsset(g.asset, g.dest, g.kind.label, p)) return false;
+                //noinspection ResultOfMethodCallIgnored
+                g.dest.setExecutable(true, false);
+                continue;
+            }
             if (g.kind == Kind.ROOTFS && g.compressedRootfs) {
                 File archive = new File(base, "rootfs.download");
                 if (!QemuInstaller.fetchAsset(g.asset, archive, "rootfs", p)) return false;

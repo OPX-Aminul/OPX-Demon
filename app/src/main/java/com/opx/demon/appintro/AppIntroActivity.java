@@ -79,7 +79,9 @@ public class AppIntroActivity extends FragmentActivity {
     public void applyEngineFlow(EngineType type) {
         while (pages.size() > 2) pages.remove(pages.size() - 1);
         pages.add(Page.PERMS);
-        if (type == EngineType.ROOTLESS) {
+        // Both VM engines (QEMU rootless and UML rootless) install through the same
+        // download/boot slide; QemuInstaller.install() dispatches on the engine type.
+        if (type == EngineType.ROOTLESS || type == EngineType.ROOTLESS_UML) {
             pages.add(Page.INSTALL_QEMU);
         } else {
             pages.add(Page.PCHECK);

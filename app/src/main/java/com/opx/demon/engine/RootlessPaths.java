@@ -49,6 +49,15 @@ public final class RootlessPaths {
     public static File rootfs(Context c)    { return new File(base(c), "rootfs.img"); }
     public static File rootfsGz(Context c)  { return new File(base(c), "rootfs.img.gz"); }
 
+    /**
+     * UML engine artifacts. The UML kernel is a plain userspace ELF that runs
+     * next to QEMU in the same rootless dir; stub_exe is the tiny
+     * "uml-userspace" ELF the kernel needs beside it. Both come from the
+     * uml-mode-all-file release.
+     */
+    public static File umlKernel(Context c) { return new File(base(c), "linux-uml"); }
+    public static File umlStub(Context c)   { return new File(base(c), "stub_exe"); }
+
     public static File qmpSock(Context c)   { return new File(base(c), "qmp.sock"); }
     public static File serialSock(Context c){ return new File(base(c), "serial.sock"); }
     public static File serialLog(Context c){ return new File(base(c), "serial.log"); }

@@ -55,12 +55,23 @@ public final class RemoteManifest {
         public final Asset libslirp;
         public final Asset rootfs;
 
+        /** UML engine binaries — present only when the manifest carries a rootless_v2 block. */
+        public final Asset umlKernel;
+        public final Asset umlStub;
+
         RootlessAssets(Asset qemu, Asset kernel, Asset initrd, Asset libslirp, Asset rootfs) {
+            this(qemu, kernel, initrd, libslirp, rootfs, null, null);
+        }
+
+        RootlessAssets(Asset qemu, Asset kernel, Asset initrd, Asset libslirp, Asset rootfs,
+                       Asset umlKernel, Asset umlStub) {
             this.qemu = qemu;
             this.kernel = kernel;
             this.initrd = initrd;
             this.libslirp = libslirp;
             this.rootfs = rootfs;
+            this.umlKernel = umlKernel;
+            this.umlStub = umlStub;
         }
 
         public boolean isComplete() {
@@ -69,6 +80,12 @@ public final class RemoteManifest {
                     && initrd != null && initrd.isUsable()
                     && libslirp != null && libslirp.isUsable()
                     && rootfs != null && rootfs.isUsable();
+        }
+
+        /** True when both UML binaries have usable download URLs. */
+        public boolean isUmlComplete() {
+            return umlKernel != null && umlKernel.isUsable()
+                    && umlStub != null && umlStub.isUsable();
         }
     }
 
@@ -120,12 +137,21 @@ public final class RemoteManifest {
 
         JSONObject rootless = root.optJSONObject("rootless");
         if (rootless != null) {
+            // The UML binaries ride in the rootless_v2 block when present; merge them onto
+            // the resolved rootless assets so a single Bundle serves both engines.
+            Asset umlKernel = null, umlStub = null;
+            JSONObject v2 = root.optJSONObject("rootless_v2");
+            if (v2 != null) {
+                umlKernel = asset(v2.optJSONObject("uml_kernel"));
+                umlStub = asset(v2.optJSONObject("uml_stub"));
+            }
             manifest.rootless = new RootlessAssets(
                     asset(rootless.optJSONObject("qemu")),
                     asset(rootless.optJSONObject("kernel")),
                     asset(rootless.optJSONObject("initrd")),
                     asset(rootless.optJSONObject("libslirp")),
-                    asset(rootless.optJSONObject("rootfs")));
+                    asset(rootless.optJSONObject("rootfs")),
+                    umlKernel, umlStub);
         }
 
         JSONObject app = root.optJSONObject("app");

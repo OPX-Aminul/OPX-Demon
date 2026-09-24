@@ -121,9 +121,14 @@ jobs:
           [ -s ./stub_exe ] || { echo "::error::stub_exe is empty"; exit 1; }
 
       # ══════════════════════════════════════════════════════════════════════
-      # UPLOAD: Replace files in all-core-file release
+      # UPLOAD: split releases
+      #   all-core-file      — Debian Trixie engine only (QEMU boot chain:
+      #                        qemu, libslirp, Image, initrd, rootfs)
+      #   uml-mode-all-file  — UML engine only (linux-uml, stub_exe)
+      # The same rootfs boots both engines; the split keeps each release
+      # single-engine so installs only pull the files their engine needs.
       # ══════════════════════════════════════════════════════════════════════
-      - name: Upload to all-core-file release
+      - name: Upload QEMU/Debian-Trixie core to all-core-file release
         # Only publish from main — PR/branch runs are build verification only.
         if: github.ref == 'refs/heads/main'
         env:
@@ -135,13 +140,36 @@ jobs:
             ./rootfs.imgz \
             ./qemu-system-aarch64 \
             ./libslirp.so \
-            ./linux-uml \
-            ./stub_exe \
             --clobber
 
           echo ""
-          echo "✅ Release updated:"
+          echo "✅ all-core-file (Debian Trixie engine) updated:"
           gh release view all-core-file --json assets \
+            --jq '.assets[] | "  \(.name) (\(.size / 1048576 * 100 | round / 100) MB)"'
+
+      - name: Upload UML core to uml-mode-all-file release
+        # Only publish from main — PR/branch runs are build verification only.
+        # Re-create the release if it does not exist yet (first UML publish).
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view uml-mode-all-file >/dev/null 2>&1 \
+            || gh release create uml-mode-all-file \
+                 --title "uml-mode-all-file (UML engine)" \
+                 --notes "arm64 User-Mode-Linux engine core files (kernel 7.2).\
+                    linux-uml + stub_exe boot the same Debian Trixie rootfs.imgz\
+                    from the all-core-file release — download that rootfs when\
+                    installing the UML engine."
+          gh release upload uml-mode-all-file \
+            ./linux-uml \
+            ./stub_exe \
+            ./linux-uml.config \
+            --clobber
+
+          echo ""
+          echo "✅ uml-mode-all-file (UML engine) updated:"
+          gh release view uml-mode-all-file --json assets \
             --jq '.assets[] | "  \(.name) (\(.size / 1048576 * 100 | round / 100) MB)"'
 
       # ══════════════════════════════════════════════════════════════════════
@@ -170,8 +198,9 @@ jobs:
           with open("opx_manifest.json") as fh:
               manifest = json.load(fh)
           rl = manifest["rootless"]
-          # rootless_v2: UML engine (kernel 7.2). QEMU/libslirp are shared with
-          # rootless-main; only the UML-specific artifacts are re-pinned here.
+          # rootless_v2: UML engine (kernel 7.2). Its UML binaries live in the
+          # uml-mode-all-file release; the Debian Trixie chain stays in
+          # all-core-file. QEMU/libslirp are shared with rootless-main.
           if "rootless_v2" in manifest:
               rv2 = manifest["rootless_v2"]
               v2_map = [
@@ -180,10 +209,12 @@ jobs:
                   ("Image", "kernel"),
                   ("initrd.img", "initrd"),
                   ("rootfs.imgz", "rootfs"),
-                  ("linux-uml", "uml_kernel"),
-                  ("stub_exe", "uml_stub"),
+                  ("linux-uml", "uml_kernel", "uml-mode-all-file"),
+                  ("stub_exe", "uml_stub", "uml-mode-all-file"),
               ]
-              for file_name, key in v2_map:
+              for entry in v2_map:
+                  file_name, key = entry[0], entry[1]
+                  release = entry[2] if len(entry) > 2 else "all-core-file"
                   if not os.path.exists(file_name) or os.path.getsize(file_name) == 0:
                       print(f"  WARN: {file_name} missing — leaving {key} pins untouched")
                       continue
@@ -191,7 +222,11 @@ jobs:
                       digest = hashlib.sha256(fh.read()).hexdigest()
                   rv2[key]["sha256"] = digest
                   rv2[key]["size"] = os.path.getsize(file_name)
-                  print(f"  v2 {file_name}: {rv2[key]['size']} bytes, sha256 {digest[:12]}…")
+                  rv2[key]["url"] = (
+                      "https://github.com/" + os.environ["GITHUB_REPOSITORY"]
+                      + "/releases/download/" + release + "/" + file_name
+                  )
+                  print(f"  v2 {file_name}: {rv2[key]['size']} bytes, sha256 {digest[:12]}… -> {release}")
           for file_name, key in mapping:
               with open(file_name, "rb") as fh:
                   digest = hashlib.sha256(fh.read()).hexdigest()

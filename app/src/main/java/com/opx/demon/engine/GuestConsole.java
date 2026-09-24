@@ -31,6 +31,9 @@ final class GuestConsole {
     private static final String TAG = "GuestConsole";
     private static final String MARK = "__OPX_DEMON_CON__";
     private static final int READ_TIMEOUT_MS = 20000;
+    private static final int CONNECT_TIMEOUT_MS = 4000;
+    /** Port: channel the UML engine listens on for its serial console. */
+    static final int PORT = 1050;
 
     private GuestConsole() {
     }
@@ -39,10 +42,14 @@ final class GuestConsole {
      * Runs {@code command} and returns the console output between the echoed command and the
      * marker. Empty when the console could not be reached — the caller cannot distinguish that
      * from a command that printed nothing, so probe with something that always prints.
+     *
+     * UML note: the UML engine serves its console on TCP 127.0.0.1:1050 (a port: channel)
+     * instead of a unix socket, so {@code socketPath == null} routes through the TCP backend.
      */
     static ArrayList<String> run(String command, String socketPath, int timeoutMs) {
         ArrayList<String> out = new ArrayList<>();
-        if (command == null || socketPath == null) return out;
+        if (command == null) return out;
+        if (socketPath == null) return runTcp(command, timeoutMs);
         LocalSocket sock = open(socketPath, timeoutMs);
         if (sock == null) return out;
         try {
@@ -112,6 +119,67 @@ final class GuestConsole {
             Log.w(TAG, "console connect failed: " + e.getMessage());
             try { sock.close(); } catch (Exception ignored) {}
             return null;
+        }
+    }
+
+    /**
+     * TCP console backend for the UML engine (port: channel on 127.0.0.1:1050).
+     *
+     * The same write/handshake/collect contract as the unix-socket path, just over a plain
+     * TCP socket. The UML console is the kernel's tty directly, so the login handshake
+     * below still runs harmlessly when no shell prompt is seen yet.
+     */
+    private static ArrayList<String> runTcp(String command, int timeoutMs) {
+        ArrayList<String> out = new ArrayList<>();
+        java.net.Socket sock = new java.net.Socket();
+        try {
+            sock.connect(new java.net.InetSocketAddress("127.0.0.1", PORT), CONNECT_TIMEOUT_MS);
+            sock.setSoTimeout(timeoutMs > 0 ? timeoutMs : READ_TIMEOUT_MS);
+            OutputStream os = sock.getOutputStream();
+            StringBuilder buf = new StringBuilder();
+            drainTcp(sock, buf, 3000);
+            if (!promptSeen(buf.toString())) {
+                os.write("\nroot\n".getBytes(StandardCharsets.UTF_8));
+                os.flush();
+                buf.setLength(0);
+                drainTcp(sock, buf, 3000);
+                if (buf.toString().toLowerCase(java.util.Locale.ROOT).contains("password")) {
+                    os.write("opxdemon\n".getBytes(StandardCharsets.UTF_8));
+                    os.flush();
+                }
+                buf.setLength(0);
+                drainTcp(sock, buf, 3000);
+            }
+            os.write(("\n" + command + "\n" + "echo " + MARK + "$?\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            os.flush();
+            buf.setLength(0);
+            drainTcp(sock, buf, timeoutMs > 0 ? timeoutMs : READ_TIMEOUT_MS);
+            collect(buf.toString(), out);
+        } catch (Exception e) {
+            Log.w(TAG, "tcp console command failed: " + e.getMessage());
+        } finally {
+            try { sock.close(); } catch (Exception ignored) {}
+        }
+        return out;
+    }
+
+    private static void drainTcp(java.net.Socket sock, StringBuilder buf, int quietMs) {
+        try {
+            InputStream is = sock.getInputStream();
+            sock.setSoTimeout(quietMs);
+            byte[] chunk = new byte[4096];
+            long deadline = System.currentTimeMillis() + quietMs;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    int r = is.read(chunk);
+                    if (r <= 0) return;
+                    buf.append(new String(chunk, 0, r, StandardCharsets.UTF_8));
+                } catch (java.net.SocketTimeoutException ste) {
+                    return;
+                }
+            }
+        } catch (Exception ignored) {
         }
     }
 
