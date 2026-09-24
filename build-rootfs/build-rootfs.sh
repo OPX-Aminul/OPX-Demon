@@ -158,6 +158,7 @@ apt-get install -y --no-install-recommends \
     tzdata \
     ucf \
     unzip \
+    usbip \
     usbutils \
     util-linux \
     vim-common \
