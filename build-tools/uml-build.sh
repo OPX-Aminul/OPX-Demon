@@ -226,7 +226,13 @@ if command -v readelf >/dev/null 2>&1; then
     # banner verbatim as a NUL-terminated C string (linux_banner[]), so match
     # up to the first control byte — no pipes, no SIGPIPE, no megabyte match.
     BANNER="$(grep -aom1 'Linux version 7\.[^"[:cntrl:]]*' "${OUT}/linux-uml" || true)"
+    # The Xiaomi/MIUI hub fix is applied to this tree on purpose, so the kernel
+    # adds the "-dirty" git-state suffix to its version string. That is the
+    # expected result, not a lineage change: the release commit and builder tag
+    # after it must still match exactly, otherwise the build stops here.
     case "${BANNER}" in
+        "Linux version ${KVER_BASELINE}-g8897487c5223"*"-dirty"*"(stryker@images)"*)
+            log "Banner matches the original release (patched tree, -dirty expected): ${BANNER}" ;;
         "Linux version ${KVER_BASELINE}-g8897487c5223 (stryker@images)"*)
             log "Banner matches the original release: ${BANNER}" ;;
         *) die "Banner mismatch — got '${BANNER}', expected the 7.2.0-rc4-g8897487c5223 (stryker@images) lineage" ;;
