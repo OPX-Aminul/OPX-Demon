@@ -66,8 +66,8 @@
     },
     "uml_netd": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/uml-mode-all-file/uml-netd",
-      "sha256": "f69c3c023ce067f7f90164a85e0d370e3f5e7bed4c0dbced188adf638bb5cbda",
-      "size": 2239928,
+      "sha256": "640148c8aa5cd1e8d299d408324b03f2c063ee077e7337573ac1fa96bb98115c",
+      "size": 2900616,
       "note": "Rootless UML network gateway (BESS vector transport): ARP/ICMP + TCP relay to 127.0.0.1:<same port> + DNS. CI re-pins sha256/size after each upload."
     }
   },
@@ -107,7 +107,7 @@
     "sha256": "f79f89be18d128e45956d43bafaeecb2d48cb57417b2b1b00738c141ebd487c3",
     "size": 22181528,
     "mandatory": false,
-    "changelog": "OPX-Demon v1.1.9 — rootless UML engine gets working USB/IP passthrough.\n\n- UML kernel now boots with CONFIG_IP_PNP so vec0 gets its 10.0.2.15 address and answers ARP.\n- New uml-netd gateway: BESS transport daemon on the host, relaying ARP/ICMP/TCP/DNS for the UML guest over 127.0.0.1.\n- console fallback reconfigures vec0 with the same address.\n- QEMU engine unchanged."
+    "changelog": "OPX-Demon v1.1.9 \u2014 rootless UML engine gets working USB/IP passthrough.\n\n- UML kernel now boots with CONFIG_IP_PNP so vec0 gets its 10.0.2.15 address and answers ARP.\n- New uml-netd gateway: BESS transport daemon on the host, relaying ARP/ICMP/TCP/DNS for the UML guest over 127.0.0.1.\n- console fallback reconfigures vec0 with the same address.\n- QEMU engine unchanged."
   },
   "news": [],
   "notifications": []
