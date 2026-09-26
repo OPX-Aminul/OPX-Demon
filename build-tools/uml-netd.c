@@ -20,10 +20,17 @@
  *   1. ARP  — answer every "who has X" with the gateway MAC (proxy-ARP), so
  *             the guest always resolves; gratuitous ARP after connect.
  *   2. ICMP — echo replies for 10.0.2.2 ("ping the host" works).
- *   3. TCP  — GENERIC relay: a SYN to 10.0.2.2:<port> is relayed to
- *             127.0.0.1:<same port> on the device. This carries
+ *   3. TCP  — relay with an explicit egress policy. A SYN to the gateway
+ *             (10.0.2.2) or to 127.0.0.0/8 is relayed to 127.0.0.1:<same
+ *             port> on the device: that carries
  *             `usbip attach -r 10.0.2.2 -b <busid>` to the app's USB/IP
- *             server on port 3240.
+ *             server on port 3240. Any other destination leaves the phone
+ *             through --egress (default "direct": the daemon runs inside
+ *             the app process, so its own sockets already carry the app's
+ *             INTERNET permission; "socks" tunnels it through a SOCKS5
+ *             proxy instead; "loopback" restores the old gateway-only
+ *             behaviour). This is what gives the guest working internet —
+ *             unlike QEMU/slirp there is no NAT underneath us.
  *   4. UDP  — DNS (guest -> 10.0.2.2:53) forwarded to --dns (default
  *             10.0.2.3 -> falls back to 8.8.8.8 unless overridden) so apt
  *             resolves inside the guest.
@@ -32,12 +39,14 @@
  * (see RootlessEngine.buildUmlCommand). No root, no /dev/net/tun, no
  * VpnService — an ordinary unprivileged process holds both endpoints.
  *
- * Usage: uml-netd --socket <path> [--dns <ipv4>] [--verbose]
+ * Usage: uml-netd --socket <path> [--dns <ipv4>] [--egress <loopback|direct|socks>]
+ *                 [--socks <host:port>] [--verbose]
  */
 
 #define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <errno.h>
+#include <netdb.h>
 #include <fcntl.h>
 #include <linux/tcp.h>
 #include <netinet/in.h>
@@ -82,6 +91,66 @@ static const uint8_t MAC_GUEST[6] = {0x52, 0x54, 0x00, 0x12, 0x34, 0x15};
 
 /* ── small helpers ─────────────────────────────────────────────────────────── */
 static int g_verbose;
+
+/* "<host>:<port>" for --socks; the host may be a literal IPv4 or a name. */
+static int parse_socks(const char *arg);
+
+/* Guest internet egress. The gateway/loopback destinations never leave the
+ * phone: they are relayed to 127.0.0.1 with the port preserved, which is how
+ * `usbip attach -r 10.0.2.2` reaches the app's USB/IP server. */
+enum { EGRESS_LOOPBACK = 0, EGRESS_DIRECT = 1, EGRESS_SOCKS = 2 };
+static int g_egress = EGRESS_DIRECT;
+static uint32_t g_socks_ip;  /* wire-order bytes in memory (memcpy-safe) */
+static uint16_t g_socks_port = 1080;
+static int g_socks_set;
+
+static const char *egress_name(int e)
+{
+    switch (e) {
+    case EGRESS_LOOPBACK: return "loopback";
+    case EGRESS_SOCKS:    return "socks";
+    default:              return "direct";
+    }
+}
+
+/* Addresses the guest believes are "the device itself". */
+static int dip_is_device(const uint8_t dip[4])
+{
+    if (dip[0] == 0x7F) return 1;                    /* 127.0.0.0/8 */
+    if (memcmp(dip, IP_HOST, 4) == 0) return 1;      /* the gateway  */
+    return 0;
+}
+
+static int parse_socks(const char *arg)
+{
+    const char *colon = strrchr(arg, ':');
+    if (!colon || colon == arg) return -1;
+    size_t hlen = (size_t)(colon - arg);
+    long port = strtol(colon + 1, NULL, 10);
+    if (port <= 0 || port > 65535) return -1;
+
+    char host[256];
+    if (hlen >= sizeof host) return -1;
+    memcpy(host, arg, hlen);
+    host[hlen] = '\0';
+
+    struct in_addr a;
+    if (inet_pton(AF_INET, host, &a) == 1) {
+        memcpy(&g_socks_ip, &a, 4);
+    } else {
+        struct addrinfo hints, *res = NULL;
+        memset(&hints, 0, sizeof hints);
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        if (getaddrinfo(host, NULL, &hints, &res) != 0 || !res) return -1;
+        struct sockaddr_in *sa = (struct sockaddr_in *)res->ai_addr;
+        memcpy(&g_socks_ip, &sa->sin_addr, 4);
+        freeaddrinfo(res);
+    }
+    g_socks_port = (uint16_t)port;
+    g_socks_set = 1;
+    return 0;
+}
 
 static uint16_t csum16(const void *b, size_t len)
 {
@@ -378,8 +447,11 @@ struct trelay {
     int connecting;        /* host connect() in progress */
 
     uint16_t gport;        /* guest source port (host order) — lookup key */
-    uint16_t dport;        /* guest destination port = host loopback port */
-    int hfd;               /* host-side socket, 127.0.0.1:dport */
+    uint16_t dport;        /* guest destination port (host order) */
+    uint8_t dip[4];        /* guest destination IP, wire order */
+    int egress;            /* EGRESS_* chosen for this relay */
+    int hs;                /* 0 = upstream not usable yet (handshake pending) */
+    int hfd;               /* host-side socket (see egress) */
 
     uint32_t rcv_nxt;      /* next expected seq from guest */
     uint32_t snd_nxt;      /* next seq we will use toward the guest */
@@ -496,29 +568,99 @@ static void relay_send_rst(struct trelay *r)
 
 static void relay_connect_host(struct trelay *r)
 {
+    struct sockaddr_in da;
+    memset(&da, 0, sizeof da);
+    da.sin_family = AF_INET;
+    da.sin_port = htons(r->dport);
+
+    /* Gateway and loopback destinations stay on the device — this is the
+     * usbip/USB-IP path. Everything else follows the egress policy. */
+    if (g_egress == EGRESS_LOOPBACK || dip_is_device(r->dip)) {
+        r->egress = EGRESS_LOOPBACK;
+        da.sin_addr.s_addr = htonl(0x7F000001u); /* 127.0.0.1 */
+    } else if (g_egress == EGRESS_SOCKS) {
+        r->egress = EGRESS_SOCKS;
+        da.sin_addr.s_addr = g_socks_ip;
+        da.sin_port = htons(g_socks_port);
+    } else {
+        r->egress = EGRESS_DIRECT;
+        memcpy(&da.sin_addr, r->dip, 4);
+    }
+
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
         r->dead = 1;
         return;
     }
     set_nonblock(fd);
-    struct sockaddr_in da;
-    memset(&da, 0, sizeof da);
-    da.sin_family = AF_INET;
-    da.sin_addr.s_addr = htonl(0x7F000001u); /* 127.0.0.1 */
-    da.sin_port = htons(r->dport);
     int rc = connect(fd, (struct sockaddr *)&da, sizeof da);
-    if (rc == 0) {
-        r->connecting = 0;
-    } else if (errno == EINPROGRESS) {
-        r->connecting = 1;
-    } else {
+    if (rc != 0 && errno != EINPROGRESS) {
         close(fd);
         r->hfd = -1;
         r->dead = 1;
         return;
     }
     r->hfd = fd;
+    /* Stay in the "connecting" state even when the loopback connect() already
+     * returned 0: host_pump_all() is the single place that validates the
+     * socket, runs the SOCKS5 handshake and flips r->hs. */
+    r->connecting = 1;
+}
+
+/* ── SOCKS5 CONNECT (RFC 1928) ─────────────────────────────────────────────
+ * The proxy always sits on the device (127.0.0.1 by default), so this
+ * handshake completes in a couple of milliseconds even though it runs
+ * synchronously: a blocking socket with a 5 s cap is simpler and safer than
+ * a third state machine in the poll loop. */
+static int io_all(int fd, void *buf, size_t len, int write_side)
+{
+    uint8_t *p = buf;
+    size_t done = 0;
+    while (done < len) {
+        ssize_t n = write_side
+            ? write(fd, p + done, len - done)
+            : read(fd, p + done, len - done);
+        if (n > 0) { done += (size_t)n; continue; }
+        if (n < 0 && errno == EINTR) continue;
+        return -1;
+    }
+    return 0;
+}
+
+static int socks_connect(struct trelay *r)
+{
+    struct timeval tv = { 5, 0 };
+    setsockopt(r->hfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+    setsockopt(r->hfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
+    int fl = fcntl(r->hfd, F_GETFL, 0);
+    if (fl >= 0) fcntl(r->hfd, F_SETFL, fl & ~O_NONBLOCK);
+
+    int rc = -1;
+    uint8_t greet[3] = { 5, 1, 0 };                 /* VER 5, 1 method, none */
+    uint8_t rep[2];
+    uint8_t req[10];                                /* ATYP 1 = IPv4 */
+    uint8_t head[4], addr[4], tail[2];
+
+    if (io_all(r->hfd, greet, sizeof greet, 1) < 0) goto out;
+    if (io_all(r->hfd, rep, sizeof rep, 0) < 0) goto out;
+    if (rep[0] != 5 || rep[1] != 0) goto out;      /* no "no-auth" offered */
+
+    req[0] = 5; req[1] = 1;                        /* CONNECT */
+    req[2] = 0; req[3] = 1;                        /* RSV, ATYP = IPv4 */
+    memcpy(req + 4, r->dip, 4);
+    req[8] = (uint8_t)(r->dport >> 8);
+    req[9] = (uint8_t)r->dport;
+    if (io_all(r->hfd, req, sizeof req, 1) < 0) goto out;
+
+    if (io_all(r->hfd, head, sizeof head, 0) < 0) goto out;
+    if (head[1] != 0) goto out;                    /* reply code != success */
+    if (io_all(r->hfd, addr, sizeof addr, 0) < 0) goto out;
+    if (io_all(r->hfd, tail, sizeof tail, 0) < 0) goto out;
+    rc = 0;
+
+out:
+    if (fl >= 0) fcntl(r->hfd, F_SETFL, fl | O_NONBLOCK);
+    return rc;
 }
 
 /* guest -> host: flush gbuf into hfd.
@@ -526,7 +668,7 @@ static void relay_connect_host(struct trelay *r)
  * sequence-wise when they were appended to gbuf; this pump only drains. */
 static void pump_to_host(struct trelay *r)
 {
-    if (r->hfd < 0 || r->connecting) return;
+    if (r->hfd < 0 || r->connecting || !r->hs) return;
     while (r->glen > 0) {
         ssize_t n = write(r->hfd, r->gbuf, r->glen);
         if (n > 0) {
@@ -547,6 +689,7 @@ static void pump_to_host(struct trelay *r)
 /* host -> guest: transmit new data + FIN */
 static void pump_to_guest(struct trelay *r)
 {
+    if (r->hfd < 0 || !r->hs) return; /* upstream not usable yet */
     while (r->hsent < r->hlen && !r->dead) {
         size_t avail = r->hlen - r->hsent;
         size_t chunk = avail > MSS ? MSS : avail;
@@ -585,8 +728,9 @@ static void relay_retx(struct trelay *r, long now)
     r->last_tx_ms = now;
 }
 
-/* Inbound TCP segment from the guest. */
-static void tcp_input(const uint8_t *seg, size_t len)
+/* Inbound TCP segment from the guest. `dip` is the frame's destination IP —
+ * the egress decision needs it and it lives in the IP header, not in TCP. */
+static void tcp_input(const uint8_t *seg, size_t len, const uint8_t dip[4])
 {
     if (len < 20) return;
     uint16_t sport = (uint16_t)((seg[0] << 8) | seg[1]);
@@ -617,6 +761,7 @@ static void tcp_input(const uint8_t *seg, size_t len)
         r = relay_alloc(sport);
         if (!r) return; /* table full: guest will retransmit */
         r->dport = dport;
+        memcpy(r->dip, dip, 4);
         r->rcv_nxt = seq + 1;
         r->our_isn = make_isn(sport);
         r->snd_nxt = r->our_isn + 1;
@@ -714,22 +859,38 @@ static void host_pump_all(void)
             getsockopt(r->hfd, SOL_SOCKET, SO_ERROR, &err, &el);
             r->connecting = 0;
             if (err != 0) {
-                logf_("uml-netd: host connect to 127.0.0.1:%u failed (errno=%d)",
-                      r->dport, err);
+                logf_("uml-netd: %s connect to %u.%u.%u.%u:%u failed (errno=%d)",
+                      egress_name(r->egress), r->dip[0], r->dip[1], r->dip[2],
+                      r->dip[3], r->dport, err);
                 /* Refused: tell the guest immediately so connect() fails fast
                  * instead of waiting for its own retransmit timeouts. */
                 tcp_send(r, F_RST | F_ACK, NULL, 0, r->rcv_nxt, r->snd_nxt);
                 relay_free(r);
                 continue;
             }
-            logf_("uml-netd: relay %u -> 127.0.0.1:%u established",
-                  r->gport, r->dport);
+            if (r->egress == EGRESS_SOCKS && socks_connect(r) < 0) {
+                logf_("uml-netd: SOCKS5 CONNECT to %u.%u.%u.%u:%u refused",
+                      r->dip[0], r->dip[1], r->dip[2], r->dip[3], r->dport);
+                tcp_send(r, F_RST | F_ACK, NULL, 0, r->rcv_nxt, r->snd_nxt);
+                relay_free(r);
+                continue;
+            }
+            r->hs = 1;
+            if (r->egress == EGRESS_LOOPBACK) {
+                logf_("uml-netd: relay %u -> 127.0.0.1:%u established",
+                      r->gport, r->dport);
+            } else {
+                logf_("uml-netd: relay %u -> %u.%u.%u.%u:%u established (%s)",
+                      r->gport, r->dip[0], r->dip[1], r->dip[2], r->dip[3],
+                      r->dport, egress_name(r->egress));
+            }
             pump_to_host(r);
             pump_to_guest(r);
             continue;
         }
 
         if (rev & (POLLIN | POLLHUP | POLLERR)) {
+            if (!r->hs) continue; /* connect still in flight */
             for (;;) {
                 size_t space = sizeof r->hbuf - r->hlen;
                 if (space == 0) break;
@@ -778,11 +939,29 @@ int main(int argc, char **argv)
         } else if (!strcmp(argv[i], "--dns") && i + 1 < argc) {
             struct in_addr a;
             if (inet_pton(AF_INET, argv[++i], &a) == 1) g_dns_ip = a.s_addr;
+        } else if (!strcmp(argv[i], "--egress") && i + 1 < argc) {
+            const char *m = argv[++i];
+            if (!strcmp(m, "loopback")) g_egress = EGRESS_LOOPBACK;
+            else if (!strcmp(m, "direct")) g_egress = EGRESS_DIRECT;
+            else if (!strcmp(m, "socks")) g_egress = EGRESS_SOCKS;
+            else {
+                fprintf(stderr, "uml-netd: --egress must be "
+                                "loopback|direct|socks\n");
+                return 2;
+            }
+        } else if (!strcmp(argv[i], "--socks") && i + 1 < argc) {
+            if (parse_socks(argv[++i]) < 0) {
+                fprintf(stderr, "uml-netd: --socks expects <host>:<port>\n");
+                return 2;
+            }
+            g_egress = EGRESS_SOCKS;
         } else if (!strcmp(argv[i], "--verbose")) {
             g_verbose = 1;
         } else {
             fprintf(stderr,
-                    "usage: uml-netd --socket <path> [--dns <ipv4>] [--verbose]\n");
+                    "usage: uml-netd --socket <path> [--dns <ipv4>] "
+                    "[--egress <loopback|direct|socks>] [--socks <host:port>] "
+                    "[--verbose]\n");
             return 2;
         }
     }
@@ -790,14 +969,20 @@ int main(int argc, char **argv)
         fprintf(stderr, "usage: uml-netd --socket <path>\n");
         return 2;
     }
+    if (g_egress == EGRESS_SOCKS && !g_socks_set) {
+        fprintf(stderr, "uml-netd: --egress socks needs --socks <host:port>\n");
+        return 2;
+    }
 
     if (bess_listen(path) < 0) {
         fprintf(stderr, "uml-netd: cannot listen on %s: %s\n", path, strerror(errno));
         return 1;
     }
-    logf_("uml-netd: listening on %s (dns=%u.%u.%u.%u)", path,
+    logf_("uml-netd: listening on %s (dns=%u.%u.%u.%u egress=%s%s)", path,
           g_dns_ip & 0xFF, (g_dns_ip >> 8) & 0xFF,
-          (g_dns_ip >> 16) & 0xFF, (g_dns_ip >> 24) & 0xFF);
+          (g_dns_ip >> 16) & 0xFF, (g_dns_ip >> 24) & 0xFF,
+          egress_name(g_egress),
+          g_socks_set ? "/socks-proxy" : "");
 
     long last_gratuitous = 0;
     long last_activity = now_ms();
@@ -887,7 +1072,7 @@ int main(int argc, char **argv)
                 } else if (proto == 17) {
                     handle_udp(l4, l4len, frame + 14 + 12);
                 } else if (proto == 6) {
-                    tcp_input(l4, l4len);
+                    tcp_input(l4, l4len, frame + 14 + 16);
                 }
             }
         }

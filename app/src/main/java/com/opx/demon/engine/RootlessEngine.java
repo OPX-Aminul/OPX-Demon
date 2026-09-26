@@ -1254,6 +1254,25 @@ public final class RootlessEngine {
             cmd.add(netd.getAbsolutePath());
             cmd.add("--socket");
             cmd.add(sock.getAbsolutePath());
+            // Guest internet: 10.0.2.2 and 127.0.0.0/8 always stay on the device
+            // (that is the usbip path); anything else leaves through the
+            // daemon's own sockets, which carry the app's INTERNET permission.
+            // A SOCKS5 proxy can be forced from SharedPreferences
+            // ("opx_demon" / "uml_socks5" = "host:port") for networks that
+            // block direct egress.
+            String socks = null;
+            try {
+                socks = app.getSharedPreferences("opx_demon", Context.MODE_PRIVATE)
+                        .getString("uml_socks5", null);
+            } catch (Throwable ignored) {
+            }
+            if (socks != null && socks.trim().contains(":")) {
+                cmd.add("--socks");
+                cmd.add(socks.trim());
+            } else {
+                cmd.add("--egress");
+                cmd.add("direct");
+            }
             Log.i(TAG, "uml-netd: " + join(cmd));
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.directory(RootlessPaths.base(app));

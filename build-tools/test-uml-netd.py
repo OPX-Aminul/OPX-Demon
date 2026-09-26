@@ -10,7 +10,13 @@ client, one raw Ethernet frame per packet) and asserts that uml-netd:
   3. completes a TCP 3-way handshake to a host loopback listener and relays
      data both ways with correct sequence/ACK accounting and checksums,
   4. sends RST when the host-side port is refused,
-  5. relays UDP DNS to the resolver given via --dns.
+  5. relays UDP DNS to the resolver given via --dns,
+  6. sends a non-gateway destination straight out to that address
+     (--egress direct, the guest-internet path),
+  7. tunnels a non-gateway destination through a SOCKS5 proxy
+     (--socks) and relays payload both ways after the handshake,
+  8. still relays the gateway (10.0.2.2) to 127.0.0.1 while --socks is on,
+  9. refuses to start with --egress socks and no --socks.
 
 Run:  python3 build-tools/test-uml-netd.py
 """
@@ -26,6 +32,8 @@ import threading
 import time
 
 SOCK = tempfile.mktemp(prefix="uml-netd-test-", suffix=".sock")
+SOCK2 = tempfile.mktemp(prefix="uml-netd-test2-", suffix=".sock")
+SOCK3 = tempfile.mktemp(prefix="uml-netd-test3-", suffix=".sock")
 NETD = os.path.join(os.path.dirname(__file__), "..", "build-tools", "uml-netd")
 NETD = os.path.abspath(NETD)
 
@@ -75,10 +83,10 @@ def ip_csum_ok(ip: bytes) -> bool:
     return csum(ip[:20]) == 0
 
 
-def tcp_seg(sport, dport, seq, ack, flags, payload=b"", window=8192):
+def tcp_seg(sport, dport, seq, ack, flags, payload=b"", window=8192, dst=IP_HOST):
     # full 20-byte TCP header: ports, seq, ack, offset/flags, window, csum, urgent
     hdr = struct.pack(">HHIIBBHHH", sport, dport, seq, ack, 0x50, flags, window, 0, 0)
-    ph = IP_GUEST + IP_HOST + struct.pack(">BBH", 0, 6, 20 + len(payload))
+    ph = IP_GUEST + dst + struct.pack(">BBH", 0, 6, 20 + len(payload))
     cs = csum(ph + hdr + payload)
     hdr = hdr[:16] + struct.pack(">H", cs) + hdr[18:]
     return hdr + payload
@@ -94,10 +102,10 @@ def tcp_csum_ok(seg: bytes) -> bool:
 class Kernel:
     """The fake UML kernel: a BESS seqpacket client."""
 
-    def __init__(self):
+    def __init__(self, path=SOCK):
         self.s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
         self.s.settimeout(2.0)
-        self.s.connect(SOCK)
+        self.s.connect(path)
 
     def send(self, frame: bytes):
         self.s.send(frame)
@@ -141,6 +149,61 @@ def wait_frame(k, predicate, tries=10):
         if predicate(f):
             return f
     return None
+
+
+def is_synack(f, dport):
+    try:
+        proto, src, dst, l4 = parse_ip(f)
+        return proto == 6 and l4[13] & 0x12 == 0x12 and l4[0:2] == struct.pack(">H", dport)
+    except Exception:
+        return False
+
+
+def is_psh(f):
+    try:
+        proto, src, dst, l4 = parse_ip(f)
+        return proto == 6 and l4[13] & 0x08 and len(l4) > 20
+    except Exception:
+        return False
+
+
+def local_ipv4():
+    """A routable address of this host, for the direct-egress test."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 53))
+        ip = s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+    if ip.startswith("127.") or ip == "10.0.2.2":
+        return None
+    return ip
+
+
+def relay_exchange(k, dst_ip, dport, sport, payload, tries=12):
+    """3-way handshake + one data round trip to an arbitrary destination."""
+    seq = 1000
+    k.send(eth(ipv4(6, tcp_seg(sport, dport, seq, 0, 0x02, dst=dst_ip), IP_GUEST, dst_ip), 0x0800))
+    f = wait_frame(k, lambda fr: is_synack(fr, dport), tries=tries)
+    if f is None:
+        return None
+    _, _, _, l4 = parse_ip(f)
+    isn = struct.unpack(">I", l4[4:8])[0]
+    our_seq, rcv_nxt = seq + 1, isn + 1
+    k.send(eth(ipv4(6, tcp_seg(sport, dport, our_seq, rcv_nxt, 0x10, dst=dst_ip), IP_GUEST, dst_ip), 0x0800))
+    k.send(eth(ipv4(6, tcp_seg(sport, dport, our_seq, rcv_nxt, 0x18, payload,
+                              dst=dst_ip), IP_GUEST, dst_ip), 0x0800))
+    f = wait_frame(k, is_psh, tries=tries)
+    if f is None:
+        return None
+    _, _, _, l4 = parse_ip(f)
+    data = l4[(l4[12] >> 4) * 4:]
+    rseq = struct.unpack(">I", l4[4:8])[0]
+    k.send(eth(ipv4(6, tcp_seg(sport, dport, our_seq + len(payload),
+                               rseq + len(data), 0x10, dst=dst_ip), IP_GUEST, dst_ip), 0x0800))
+    return data
 
 
 def main():
@@ -354,6 +417,164 @@ def main():
         udp_srv.close()
         srv.close()
         k.close()
+
+        # ── 6. direct egress (guest internet) ──────────────────────────────
+        print("[6] direct egress to a non-gateway address")
+        host_ip = local_ipv4()
+        if host_ip is None:
+            print("  SKIP  no routable local IPv4 on this machine")
+        else:
+            got.clear()
+            direct_srv = socket.socket()
+            direct_srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            direct_srv.bind((host_ip, 39997))
+            direct_srv.listen(4)
+            # A fresh daemon: the first one exits together with its kernel.
+            direct_proc = subprocess.Popen(
+                [NETD, "--socket", SOCK2, "--dns", "127.0.0.1", "--verbose"],
+                stderr=subprocess.PIPE,
+            )
+            time.sleep(0.3)
+
+            def direct_echo():
+                c, peer = direct_srv.accept()
+                data = c.recv(4096)
+                got["direct"] = (peer[0], data)
+                c.sendall(b"DIRECT:" + data)
+                time.sleep(0.1)
+                c.close()
+
+            th3 = threading.Thread(target=direct_echo, daemon=True)
+            th3.start()
+            k2 = Kernel(SOCK2)
+            payload = b"direct-egress"
+            back = relay_exchange(k2, socket.inet_aton(host_ip), 39997, 55601, payload)
+            th3.join(timeout=2)
+            check("direct: gateway replied to a non-gateway SYN", back is not None)
+            check("direct: server received the payload", got.get("direct", (None, None))[1] == payload)
+            check("direct: echo relayed back", back == b"DIRECT:" + payload,
+                  f"{back!r}")
+            check("direct: server saw the real destination, not 127.0.0.1",
+                  got.get("direct", (None,))[0] == host_ip,
+                  f"{got.get('direct')}")
+            direct_srv.close()
+            k2.close()
+            if direct_proc.poll() is None:
+                direct_proc.send_signal(signal.SIGTERM)
+                try:
+                    direct_proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    direct_proc.kill()
+
+        # ── 7/8. SOCKS5 egress ─────────────────────────────────────────────
+        print("[7] SOCKS5 egress")
+        socks_state = {"connects": [], "data": None}
+        socks_srv = socket.socket()
+        socks_srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        socks_srv.bind(("127.0.0.1", 10800))
+        socks_srv.listen(4)
+
+        def socks_server():
+            c, _ = socks_srv.accept()
+            greet = c.recv(3)
+            if greet[0] != 5:
+                c.close()
+                return
+            socks_state["greet"] = greet
+            c.sendall(b"\x05\x00")                      # no auth
+            req = c.recv(10)
+            if len(req) < 10 or req[3] != 1:
+                c.close()
+                return
+            socks_state["connects"].append(
+                (socket.inet_ntoa(req[4:8]), struct.unpack(">H", req[8:10])[0])
+            )
+            c.sendall(b"\x05\x00\x00\x01" + b"\x00" * 4 + b"\x00\x00")
+            data = c.recv(4096)
+            socks_state["data"] = data
+            c.sendall(b"TUNNELED:" + data)
+            time.sleep(0.1)
+            c.close()
+
+        th4 = threading.Thread(target=socks_server, daemon=True)
+        th4.start()
+        socks_proc = subprocess.Popen(
+            [NETD, "--socket", SOCK3, "--dns", "127.0.0.1",
+             "--socks", "127.0.0.1:10800", "--verbose"],
+            stderr=subprocess.PIPE,
+        )
+        time.sleep(0.3)
+        if socks_proc.poll() is not None:
+            check("socks: uml-netd started with --socks", False,
+                  socks_proc.stderr.read().decode())
+        else:
+            check("socks: uml-netd started with --socks", True)
+            k3 = Kernel(SOCK3)
+            time.sleep(0.1)
+            payload = b"socks-egress"
+            back = relay_exchange(k3, socket.inet_aton("93.184.216.34"), 443,
+                                  55602, payload)
+            th4.join(timeout=3)
+            check("socks: greeting offered 'no auth'", socks_state.get("greet") == b"\x05\x01\x00",
+                  f"{socks_state.get('greet')!r}")
+            check("socks: CONNECT carries the guest's destination",
+                  socks_state["connects"] == [("93.184.216.34", 443)],
+                  f"{socks_state['connects']}")
+            check("socks: payload only after the handshake",
+                  socks_state.get("data") == payload, f"{socks_state.get('data')!r}")
+            check("socks: tunnelled echo relayed to the guest",
+                  back == b"TUNNELED:" + payload, f"{back!r}")
+
+            # ── 8. gateway still maps to 127.0.0.1 while --socks is on ────
+            print("[8] gateway path is unaffected by --socks")
+            got.clear()
+            gw_srv = socket.socket()
+            gw_srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            gw_srv.bind(("127.0.0.1", 39996))
+            gw_srv.listen(4)
+
+            def gw_echo():
+                c, peer = gw_srv.accept()
+                data = c.recv(4096)
+                got["gw"] = (peer[0], data)
+                c.sendall(b"GW:" + data)
+                time.sleep(0.1)
+                c.close()
+
+            th5 = threading.Thread(target=gw_echo, daemon=True)
+            th5.start()
+            back = relay_exchange(k3, IP_HOST, 39996, 55603, b"usbip-path")
+            th5.join(timeout=2)
+            check("gateway SYN still lands on 127.0.0.1", got.get("gw", (None,))[0] == "127.0.0.1",
+                  f"{got.get('gw')}")
+            check("gateway payload relayed", got.get("gw", (None, None))[1] == b"usbip-path")
+            check("gateway echo relayed back", back == b"GW:usbip-path", f"{back!r}")
+            check("socks proxy saw no extra CONNECT", len(socks_state["connects"]) == 1,
+                  f"{socks_state['connects']}")
+            gw_srv.close()
+            k3.close()
+
+        socks_srv.close()
+        if socks_proc.poll() is None:
+            socks_proc.send_signal(signal.SIGTERM)
+            try:
+                socks_proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                socks_proc.kill()
+
+        # ── 9. argument validation ─────────────────────────────────────────
+        print("[9] argument validation")
+        bad = [
+            ["--socket", SOCK3, "--egress", "socks"],
+            ["--socket", SOCK3, "--socks", "127.0.0.1"],
+            ["--socket", SOCK3, "--socks", "127.0.0.1:0"],
+            ["--socket", SOCK3, "--egress", "nonsense"],
+        ]
+        for args in bad:
+            r = subprocess.run([NETD] + args, capture_output=True, timeout=5)
+            check(f"rejects {' '.join(args[1:])}", r.returncode == 2,
+                  f"rc={r.returncode} {r.stderr.decode().strip()}")
+
         print()
         print(f"RESULT: {PASS} passed, {FAIL} failed")
         return 0 if FAIL == 0 else 1

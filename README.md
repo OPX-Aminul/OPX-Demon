@@ -81,9 +81,25 @@ and the app spawns **`uml-netd`** (`build-tools/uml-netd.c`) listening on that s
 * **ARP** — proxy-answers everything with the gateway MAC `52:54:00:12:34:02` and sends gratuitous
   ARPs for the first seconds after the kernel connects;
 * **ICMP** — answers echo requests so `ping 10.0.2.2` works;
-* **TCP relay** — a guest connection to `10.0.2.2:<port>` is relayed to `127.0.0.1:<same port>` in
-  the app: that is exactly what carries `usbip attach -r 10.0.2.2 -b <busid>` to the USB/IP server;
+* **TCP relay** — a guest connection to `10.0.2.2:<port>` (or to `127.0.0.0/8`) is relayed to
+  `127.0.0.1:<same port>` in the app: that is exactly what carries
+  `usbip attach -r 10.0.2.2 -b <busid>` to the USB/IP server;
 * **UDP DNS** — guest queries are forwarded to the resolver passed via `--dns`.
+
+**Guest internet.** QEMU gets its connectivity from slirp's user-mode NAT; UML has nothing
+underneath it, so `uml-netd` owns the egress policy for every other destination:
+
+| `--egress` | guest connects to | result |
+| --- | --- | --- |
+| `direct` (default) | `10.0.2.2`, `127.0.0.0/8` | relayed to `127.0.0.1:<same port>` (usbip) |
+| `direct` (default) | anything else | opened by the daemon itself — it runs inside the app process, so its sockets already carry the app's `INTERNET` permission (no root, no `VpnService`) |
+| `socks` (`--socks host:port`) | anything else | SOCKS5 `CONNECT` tunnel (RFC 1928, no auth) through a proxy on the device |
+| `loopback` | anything | the old gateway-only behaviour, for A/B comparison |
+
+So `apt update`, `curl`, `pip`, `nmap -sT` etc. work in the UML guest out of the box. A SOCKS5
+proxy can be forced from SharedPreferences (`opx_demon` / `uml_socks5` = `host:port`) for networks
+where direct egress is blocked. DNS stays a UDP relay to `--dns` (default `8.8.8.8`), so hostnames
+resolve on the device either way.
 
 `uml-netd` implements a mini TCP stack per connection (MSS 1400, cumulative ACKs, retransmit,
 reap after 30 idle minutes) and its lifecycle is bound to the kernel connection: UML died or the app
@@ -93,8 +109,9 @@ Boot is degradable: if `uml-netd` is missing or dies at start-up, the guest stil
 `eth0=tap` diagnostic cmdline) — only guest→host traffic, and with it USB passthrough, needs the
 daemon. CI compiles it from `build-tools/uml-netd.c` with the same NDK, uploads it to
 `uml-mode-all-file`, and re-pins `rootless_v2.uml_netd`; a functional harness
-(`build-tools/test-uml-netd.py`, 25 checks) simulates the kernel side and validates ARP, ICMP, TCP
-relay, RST-on-refused and DNS paths.
+(`build-tools/test-uml-netd.py`, 42 checks) simulates the kernel side and validates ARP, ICMP, TCP
+relay, RST-on-refused, DNS, direct egress, the SOCKS5 handshake (including that the gateway path
+stays on loopback while a proxy is configured) and the argument validation.
 
 ### USB passthrough in UML mode (USB/IP)
 
