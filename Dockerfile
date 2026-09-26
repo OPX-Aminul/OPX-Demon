@@ -85,7 +85,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /usr/src
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates git make flex bison bc libssl-dev libelf-dev cpio kmod wget \
+    ca-certificates git make flex bison bc libssl-dev libelf-dev cpio kmod wget patch \
     xz-utils python3 file python3-minimal unzip gcc \
     && rm -rf /var/lib/apt/lists/*
 
