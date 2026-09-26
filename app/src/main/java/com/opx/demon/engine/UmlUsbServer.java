@@ -121,16 +121,19 @@ public final class UmlUsbServer implements UsbBridge {
     private static final int USB_SPEED_SUPER = 4;
     private static final int USB_SPEED_UNKNOWN = 0;
 
+    private static final int USB_ENDPOINT_DIR_IN = 0x80;
     private static final int BUSID_LEN = 32;
     private static final int PATH_LEN = 256;
     private static final int DEV_STRUCT_LEN =
             PATH_LEN + BUSID_LEN + 4 + 4 + 4 + 2 + 2 + 2 + 1 + 1 + 1 + 1 + 1 + 1; // 312
 
-    /** Android USB speed constants (UsbConstants) for reference. */
-    private static final int ANDROID_SPEED_LOW = UsbConstants.USB_SPEED_LOW;
-    private static final int ANDROID_SPEED_FULL = UsbConstants.USB_SPEED_FULL;
-    private static final int ANDROID_SPEED_HIGH = UsbConstants.USB_SPEED_HIGH;
-    private static final int ANDROID_SPEED_SUPER = UsbConstants.USB_SPEED_SUPER;
+    /**
+     * Android's USB_SPEED_* constants and UsbDevice.getSpeed() are @hide in the
+     * platform SDK, so they are not in android.jar and referencing them does not
+     * compile. The Linux values are identical (0 unknown, 1 low, 2 full, 3 high,
+     * 4 super), so linuxSpeed() reads the value reflectively and falls back to
+     * the public endpoint information.
+     */
 
     private final Context context;
     private final UsbManager usbManager;
@@ -687,18 +690,13 @@ public final class UmlUsbServer implements UsbBridge {
      * maxpacket above 8 (read from the real cached device descriptor).
      */
     private static int linuxSpeed(UsbDevice d, int maxPacket0) {
-        int speed;
-        try {
-            speed = d.getSpeed();
-        } catch (Throwable t) {
-            speed = UsbConstants.USB_SPEED_UNKNOWN;
-        }
+        int speed = deviceSpeed(d);
         int linux;
         switch (speed) {
-            case ANDROID_SPEED_LOW: linux = USB_SPEED_LOW; break;
-            case ANDROID_SPEED_FULL: linux = USB_SPEED_FULL; break;
-            case ANDROID_SPEED_HIGH: linux = USB_SPEED_HIGH; break;
-            case ANDROID_SPEED_SUPER: linux = USB_SPEED_SUPER; break;
+            case USB_SPEED_LOW: linux = USB_SPEED_LOW; break;
+            case USB_SPEED_FULL: linux = USB_SPEED_FULL; break;
+            case USB_SPEED_HIGH: linux = USB_SPEED_HIGH; break;
+            case USB_SPEED_SUPER: linux = USB_SPEED_SUPER; break;
             default: linux = USB_SPEED_UNKNOWN; break;
         }
         if (linux == USB_SPEED_LOW && maxPacket0 > 8) {
@@ -710,6 +708,36 @@ public final class UmlUsbServer implements UsbBridge {
             linux = USB_SPEED_FULL;
         }
         return linux;
+    }
+
+    /**
+     * UsbDevice.getSpeed() is @hide, so it is read reflectively. On releases
+     * where the non-SDK greylist blocks it the call throws, and the public
+     * endpoint information is used instead: ep0 maxpacket is 8 for low-speed,
+     * 64 for full-speed, 512 for high-speed and 1024 for super-speed.
+     */
+    private static int deviceSpeed(UsbDevice d) {
+        try {
+            Object v = UsbDevice.class.getMethod("getSpeed").invoke(d);
+            if (v instanceof Integer) return (Integer) v;
+        } catch (Throwable ignored) {
+        }
+        int best = 0;
+        for (int i = 0; i < d.getInterfaceCount(); i++) {
+            UsbInterface itf = d.getInterface(i);
+            if (itf == null) continue;
+            for (int e = 0; e < itf.getEndpointCount(); e++) {
+                UsbEndpoint ep = itf.getEndpoint(e);
+                if (ep == null) continue;
+                int mps = ep.getMaxPacketSize();
+                if (mps >= 1024) return USB_SPEED_SUPER;
+                if (mps > best) best = mps;
+            }
+        }
+        if (best > 512) return USB_SPEED_HIGH;
+        if (best > 64) return USB_SPEED_FULL;
+        if (best > 8) return USB_SPEED_FULL;
+        return USB_SPEED_UNKNOWN;
     }
 
     /**
@@ -734,7 +762,10 @@ public final class UmlUsbServer implements UsbBridge {
             UsbInterface iface = e.device.getInterface(i);
             for (int j = 0; j < iface.getEndpointCount(); j++) {
                 UsbEndpoint ep = iface.getEndpoint(j);
-                boolean epIn = ep.getDirection() == UsbConstants.USB_DIR_IN;
+                // 0x80 = UsbConstants.USB_DIR_IN (endpoint direction bit 7 of
+                // bmAttributes); kept local so this file needs nothing beyond
+                // the public SDK surface.
+                boolean epIn = ep.getDirection() == USB_ENDPOINT_DIR_IN;
                 if (ep.getAddress() == address && epIn == in) return ep;
             }
         }
