@@ -8,6 +8,9 @@ name: Build & Update Release
 #
 # A successful run also fires the Build APK workflow (workflow_run) for the
 # version in app/build.gradle, which publishes the signed APK release.
+# Because the APK job is chained to this workflow, an app-only change
+# (app/**, README, docs) that still needs a published APK has to run this
+# workflow once — the engine layers are cached, so that is a ~5 minute no-op.
 #
 # 1.1.8 trigger bump: AMOLED layering — true black window + lifted gold surfaces.
 
