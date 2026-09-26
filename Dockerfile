@@ -103,6 +103,11 @@ ENV PATH=${NDK_LLVM}/bin:${PATH}
 
 RUN git clone --depth=1 --branch "${UML_REF}" "${UML_REPO}" linux-um
 
+# Copy into THIS stage: each build stage has its own filesystem, so the COPY in
+# kernel-builder does not put the patch here. Without it the RUN below dies with
+# "cannot open /usr/src/uml-xiaomi-hub.patch".
+COPY build-tools/uml-xiaomi-hub.patch /usr/src/uml-xiaomi-hub.patch
+
 # Xiaomi/MIUI fix for the UML engine too: the same ep0-maxpacket/speed
 # misreport that breaks USB passthrough under QEMU also breaks devices
 # attached through the guest's VHCI (usbip) — the guest kernel is the USB
