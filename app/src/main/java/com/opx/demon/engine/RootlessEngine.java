@@ -807,6 +807,9 @@ public final class RootlessEngine {
         else if (!new File(sock).exists()) return false;
 
         GuestExec.logToStore("guest agent unreachable — bootstrapping it over the serial console");
+        // The vector device is vec0 in UML, eth0 under QEMU/slirp.
+        String netIf = EngineType.isUml(prefs()) ? "vec0" : "eth0";
+        configureGuestNetIf(netIf, sock);
         // deployGuestCore() removes the payload after itself, so put a fresh copy in the share
         // before asking the console to unpack it.
         File staged = null;
@@ -831,13 +834,15 @@ public final class RootlessEngine {
            // hostfwd — the 'listening' check below would then lie about being up. Self-heal the
            // network first: static slirp addresses on eth0, and persist them so the next boot
            // does not start from the same broken state (pre-rootfs.imgz guests only).
-           .append("if ! ip -4 addr show dev eth0 2>/dev/null | grep -q '10.0.2.15'; then ")
-           .append("ip link set eth0 up 2>/dev/null; ")
-           .append("ip addr flush dev eth0 2>/dev/null; ")
-           .append("ip addr add 10.0.2.15/24 dev eth0 2>/dev/null; ")
-           .append("ip route add default via 10.0.2.2 dev eth0 2>/dev/null; ")
+           .append("if ! ip -4 addr show dev ").append(netIf).append(" 2>/dev/null | grep -q '10.0.2.15'; then ")
+           .append("ip link set ").append(netIf).append(" up 2>/dev/null; ")
+           .append("ip addr flush dev ").append(netIf).append(" 2>/dev/null; ")
+           .append("ip addr add 10.0.2.15/24 dev ").append(netIf).append(" 2>/dev/null; ")
+           .append("ip route add default via 10.0.2.2 dev ").append(netIf).append(" 2>/dev/null; ")
            .append("mkdir -p /etc/network /run/opxdemon; ")
-           .append("[ -f /etc/network/interfaces ] || printf 'auto lo\\niface lo inet loopback\\n\\nauto eth0\\niface eth0 inet static\\n    address 10.0.2.15\\n    netmask 255.255.255.0\\n    gateway 10.0.2.2\\n' > /etc/network/interfaces; ")
+           .append("[ -f /etc/network/interfaces ] || printf 'auto lo\\niface lo inet loopback\\n\\nauto ")
+           .append(netIf).append("\\niface ").append(netIf)
+           .append(" inet static\\n    address 10.0.2.15\\n    netmask 255.255.255.0\\n    gateway 10.0.2.2\\n' > /etc/network/interfaces; ")
            .append("touch /run/opxdemon/net-ok; ")
            .append("fi; ")
            .append("(systemctl restart opxdemon-agent.service >/dev/null 2>&1 ")
@@ -846,7 +851,7 @@ public final class RootlessEngine {
            .append("sleep 3; ")
            // A guest whose agent answers 1050 is the only proof of 'up': it needs the agent
            // AND the IP both to be true, which is what the app's own ping then exercises.
-           .append("ip -4 addr show dev eth0 2>/dev/null | grep -q '10.0.2.15' ")
+           .append("ip -4 addr show dev ").append(netIf).append(" 2>/dev/null | grep -q '10.0.2.15' ")
            .append("&& ss -ltn 2>/dev/null | grep -q ':1050' && echo __AGENT_UP__ || echo __AGENT_DOWN__");
 
         boolean up = false;
@@ -875,6 +880,30 @@ public final class RootlessEngine {
             }
         }
         return false;
+    }
+
+    /**
+     * Applies the static 10.0.2.15/24 address and default route to the guest's
+     * network interface over the console. Idempotent, and the safety net for
+     * kernels built before CONFIG_IP_PNP: the "ip=" boot parameter is ignored
+     * there, so vec0 would otherwise come up address-less and USB/IP could
+     * never reach 10.0.2.2.
+     */
+    private void configureGuestNetIf(String netIf, String consoleSock) {
+        StringBuilder c = new StringBuilder();
+        c.append("ip link set ").append(netIf).append(" up 2>/dev/null; ");
+        c.append("ip -4 addr show dev ").append(netIf).append(" 2>/dev/null | grep -q '10.0.2.15/24' || { ")
+         .append("ip addr flush dev ").append(netIf).append(" 2>/dev/null; ")
+         .append("ip addr add 10.0.2.15/24 dev ").append(netIf).append(" 2>/dev/null; }; ");
+        c.append("ip route show default dev ").append(netIf).append(" 2>/dev/null | grep -q 'via 10.0.2.2' || ")
+         .append("ip route add default via 10.0.2.2 dev ").append(netIf).append(" 2>/dev/null; ");
+        c.append("echo __NET_CFG_DONE__");
+        boolean done = false;
+        for (String l : GuestConsole.run(c.toString(), consoleSock, 30_000)) {
+            if (l != null && l.contains("__NET_CFG_DONE__")) done = true;
+        }
+        if (done) GuestExec.logToStore("guest network: " + netIf + " = 10.0.2.15/24 via 10.0.2.2");
+        else Log.w(TAG, "could not configure " + netIf + " in the guest");
     }
 
     private void restartGuestAgent() {
@@ -1126,6 +1155,9 @@ public final class RootlessEngine {
                 }
                 if (GuestExec.ping(1500) && guestShellReady()) {
                     markBooted();
+                    // vec0 addressing: set by ip= on kernels with CONFIG_IP_PNP,
+                    // re-applied here for the already-released kernels that ignore it.
+                    if (netd) configureGuestNetIf("vec0", null);
                     if (listener != null) listener.onBooted();
                     return null;
                 }
@@ -1189,6 +1221,10 @@ public final class RootlessEngine {
             // No CAP_NET_ADMIN, no /dev/net/tun, no VpnService — both endpoints
             // are ordinary app processes.
             a.add("vec0:transport=bess,dst=" + RootlessPaths.umlNetdSock(app).getAbsolutePath());
+            // Give vec0 the QEMU/slirp-equivalent addressing. Only CONFIG_IP_PNP parses
+            // this (do_ipauto in drivers/net/ipv4/devinet.c) - without it vec0 has no
+            // address, never ARPs 10.0.2.2, and uml-netd never sees a frame.
+            a.add("ip=10.0.2.15::10.0.2.2:255.255.255.0:opxdemon:vec0:off");
             // guestfwd-equivalent: nothing else needed — uml-netd relays
             // guest -> 10.0.2.2:<port> to 127.0.0.1:<same port>.
         } else {
