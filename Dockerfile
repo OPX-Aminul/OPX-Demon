@@ -139,7 +139,8 @@ FROM debian:bookworm AS uml-netd-builder
 # cache-cheap while uml-builder keeps its own heavy cache scope.
 COPY --from=uml-builder /opt/ndk /opt/ndk
 COPY build-tools/uml-netd.c /usr/src/uml-netd.c
-RUN /opt/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang \
+RUN mkdir -p /out \
+    && /opt/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang \
       -O2 -Wall -Wextra -static -o /out/uml-netd /usr/src/uml-netd.c \
     && [ -s /out/uml-netd ]
 
