@@ -54,7 +54,7 @@ public final class QemuDownloader {
         if (manifest != null && manifest.rootless != null && manifest.rootless.isComplete()) {
             RemoteManifest.RootlessAssets r = manifest.rootless;
             return new Bundle(r.qemu, r.kernel, r.initrd, r.libslirp, r.rootfs,
-                    r.umlKernel, r.umlStub);
+                    r.umlKernel, r.umlStub, r.umlNetd);
         }
         Bundle fallback = new Bundle(
                 new RemoteManifest.Asset(

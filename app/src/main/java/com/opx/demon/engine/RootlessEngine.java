@@ -164,6 +164,7 @@ public final class RootlessEngine {
             note(listener, "Boot failed (" + reason + ") — retrying with a safe profile");
             GuestExec.logToStore("VM boot failed (" + reason + "), falling back to the safe profile "
                     + "(aio=threads, cache=writeback, no 9p share, no virtio-rng, no USB HC)");
+            dumpConsoleTail();
             VmSpecs.setSafeBoot(prefs, true);
             lastBootUsedFallback = true;
             killAndAwait(12_000);
@@ -1203,6 +1204,10 @@ public final class RootlessEngine {
         // ubd0 = the shared Debian Trixie rootfs, rw (matches the QEMU -append root=/dev/vda)
         a.add("ubd0=" + rootfs.getAbsolutePath());
         a.add("root=/dev/ubda");
+        // The shared rootfs is built with mkfs.ext4, and the UML kernel config
+        // carries CONFIG_EXT4_FS=y but not EXT2_FS. Without an explicit
+        // rootfstype the kernel guesses, and a wrong guess is a dead mount.
+        a.add("rootfstype=ext4");
         a.add("rw");
         // Same console contract as QEMU's ttyAMA0: getty/autologin root, app drives commands.
         a.add("console=tty0");
@@ -1475,6 +1480,25 @@ public final class RootlessEngine {
         //noinspection ResultOfMethodCallIgnored
         new File(base, "exploits").mkdirs();
         return base;
+    }
+
+    /**
+     * Copies the tail of the console into the session log. The exported log is
+     * the only thing a user can send after a failed boot, and "see the boot log"
+     * on its own says nothing — the kernel's actual complaint (missing root
+     * device, bad geometry, out of memory) is worth shipping.
+     */
+    private void dumpConsoleTail() {
+        try {
+            java.util.List<String> tail = tailLog(30);
+            if (tail == null || tail.isEmpty()) return;
+            StringBuilder sb = new StringBuilder("---- console tail ----");
+            for (String l : tail) {
+                if (l != null && !l.trim().isEmpty()) sb.append('\n').append(l);
+            }
+            GuestExec.logToStore(sb.toString());
+        } catch (Throwable ignored) {
+        }
     }
 
     private void pumpBootLog(Process proc, BootListener listener) {
