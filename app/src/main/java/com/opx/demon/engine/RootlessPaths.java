@@ -58,6 +58,17 @@ public final class RootlessPaths {
     public static File umlKernel(Context c) { return new File(base(c), "linux-uml"); }
     public static File umlStub(Context c)   { return new File(base(c), "stub_exe"); }
 
+    /**
+     * Rootless UML network gateway daemon (uml-netd): listens on a SOCK_SEQPACKET
+     * AF_UNIX socket and plays the 10.0.2.2 gateway for the guest's vec0
+     * (BESS vector transport) — ARP/ICMP + generic TCP relay guest→127.0.0.1 so
+     * `usbip attach -r 10.0.2.2` reaches the app's USB/IP server on 3240.
+     * Ships in the uml-mode-all-file release next to linux-uml/stub_exe.
+     */
+    public static File umlNetd(Context c)   { return new File(base(c), "uml-netd"); }
+    /** Unix socket path the kernel connects to (bounded by sockaddr_un). */
+    public static File umlNetdSock(Context c) { return new File(base(c), "uml-netd.sock"); }
+
     public static File qmpSock(Context c)   { return new File(base(c), "qmp.sock"); }
     public static File serialSock(Context c){ return new File(base(c), "serial.sock"); }
     public static File serialLog(Context c){ return new File(base(c), "serial.log"); }

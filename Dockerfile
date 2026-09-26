@@ -24,6 +24,7 @@ RUN curl -fL --retry 5 --connect-timeout 20 \
     && tar xf linux-${KERNEL_VERSION}.tar.xz
 
 COPY build-tools/xiaomi-hub.patch /usr/src/xiaomi-hub.patch
+COPY build-tools/uml-xiaomi-hub.patch /usr/src/uml-xiaomi-hub.patch
 COPY build-tools/usb-wifi.fragment /usr/src/usb-wifi.fragment
 
 RUN cd linux-${KERNEL_VERSION} \
@@ -102,6 +103,14 @@ ENV PATH=${NDK_LLVM}/bin:${PATH}
 
 RUN git clone --depth=1 --branch "${UML_REF}" "${UML_REPO}" linux-um
 
+# Xiaomi/MIUI fix for the UML engine too: the same ep0-maxpacket/speed
+# misreport that breaks USB passthrough under QEMU also breaks devices
+# attached through the guest's VHCI (usbip) — the guest kernel is the USB
+# enumerator here, so the correction must live in its hub.c.
+RUN cd linux-um \
+    && patch -p1 --fuzz=0 < /usr/src/uml-xiaomi-hub.patch \
+    && grep -q 'correcting to full-speed' drivers/usb/core/hub.c
+
 COPY build-tools/uml-arm64.config /usr/src/uml-arm64.config
 COPY build-tools/uml-build.sh /usr/src/uml-build.sh
 RUN chmod +x /usr/src/uml-build.sh
@@ -110,6 +119,24 @@ RUN chmod +x /usr/src/uml-build.sh
 # the NDK provides, no modules (CONFIG_MODULES=n), no initramfs, no dtb.
 RUN UML_CONFIG=/usr/src/uml-arm64.config \
     /usr/src/uml-build.sh /usr/src/linux-um /out
+
+# ==============================================================================
+# SECTION 2b: uml-netd — rootless UML network gateway (BESS vector transport).
+# Sits on the AF_UNIX SOCK_SEQPACKET socket the UML kernel's vec0 connects to
+# (vec0:transport=bess,dst=<sock>) and answers ARP/ICMP, relays TCP to
+# 127.0.0.1:<same port> (usbip attach -r 10.0.2.2 reaches the app's USB/IP
+# server) and UDP DNS — no root, no VpnService, no CAP_NET_ADMIN anywhere.
+# Static bionic binary: the app execs it straight from its data dir, with no
+# shared-loader path available at guest-boot time.
+# ==============================================================================
+FROM debian:bookworm AS uml-netd-builder
+# Reuse the UML kernel's NDK instead of re-downloading it; this stage stays
+# cache-cheap while uml-builder keeps its own heavy cache scope.
+COPY --from=uml-builder /opt/ndk /opt/ndk
+COPY build-tools/uml-netd.c /usr/src/uml-netd.c
+RUN /opt/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang \
+      -O2 -Wall -Wextra -static -o /out/uml-netd /usr/src/uml-netd.c \
+    && [ -s /out/uml-netd ]
 
 # ==============================================================================
 # SECTION 1: Rootfs (Debian Trixie + pentest tools + opxdemon-agentd)
@@ -312,3 +339,5 @@ COPY --from=uml-builder /out/linux-uml /linux-uml
 COPY --from=uml-builder /out/linux-uml.config /linux-uml.config
 # UML stub binary (uml-userspace note ELF, ~1.9 KB)
 COPY --from=uml-builder /out/stub_exe /stub_exe
+# uml-netd gateway (rootless BESS networking for vec0, guest 10.0.2.15 -> host 10.0.2.2)
+COPY --from=uml-netd-builder /out/uml-netd /uml-netd

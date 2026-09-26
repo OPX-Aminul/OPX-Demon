@@ -15,15 +15,24 @@ public final class QemuDownloader {
         /** UML engine binaries; null when the manifest carries no rootless_v2 block. */
         public final RemoteManifest.Asset umlKernel;
         public final RemoteManifest.Asset umlStub;
+        /** Optional BESS network gateway (uml-netd); null on manifests predating it. */
+        public final RemoteManifest.Asset umlNetd;
 
         Bundle(RemoteManifest.Asset qemu, RemoteManifest.Asset kernel, RemoteManifest.Asset initrd,
                RemoteManifest.Asset libslirp, RemoteManifest.Asset rootfs) {
-            this(qemu, kernel, initrd, libslirp, rootfs, null, null);
+            this(qemu, kernel, initrd, libslirp, rootfs, null, null, null);
         }
 
         Bundle(RemoteManifest.Asset qemu, RemoteManifest.Asset kernel, RemoteManifest.Asset initrd,
                RemoteManifest.Asset libslirp, RemoteManifest.Asset rootfs,
                RemoteManifest.Asset umlKernel, RemoteManifest.Asset umlStub) {
+            this(qemu, kernel, initrd, libslirp, rootfs, umlKernel, umlStub, null);
+        }
+
+        Bundle(RemoteManifest.Asset qemu, RemoteManifest.Asset kernel, RemoteManifest.Asset initrd,
+               RemoteManifest.Asset libslirp, RemoteManifest.Asset rootfs,
+               RemoteManifest.Asset umlKernel, RemoteManifest.Asset umlStub,
+               RemoteManifest.Asset umlNetd) {
             this.qemu = qemu;
             this.kernel = kernel;
             this.initrd = initrd;
@@ -31,6 +40,7 @@ public final class QemuDownloader {
             this.rootfs = rootfs;
             this.umlKernel = umlKernel;
             this.umlStub = umlStub;
+            this.umlNetd = umlNetd;
         }
 
         public boolean hasUml() {
@@ -73,6 +83,7 @@ public final class QemuDownloader {
         return new Bundle(fallback.qemu, fallback.kernel, fallback.initrd,
                 fallback.libslirp, fallback.rootfs,
                 new RemoteManifest.Asset(OpxDemonEndpoints.FALLBACK_UML_KERNEL, "", 0),
-                new RemoteManifest.Asset(OpxDemonEndpoints.FALLBACK_UML_STUB, "", 0));
+                new RemoteManifest.Asset(OpxDemonEndpoints.FALLBACK_UML_STUB, "", 0),
+                new RemoteManifest.Asset(OpxDemonEndpoints.FALLBACK_UML_NETD, "", 0));
     }
 }

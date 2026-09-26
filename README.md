@@ -60,12 +60,62 @@ carries its own build scripts that reproduce that engine from public sources:
 |---|---|---|
 | `linux-uml` | arm64 **User-Mode Linux** kernel — a normal userspace ELF (`CONFIG_UML=y`, `CONFIG_UML_ARM64=y`, `CONFIG_STATIC_LINK=y`), kernel 7.2-rc4 lineage, USB-WiFi drivers built in | `build-tools/uml-build.sh` inside the `uml-builder` Docker stage: Linux 7.2-rc UML tree, `make ARCH=um SUBARCH=arm64` with the Android NDK (clang/LLD) toolchain and `build-tools/uml-arm64.config` |
 | `stub_exe` | ~1.9 KB static arm64 ELF carrying a `uml-userspace` build note — the UML build tree's stub binary | collected from the same UML build output |
+| `uml-netd` | rootless **UML network gateway** — a small static arm64 daemon that plays the `10.0.2.2` gateway for the guest's `vec0` (see below) | `build-tools/uml-netd.c` compiled statically with the NDK in the `uml-netd-builder` Docker stage |
 | `Image` / `initrd.img` / `rootfs.imgz` | the shared 7.2 QEMU-boot kernel and rootfs (one image boots both engines) | existing `rootfs-builder` / `kernel-builder` stages |
 
 Run the UML stage alone with `./build-all.sh uml` (or the full engine with `./build-all.sh all`); CI
-uploads `linux-uml` + `stub_exe` to the `all-core-file` release and re-pins their hashes into the
-`rootless_v2` block of `opx_manifest.json`. The rootfs kernel side now targets the 7.2 series to
-match: keep `KERNEL_VERSION` in sync with the UML tree when bumping either.
+uploads `linux-uml` + `stub_exe` + `uml-netd` to the `uml-mode-all-file` release and re-pins their
+hashes into the `rootless_v2` block of `opx_manifest.json`. The rootfs kernel side now targets the
+7.2 series to match: keep `KERNEL_VERSION` in sync with the UML tree when bumping either.
+
+### Guest networking without root — `uml-netd` (BESS gateway)
+
+The classic UML slirp/daemon networking (`eth0=tap,...`) needs `CAP_NET_ADMIN` (TUNSETIFF), which an
+app uid never has, so a rootless UML guest would have no network at all. OPX-Demon closes that gap
+without root, without VPN, and without rebuilding the kernel: the UML tree's **vector-net driver**
+ships a **BESS transport** in which the *kernel* is a client of an `AF_UNIX SOCK_SEQPACKET` socket —
+one seqpacket = one raw Ethernet frame, no header, no capabilities. The boot command line therefore
+uses `vec0:transport=bess,dst=<uml-netd.sock>` (guest = `10.0.2.15/24`, MAC `52:54:00:12:34:15`),
+and the app spawns **`uml-netd`** (`build-tools/uml-netd.c`) listening on that socket:
+
+* **ARP** — proxy-answers everything with the gateway MAC `52:54:00:12:34:02` and sends gratuitous
+  ARPs for the first seconds after the kernel connects;
+* **ICMP** — answers echo requests so `ping 10.0.2.2` works;
+* **TCP relay** — a guest connection to `10.0.2.2:<port>` is relayed to `127.0.0.1:<same port>` in
+  the app: that is exactly what carries `usbip attach -r 10.0.2.2 -b <busid>` to the USB/IP server;
+* **UDP DNS** — guest queries are forwarded to the resolver passed via `--dns`.
+
+`uml-netd` implements a mini TCP stack per connection (MSS 1400, cumulative ACKs, retransmit,
+reap after 30 idle minutes) and its lifecycle is bound to the kernel connection: UML died or the app
+was killed → socket EOF → the daemon exits and unlinks its socket (no `PR_SET_PDEATHSIG`, which
+misfires on the forking *thread*), and it gives up if the kernel never connects within 5 minutes.
+Boot is degradable: if `uml-netd` is missing or dies at start-up, the guest still boots (legacy
+`eth0=tap` diagnostic cmdline) — only guest→host traffic, and with it USB passthrough, needs the
+daemon. CI compiles it from `build-tools/uml-netd.c` with the same NDK, uploads it to
+`uml-mode-all-file`, and re-pins `rootless_v2.uml_netd`; a functional harness
+(`build-tools/test-uml-netd.py`, 25 checks) simulates the kernel side and validates ARP, ICMP, TCP
+relay, RST-on-refused and DNS paths.
+
+### USB passthrough in UML mode (USB/IP)
+
+UML has no QEMU to hand devices to, so the app runs its own **USB/IP server**
+(`app/src/main/java/com/opx/demon/engine/UmlUsbServer.java`) on port 3240 and the guest binds it:
+the UML kernel carries `CONFIG_USBIP_VHCI_HCD=y` (8-port VHCI) and the Debian Trixie rootfs ships
+`/usr/sbin/usbip` (usbip-utils 2.0). `attach` claims the Android `UsbDeviceConnection`, exports a
+USB/IP device struct, then runs `usbip attach -r 10.0.2.2 -b <busid>` inside the guest over the
+agent/console path — the kernel's `vhci_hcd` then streams URBs to the app's server, which services
+them with `controlTransfer` / `bulkTransfer`. The wire protocol (op_common, 312-byte device struct,
+48-byte URB headers) matches usbip-utils 2.0 byte-for-byte.
+
+The **Xiaomi/MIUI fix applies to UML mode on both ends**: the UML kernel is patched at build time
+with `build-tools/uml-xiaomi-hub.patch` (the same ep0-maxpacket/speed reclassification as the QEMU
+`hub.c` fix), and the server re-applies the spec-level invariant at export time (never report
+`USB_SPEED_LOW` for a device whose real descriptor says `bMaxPacketSize0 > 8`), so a misreported
+Realtek adapter enumerates instead of dying with `Invalid ep0 maxpacket`.
+
+The app talks to both engines through one interface (`engine/UsbBridge.java`):
+`UsbPassthroughManager` (QEMU, usb-host over QMP) and `UmlUsbServer` (UML, USB/IP) implement it, so
+the attach dialog, dashboard device list and WiFi scanner are engine-agnostic.
 
 ---
 

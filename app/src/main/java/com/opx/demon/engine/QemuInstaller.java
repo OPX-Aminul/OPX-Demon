@@ -153,6 +153,14 @@ public final class QemuInstaller {
                 return false;
             //noinspection ResultOfMethodCallIgnored
             RootlessPaths.umlStub(context).setExecutable(true, false);
+            // Optional: the BESS network gateway for rootless USB passthrough. Boot works
+            // without it (eth0=tap legacy cmdline); only vec0/10.0.2.2 relay needs it.
+            if (b.umlNetd != null && b.umlNetd.isUsable()) {
+                if (!fetchIfNeeded(b.umlNetd, RootlessPaths.umlNetd(context), "UML netd", p, 1))
+                    return false;
+                //noinspection ResultOfMethodCallIgnored
+                RootlessPaths.umlNetd(context).setExecutable(true, false);
+            }
 
             stage(p, Stage.DECOMPRESSING_ROOTFS);
             File rootfs = RootlessPaths.rootfs(context);

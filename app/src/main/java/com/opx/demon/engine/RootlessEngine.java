@@ -52,10 +52,15 @@ public final class RootlessEngine {
     private volatile QmpClient qmp;
 
     private static final String NETDEV_ID = "net0";
-    private volatile UsbPassthroughManager usb;
+    /** QEMU engine: usb-host devices over QMP. UML engine: USB/IP over TCP 3240. */
+    private volatile UsbBridge usb;
+    /** UML-mode USB/IP server; null on the QEMU engine. */
+    private volatile UmlUsbServer umlUsbServer;
 
     /** True while the running VM process is the UML kernel (not QEMU). */
     private volatile boolean umlProcess;
+    /** Rootless UML network gateway (uml-netd) serving the guest's vec0. */
+    private volatile Process umlNetdProcess;
 
     public interface BootListener {
         void onBootLine(String line);
@@ -420,18 +425,24 @@ public final class RootlessEngine {
     private void teardownRunning() {
         booted = false;
         guestPrompt = "";
-        final UsbPassthroughManager oldUsb = usb;
+        final UsbBridge oldUsb = usb;
+        final UmlUsbServer oldUmlUsb = umlUsbServer;
         final QmpClient oldQmp = qmp;
         usb = null;
         qmp = null;
+        umlUsbServer = null;
         umlProcess = false;
+        final Process oldNetd = umlNetdProcess;
+        umlNetdProcess = null;
         final Process p = qemuProcess;
         qemuProcess = null;
         if (p != null) dyingProcess = p;
         new Thread(() -> {
+            try { if (oldUmlUsb != null) oldUmlUsb.stop(); } catch (Throwable ignored) {}
             try { if (oldUsb != null) oldUsb.detachAll(); } catch (Throwable ignored) {}
             try { if (oldQmp != null) oldQmp.powerdown(); } catch (Throwable ignored) {}
             try { if (oldQmp != null) oldQmp.close(); } catch (Throwable ignored) {}
+            try { if (oldNetd != null) oldNetd.destroy(); } catch (Throwable ignored) {}
             if (p == null) return;
             sleep(2500);
             if (isAlive(p)) p.destroy();
@@ -943,7 +954,7 @@ public final class RootlessEngine {
         return true;
     }
 
-    public UsbPassthroughManager usb() { return usb; }
+    public UsbBridge usb() { return usb; }
     public QmpClient qmp() { return qmp; }
 
     public boolean forwardPort(int hostPort, int guestPort) {
@@ -1043,6 +1054,15 @@ public final class RootlessEngine {
 
     private void connectControl() {
         try {
+            if (EngineType.isUml(prefs())) {
+                // UML has no QMP and no usb-host: USB passthrough is the USB/IP
+                // server, which the guest binds to via usbip attach.
+                UmlUsbServer s = new UmlUsbServer(app);
+                umlUsbServer = s;
+                usb = s;
+                s.start();
+                return;
+            }
             qmp = new QmpClient(RootlessPaths.qmpSock(app).getAbsolutePath());
             if (qmp.connect()) {
                 usb = new UsbPassthroughManager(app, qmp);
@@ -1075,7 +1095,17 @@ public final class RootlessEngine {
             kern.setExecutable(true, false);
             stub.setExecutable(true, false);
 
-            List<String> a = buildUmlCommand(kern, stub, rootfs);
+            // Start the rootless network gateway before the kernel connects.
+            // Without it the guest has no 10.0.2.2 and `usbip attach` (and any
+            // other guest->host traffic) cannot reach the app. Boot continues
+            // without it — only USB passthrough needs the network hop.
+            boolean netd = startUmlNetd();
+            if (!netd) {
+                GuestExec.logToStore("uml-netd unavailable — the UML guest will boot "
+                        + "without networking; USB passthrough needs uml-netd");
+            }
+
+            List<String> a = buildUmlCommand(kern, stub, rootfs, netd);
             Log.i(TAG, "UML: " + join(a));
             ProcessBuilder pb = new ProcessBuilder(a);
             pb.directory(RootlessPaths.base(app));
@@ -1124,7 +1154,7 @@ public final class RootlessEngine {
         }
     }
 
-    private List<String> buildUmlCommand(File kern, File stub, File rootfs) {
+    private List<String> buildUmlCommand(File kern, File stub, File rootfs, boolean netd) {
         int cpus = VmSpecs.DEFAULT_CPUS;
         int ramMb = VmSpecs.DEFAULT_RAM_MB;
         try {
@@ -1150,12 +1180,75 @@ public final class RootlessEngine {
         // One port channel: the UML serial console is served over TCP 127.0.0.1:1050 —
         // the exact port GuestExec/GuestConsole already talk to.
         a.add("port=1050");
-        // Vector-net eth0 over a host tap (CONFIG_UML_NET_VECTOR=y is set in the
-        // released config). Requires /dev/net/tun on the host; without it the UML
-        // kernel logs a transport error and boots without networking.
-        a.add("eth0=tap,,,10.0.2.15");
+        if (netd) {
+            // vec0 = vector-net device. The BESS transport makes the KERNEL a
+            // client of our AF_UNIX SOCK_SEQPACKET socket (uml-netd listens);
+            // one seqpacket = one raw Ethernet frame, no header. uml-netd then
+            // plays the 10.0.2.2 gateway (ARP/ICMP + TCP relay to 127.0.0.1),
+            // which carries `usbip attach -r 10.0.2.2` to the USB/IP server.
+            // No CAP_NET_ADMIN, no /dev/net/tun, no VpnService — both endpoints
+            // are ordinary app processes.
+            a.add("vec0:transport=bess,dst=" + RootlessPaths.umlNetdSock(app).getAbsolutePath());
+            // guestfwd-equivalent: nothing else needed — uml-netd relays
+            // guest -> 10.0.2.2:<port> to 127.0.0.1:<same port>.
+        } else {
+            // Legacy/fallback: tap transport needs /dev/net/tun + CAP_NET_ADMIN
+            // which an app uid never has; kept only as a diagnostic path.
+            a.add("eth0=tap,,,10.0.2.15");
+        }
         a.add("umid=opxdemon-uml");
         return a;
+    }
+
+    /**
+     * Spawns uml-netd listening on the BESS socket the kernel will connect to.
+     * Idempotent: a stale socket file from a previous killed boot is unlinked
+     * by the daemon itself. Returns false when the binary is missing or the
+     * process died immediately — boot continues either way.
+     */
+    private boolean startUmlNetd() {
+        try {
+            File netd = RootlessPaths.umlNetd(app);
+            if (!netd.isFile()) return false;
+            netd.setExecutable(true, false);
+            File sock = RootlessPaths.umlNetdSock(app);
+            // Best-effort cleanup of a dead daemon's socket
+            try { sock.delete(); } catch (Throwable ignored) {}
+            List<String> cmd = new ArrayList<>();
+            cmd.add(netd.getAbsolutePath());
+            cmd.add("--socket");
+            cmd.add(sock.getAbsolutePath());
+            Log.i(TAG, "uml-netd: " + join(cmd));
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.directory(RootlessPaths.base(app));
+            pb.redirectErrorStream(true);
+            Process proc = pb.start();
+            umlNetdProcess = proc;
+            new Thread(() -> {
+                try (java.io.BufferedReader br = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(proc.getInputStream()))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        Log.d(TAG, "uml-netd: " + line);
+                    }
+                } catch (Throwable ignored) {
+                }
+            }, "opxdemon-uml-netd-log").start();
+            // Give the listener a beat; a daemon that dies on startup (bad ABI,
+            // old device) must not leave a half-alive process behind.
+            Thread.sleep(150);
+            if (!proc.isAlive()) {
+                GuestExec.logToStore("uml-netd exited immediately (code "
+                        + safeExit(proc) + ") — booting without networking");
+                umlNetdProcess = null;
+                return false;
+            }
+            return true;
+        } catch (Throwable t) {
+            Log.w(TAG, "uml-netd start failed: " + t.getMessage());
+            umlNetdProcess = null;
+            return false;
+        }
     }
 
     private List<String> buildCommand() {

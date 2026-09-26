@@ -22,7 +22,8 @@ public final class RootlessCoreFiles {
         LIBSLIRP_SONAME("libslirp.so.0", "libslirp.so.0", QemuInstaller.Stage.EXTRACTING_LIBS),
         ROOTFS("rootfs.img", "rootfs.img", QemuInstaller.Stage.DECOMPRESSING_ROOTFS),
         UML_KERNEL("linux-uml", "UML kernel", QemuInstaller.Stage.EXTRACTING_QEMU),
-        UML_STUB("stub_exe", "UML stub", QemuInstaller.Stage.EXTRACTING_QEMU);
+        UML_STUB("stub_exe", "UML stub", QemuInstaller.Stage.EXTRACTING_QEMU),
+        UML_NETD("uml-netd", "UML netd", QemuInstaller.Stage.EXTRACTING_QEMU);
 
         public final String fileName;
         public final String label;
@@ -89,12 +90,17 @@ public final class RootlessCoreFiles {
     /**
      * Gaps for the UML engine: linux-uml + stub_exe (from the uml-mode-all-file
      * release) plus the same shared rootfs. No QEMU/libslirp/Image/initrd needed —
-     * the UML kernel is a userspace ELF with everything built in.
+     * the UML kernel is a userspace ELF with everything built in. uml-netd (the
+     * BESS network gateway) is optional: manifests predating it still boot fine,
+     * only USB passthrough (10.0.2.2 TCP relay) requires it.
      */
     private static List<Gap> missingUml(Context c, QemuDownloader.Bundle b) {
         List<Gap> out = new ArrayList<>();
         addIfNeeded(out, Kind.UML_KERNEL, RootlessPaths.umlKernel(c), asset(b, Kind.UML_KERNEL), false);
         addIfNeeded(out, Kind.UML_STUB, RootlessPaths.umlStub(c), asset(b, Kind.UML_STUB), false);
+        if (asset(b, Kind.UML_NETD) != null) {
+            addIfNeeded(out, Kind.UML_NETD, RootlessPaths.umlNetd(c), asset(b, Kind.UML_NETD), false);
+        }
         addIfNeeded(out, Kind.ROOTFS, RootlessPaths.rootfs(c), asset(b, Kind.ROOTFS), true);
         return out;
     }
@@ -115,6 +121,7 @@ public final class RootlessCoreFiles {
             case ROOTFS: return b.rootfs;
             case UML_KERNEL: return b.umlKernel;
             case UML_STUB: return b.umlStub;
+            case UML_NETD: return b.umlNetd;
             default: return null;
         }
     }
@@ -185,7 +192,8 @@ public final class RootlessCoreFiles {
                 continue;
             }
             if (!g.download) continue;
-            if (g.kind == Kind.UML_KERNEL || g.kind == Kind.UML_STUB) {
+            if (g.kind == Kind.UML_KERNEL || g.kind == Kind.UML_STUB
+                    || g.kind == Kind.UML_NETD) {
                 if (!QemuInstaller.fetchAsset(g.asset, g.dest, g.kind.label, p)) return false;
                 //noinspection ResultOfMethodCallIgnored
                 g.dest.setExecutable(true, false);

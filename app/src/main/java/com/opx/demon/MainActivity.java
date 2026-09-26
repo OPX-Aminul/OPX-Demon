@@ -509,7 +509,7 @@ public class MainActivity extends AppCompatActivity {
         card.setVisibility(View.VISIBLE);
 
         com.opx.demon.engine.RootlessEngine engine = core.rootless();
-        com.opx.demon.engine.UsbPassthroughManager usb = engine == null ? null : engine.usb();
+        com.opx.demon.engine.UsbBridge usb = engine == null ? null : engine.usb();
         if (usb == null) {
             showAttachState(2, "Start the VM first, then re-scan", "Start VM", v -> {
                 com.opx.demon.engine.RootlessService.start(this);

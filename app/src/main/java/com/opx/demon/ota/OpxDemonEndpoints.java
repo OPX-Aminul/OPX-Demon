@@ -26,6 +26,8 @@ public final class OpxDemonEndpoints {
             "https://github.com/OPX-Aminul/OPX-Demon/releases/download/uml-mode-all-file/";
     public static final String FALLBACK_UML_KERNEL = UML_BASE + "linux-uml";
     public static final String FALLBACK_UML_STUB   = UML_BASE + "stub_exe";
+    /** Rootless UML network gateway (BESS vector transport) — guest vec0 -> host TCP relay. */
+    public static final String FALLBACK_UML_NETD   = UML_BASE + "uml-netd";
 
     // IMPORTANT: these must match the qemu-system-aarch64 currently uploaded to the
     // all-core-file release. The Dockerfile pipeline patches the QEMU binary (links

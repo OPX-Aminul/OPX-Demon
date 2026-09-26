@@ -27,7 +27,7 @@ Commands:
   all       Build rootfs + QEMU + UML kernel (full engine)
   rootfs    Build Debian Trixie rootfs only (rootfs.imgz)
   qemu      Build QEMU + libslirp only
-  uml       Build the arm64 UML kernel (linux-uml + stub_exe) only
+  uml       Build the arm64 UML engine (linux-uml + stub_exe + uml-netd) only
   clean     Remove build artifacts
 
 EOF
@@ -68,13 +68,24 @@ build_uml() {
     docker rm -f opxdemon-uml-extract 2>/dev/null || true
     docker create --name opxdemon-uml-extract opxdemon-uml-builder
     mkdir -p "$SCRIPT_DIR/output"
-    docker cp opxdemon-uml-extract:/linux-uml "$SCRIPT_DIR/output/"
-    docker cp opxdemon-uml-extract:/linux-uml.config "$SCRIPT_DIR/output/"
-    docker cp opxdemon-uml-extract:/stub_exe "$SCRIPT_DIR/output/stub_exe" 2>/dev/null || \
+    # uml-build.sh writes to its OUT dir (/out), not the image root.
+    docker cp opxdemon-uml-extract:/out/linux-uml "$SCRIPT_DIR/output/"
+    docker cp opxdemon-uml-extract:/out/linux-uml.config "$SCRIPT_DIR/output/"
+    docker cp opxdemon-uml-extract:/out/stub_exe "$SCRIPT_DIR/output/stub_exe" 2>/dev/null || \
         log "stub_exe missing — UML tree revision did not emit it"
     docker rm opxdemon-uml-extract >/dev/null
     success "UML engine ready."
     ls -lh "$SCRIPT_DIR/output/linux-uml" "$SCRIPT_DIR/output/linux-uml.config"
+
+    log "Building uml-netd gateway (rootless BESS networking)..."
+    docker build \
+        -t opxdemon-uml-netd-builder --target uml-netd-builder "$SCRIPT_DIR"
+    docker rm -f opxdemon-uml-netd-extract 2>/dev/null || true
+    docker create --name opxdemon-uml-netd-extract opxdemon-uml-netd-builder
+    docker cp opxdemon-uml-netd-extract:/out/uml-netd "$SCRIPT_DIR/output/uml-netd"
+    docker rm opxdemon-uml-netd-extract >/dev/null
+    success "uml-netd ready."
+    ls -lh "$SCRIPT_DIR/output/uml-netd"
 }
 
 [ $# -eq 0 ] && { show_help; exit 1; }
@@ -91,7 +102,7 @@ case "$1" in
     clean)
         log "Cleaning..."
         rm -rf "$SCRIPT_DIR/output"
-        docker rmi opxdemon-rootfs-builder opxdemon-qemu-builder opxdemon-uml-builder 2>/dev/null || true
+        docker rmi opxdemon-rootfs-builder opxdemon-qemu-builder opxdemon-uml-builder opxdemon-uml-netd-builder 2>/dev/null || true
         success "Cleaned."
         ;;
     *)

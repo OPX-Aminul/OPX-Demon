@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-public final class UsbPassthroughManager {
+public final class UsbPassthroughManager implements UsbBridge {
 
     private static final String TAG = "UsbPassthrough";
     private static final String ACTION_USB_PERMISSION = "com.opx.demon.USB_PERMISSION";
@@ -57,6 +57,7 @@ public final class UsbPassthroughManager {
         this.qmp = qmp;
     }
 
+    @Override
     public UsbDevice findByVidPid(String vidPid) {
         if (usbManager == null || vidPid == null) return null;
         String[] p = vidPid.split(":");
@@ -74,14 +75,19 @@ public final class UsbPassthroughManager {
         return null;
     }
 
+    // QEMU engine: attach/detach work over QMP; the guest side needs nothing extra.
+
+    @Override
     public boolean hasPermission(UsbDevice device) {
         return usbManager != null && device != null && usbManager.hasPermission(device);
     }
 
+    @Override
     public boolean isAttached(UsbDevice device) {
         return device != null && attached.containsKey(device.getDeviceId());
     }
 
+    @Override
     public void requestUsbPermission(UsbDevice device, PermissionCallback cb) {
         if (usbManager == null || device == null) { if (cb != null) cb.onResult(false, device); return; }
         synchronized (permissionCallbacks) { permissionCallbacks.put(device.getDeviceId(), cb); }
@@ -95,6 +101,7 @@ public final class UsbPassthroughManager {
                 new Intent(ACTION_USB_PERMISSION).setPackage(context.getPackageName()), flags);
     }
 
+    @Override
     public void attachAsync(UsbDevice device, AttachCallback done) {
         if (device == null) { if (done != null) done.onResult(false, null); return; }
         if (isAttached(device)) { if (done != null) done.onResult(true, device); return; }
@@ -109,6 +116,7 @@ public final class UsbPassthroughManager {
         });
     }
 
+    @Override
     public synchronized boolean attach(UsbDevice device) {
         if (device == null || qmp == null || usbManager == null) return false;
         try {
@@ -194,6 +202,7 @@ public final class UsbPassthroughManager {
         }
     }
 
+    @Override
     public synchronized void detach(int deviceId) {
         Attached a = attached.remove(deviceId);
         if (a == null) return;
@@ -203,6 +212,7 @@ public final class UsbPassthroughManager {
         try { a.connection.close(); } catch (Exception ignored) {}
     }
 
+    @Override
     public synchronized void detachAll() {
         for (Integer id : new java.util.ArrayList<>(attached.keySet())) {
             detach(id);
@@ -210,14 +220,17 @@ public final class UsbPassthroughManager {
         unregisterReceiver();
     }
 
+    @Override
     public synchronized boolean hasAttached() {
         return !attached.isEmpty();
     }
 
+    @Override
     public synchronized int attachedCount() {
         return attached.size();
     }
 
+    @Override
     public boolean isWifiCandidate(UsbDevice d) {
         if (d == null || d.getDeviceClass() == UsbConstants.USB_CLASS_HUB) return false;
         for (int i = 0; i < d.getInterfaceCount(); i++) {
@@ -230,6 +243,7 @@ public final class UsbPassthroughManager {
         return false;
     }
 
+    @Override
     public java.util.List<UsbDevice> pickWifiDevices() {
         java.util.List<UsbDevice> out = new java.util.ArrayList<>();
         if (usbManager == null) return out;
@@ -240,6 +254,7 @@ public final class UsbPassthroughManager {
         return out;
     }
 
+    @Override
     public int attachAllWifiDongles(long waitMs) {
         java.util.List<UsbDevice> picks = pickWifiDevices();
         if (picks.isEmpty()) return 0;
@@ -256,6 +271,7 @@ public final class UsbPassthroughManager {
         return ok;
     }
 
+    @Override
     public UsbDevice pickWifiDevice() {
         java.util.List<UsbDevice> picks = pickWifiDevices();
         return picks.isEmpty() ? null : picks.get(0);

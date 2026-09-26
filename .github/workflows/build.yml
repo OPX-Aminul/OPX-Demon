@@ -120,6 +120,28 @@ jobs:
           [ -s ./linux-uml ] || { echo "::error::linux-uml is empty"; exit 1; }
           [ -s ./stub_exe ] || { echo "::error::stub_exe is empty"; exit 1; }
 
+      - name: Build uml-netd gateway
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: uml-netd-builder
+          load: true
+          tags: opxdemon-uml-netd
+          cache-from: type=gha,scope=uml-netd
+          cache-to: type=gha,scope=uml-netd,mode=max
+
+      - name: Extract uml-netd gateway
+        run: |
+          docker create --name uml-netd-out opxdemon-uml-netd /bin/true
+          docker cp uml-netd-out:/out/uml-netd ./uml-netd
+          chmod +x ./uml-netd
+          docker rm uml-netd-out
+          echo "✅ uml-netd gateway:"
+          ls -lh ./uml-netd
+          [ -s ./uml-netd ] || { echo "::error::uml-netd is empty"; exit 1; }
+          file ./uml-netd | grep -q aarch64 \
+            || { echo "::error::uml-netd is not an aarch64 binary"; exit 1; }
+
       # ══════════════════════════════════════════════════════════════════════
       # UPLOAD: split releases
       #   all-core-file      — Debian Trixie engine only (QEMU boot chain:
@@ -164,6 +186,7 @@ jobs:
           gh release upload uml-mode-all-file \
             ./linux-uml \
             ./stub_exe \
+            ./uml-netd \
             ./linux-uml.config \
             --clobber
 
@@ -211,6 +234,7 @@ jobs:
                   ("rootfs.imgz", "rootfs"),
                   ("linux-uml", "uml_kernel", "uml-mode-all-file"),
                   ("stub_exe", "uml_stub", "uml-mode-all-file"),
+                  ("uml-netd", "uml_netd", "uml-mode-all-file"),
               ]
               for entry in v2_map:
                   file_name, key = entry[0], entry[1]
@@ -220,6 +244,7 @@ jobs:
                       continue
                   with open(file_name, "rb") as fh:
                       digest = hashlib.sha256(fh.read()).hexdigest()
+                  rv2.setdefault(key, {})
                   rv2[key]["sha256"] = digest
                   rv2[key]["size"] = os.path.getsize(file_name)
                   rv2[key]["url"] = (

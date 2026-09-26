@@ -520,7 +520,7 @@ public class Dashboard extends Fragment {
             try {
                 android.hardware.usb.UsbManager um = (android.hardware.usb.UsbManager)
                         context.getSystemService(Context.USB_SERVICE);
-                com.opx.demon.engine.UsbPassthroughManager usb =
+                com.opx.demon.engine.UsbBridge usb =
                         engine == null ? null : engine.usb();
                 if (um != null) {
                     for (android.hardware.usb.UsbDevice d : um.getDeviceList().values()) {

@@ -87,3 +87,19 @@ CLAUDE.md
 /rootless/build-rootfs/out/
 /rootless/build-rootfs/out-minimal/
 /rootless/build-rootfs/files/**/__pycache__/
+
+# CI/docker build artifacts extracted into the repo root (uploaded to releases,
+# never committed).
+/linux-uml
+/linux-uml.config
+/stub_exe
+/Image.config
+/Image
+/initrd.img
+/rootfs.imgz
+/qemu-system-aarch64
+/libslirp.so
+/uml-netd
+
+# Local test build of the uml-netd gateway (CI builds the real aarch64 one).
+/build-tools/uml-netd
