@@ -101,6 +101,10 @@ proxy can be forced from SharedPreferences (`opx_demon` / `uml_socks5` = `host:p
 where direct egress is blocked. DNS stays a UDP relay to `--dns` (default `8.8.8.8`), so hostnames
 resolve on the device either way.
 
+Engines installed *before* the gateway existed have a complete-looking bundle without it, which
+silently costs USB passthrough, so the boot path repairs itself: if `uml-netd` is missing it is
+fetched on the spot (2.9 MB) instead of sending the user back to the installer.
+
 `uml-netd` implements a mini TCP stack per connection (MSS 1400, cumulative ACKs, retransmit,
 reap after 30 idle minutes) and its lifecycle is bound to the kernel connection: UML died or the app
 was killed → socket EOF → the daemon exits and unlinks its socket (no `PR_SET_PDEATHSIG`, which
@@ -113,8 +117,17 @@ daemon. CI compiles it from `build-tools/uml-netd.c` with the same NDK, uploads 
 relay, RST-on-refused, DNS, direct egress, the SOCKS5 handshake (including that the gateway path
 stays on loopback while a proxy is configured) and the argument validation.
 
-### USB passthrough in UML mode (USB/IP)
+**Diagnosing a failed UML boot.** A UML kernel is a userspace program, but once it registers its
+console (host `127.0.0.1:1050`, which is also the guest exec channel) *everything* it prints goes to
+that socket instead of stdout — including the VFS root-device error or the panic that explains the
+failure. The engine therefore taps the channel: every line the exec/console path reads is appended
+to `serial.log`, `tailLog()` merges it with `boot.log`, and the boot-failure message quotes the
+matching line instead of "see the boot log". `lastLogProblem()` also recognises kernel wording
+(`panic`, `not syncing`, `VFS:`, `root device`, `ubda`, `Attempted to kill init`). The safe-profile
+retry additionally clamps the guest to 1 GB / 2 CPUs: UML runs *inside* the app process, so a
+desktop-sized `mem=` can exceed what Android gives a single uid.
 
+### USB passthrough in UML mode (USB/IP)
 UML has no QEMU to hand devices to, so the app runs its own **USB/IP server**
 (`app/src/main/java/com/opx/demon/engine/UmlUsbServer.java`) on port 3240 and the guest binds it:
 the UML kernel carries `CONFIG_USBIP_VHCI_HCD=y` (8-port VHCI) and the Debian Trixie rootfs ships

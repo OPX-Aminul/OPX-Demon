@@ -395,8 +395,25 @@ public final class RootlessEngine {
                 String lower = l.toLowerCase(java.util.Locale.ROOT);
                 if (lower.contains("qemu-system") || lower.contains("error")
                         || lower.contains("failed") || lower.contains("not supported")
-                        || lower.contains("invalid")) {
+                        || lower.contains("invalid")
+                        // UML is a Linux kernel, so its fatal messages are kernel
+                        // messages: without these the user only ever sees
+                        // "see the boot log" for a panic or a dead root mount.
+                        || lower.contains("panic") || lower.contains("not syncing")
+                        || lower.contains("vfs:") || lower.contains("root device")
+                        || lower.contains("rootfs") || lower.contains("ubda")
+                        || lower.contains("attempted to kill init")
+                        || lower.contains("segmentation fault")
+                        || lower.contains("attempted to kill")) {
                     return l.length() > 160 ? l.substring(0, 160) : l;
+                }
+            }
+            // Nothing matched: quote the last lines anyway — a silent exit with no
+            // keyword is exactly the case where "see the boot log" helps nobody.
+            for (int i = tail.size() - 1; i >= 0; i--) {
+                String l = tail.get(i);
+                if (l != null && l.trim().length() > 8) {
+                    return l.trim().length() > 160 ? l.trim().substring(0, 160) : l.trim();
                 }
             }
         } catch (Throwable ignored) {
@@ -435,6 +452,8 @@ public final class RootlessEngine {
         umlProcess = false;
         final Process oldNetd = umlNetdProcess;
         umlNetdProcess = null;
+        // Stop the console tap so a dead VM's console cannot keep appending to serial.log.
+        GuestConsole.setObserver(null);
         final Process p = qemuProcess;
         qemuProcess = null;
         if (p != null) dyingProcess = p;
@@ -1067,19 +1086,41 @@ public final class RootlessEngine {
 
     public java.util.List<String> tailLog(int maxLines) {
         java.util.ArrayList<String> out = new java.util.ArrayList<>();
-        File log = RootlessPaths.serialLog(app);
-        if (!log.exists() || log.length() == 0) log = RootlessPaths.bootLog(app);
-        if (!log.exists()) return out;
+        // The process stdout log (boot.log) holds everything the engine printed before it
+        // registered its console; serial.log holds the console tap, which is everything
+        // after that — including the VFS/panic line that explains a failed UML boot.
+        // Reading only one of them is what made every failure look identical.
         java.util.ArrayDeque<String> ring = new java.util.ArrayDeque<>();
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(new java.io.FileInputStream(log)))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                ring.addLast(line);
-                if (ring.size() > maxLines) ring.removeFirst();
-            }
-        } catch (Exception ignored) {}
+        for (File log : new File[]{RootlessPaths.bootLog(app), RootlessPaths.serialLog(app)}) {
+            if (!log.exists() || log.length() == 0) continue;
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(new java.io.FileInputStream(log)))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    if (line.trim().isEmpty()) continue;
+                    ring.addLast(line);
+                    while (ring.size() > maxLines) ring.removeFirst();
+                }
+            } catch (Exception ignored) {}
+        }
         out.addAll(ring);
         return out;
+    }
+
+    /** Console tap target: append whatever the engine's console carried to serial.log. */
+    private void appendConsoleText(String text) {
+        try {
+            File log = RootlessPaths.serialLog(app);
+            // The tap runs for the whole session and the console echoes every command,
+            // so cap the file instead of letting it grow without bound.
+            if (log.length() > 512L * 1024L) {
+                //noinspection ResultOfMethodCallIgnored
+                log.delete();
+            }
+            try (FileWriter fw = new FileWriter(log, true)) {
+                fw.write(text);
+            }
+        } catch (Exception ignored) {}
     }
 
     private void connectControl() {
@@ -1146,6 +1187,9 @@ public final class RootlessEngine {
             booted = false;
 
             new Thread(() -> pumpBootLog(proc, listener), "opxdemon-uml-log").start();
+            // Everything the kernel prints after it registers its console arrives here, not
+            // on stdout — without the tap a failed UML boot has no error text at all.
+            GuestConsole.setObserver(this::appendConsoleText);
 
             long deadline = System.currentTimeMillis() + BOOT_TIMEOUT_MS;
             int bootstraps = 0;
@@ -1190,13 +1234,24 @@ public final class RootlessEngine {
     private List<String> buildUmlCommand(File kern, File stub, File rootfs, boolean netd) {
         int cpus = VmSpecs.DEFAULT_CPUS;
         int ramMb = VmSpecs.DEFAULT_RAM_MB;
+        boolean safe = false;
         try {
             Core prefs = prefs();
             if (prefs != null) {
                 cpus = VmSpecs.effectiveCpus(app, prefs);
                 ramMb = VmSpecs.effectiveRamMb(app, prefs);
+                safe = VmSpecs.safeBoot(prefs);
             }
         } catch (Throwable ignored) {}
+        if (safe) {
+            // UML is an ordinary process inside the app, so the guest's RAM is the
+            // phone's RAM: a profile sized for a desktop-hosted VM can map memory the
+            // Android per-app budget does not have, and the kernel dies before the
+            // rootfs is ever mounted. Networking is kept, because a booted guest is
+            // only useful with vec0/uml-netd.
+            ramMb = Math.min(ramMb, 1024);
+            cpus = Math.min(cpus, 2);
+        }
         String base = RootlessPaths.base(app).getAbsolutePath();
 
         List<String> a = new ArrayList<>();
@@ -1250,6 +1305,12 @@ public final class RootlessEngine {
     private boolean startUmlNetd() {
         try {
             File netd = RootlessPaths.umlNetd(app);
+            if (!netd.isFile()) {
+                // Engines installed before the BESS gateway existed look complete but
+                // have no uml-netd, which silently costs USB passthrough. Pull the
+                // one 2.9 MB file instead of sending the user back to the installer.
+                QemuInstaller.ensureUmlNetd(app);
+            }
             if (!netd.isFile()) return false;
             netd.setExecutable(true, false);
             File sock = RootlessPaths.umlNetdSock(app);

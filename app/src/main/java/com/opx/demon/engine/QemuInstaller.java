@@ -363,6 +363,35 @@ public final class QemuInstaller {
         return gunzipFile(src, dest, p);
     }
 
+    /**
+     * Fetches the BESS network gateway on its own (2.9 MB). Devices that ran the
+     * UML installer before the gateway existed have a complete-looking engine
+     * without it, and the USB passthrough path silently degrades to "no
+     * networking". Pulling just this file at boot repairs that in seconds
+     * instead of making the user reinstall the whole engine.
+     */
+    public static boolean ensureUmlNetd(Context context) {
+        File dest = RootlessPaths.umlNetd(context);
+        if (dest.isFile() && dest.length() > 64 * 1024) {
+            //noinspection ResultOfMethodCallIgnored
+            dest.setExecutable(true, false);
+            return true;
+        }
+        try {
+            com.opx.demon.ota.RemoteManifest.Asset a = QemuDownloader.resolve(context).umlNetd;
+            if (a == null || !a.isUsable()) return false;
+            Log.i(TAG, "uml-netd missing — fetching " + a.url);
+            //noinspection ResultOfMethodCallIgnored
+            boolean ok = fetch(a, dest, "UML netd", null);
+            if (ok) //noinspection ResultOfMethodCallIgnored
+                dest.setExecutable(true, false);
+            return ok;
+        } catch (Throwable t) {
+            Log.w(TAG, "uml-netd auto-install failed: " + t);
+            return false;
+        }
+    }
+
     static void growDisk(Context context, Progress p) {
         ensureMinimumDisk(context, p);
     }

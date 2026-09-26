@@ -70,6 +70,7 @@ public final class GuestExec {
                     s.socket.setSoTimeout(READ_TIMEOUT_MS);
                     String line;
                     while ((line = s.reader.readLine()) != null) {
+                        GuestConsole.emit(line + "\n");
                         if (line.startsWith(EXIT_SENTINEL)) {
                             try { s.exitCode = Integer.parseInt(line.substring(EXIT_SENTINEL.length()).trim()); }
                             catch (NumberFormatException ignored) {}
@@ -157,6 +158,10 @@ public final class GuestExec {
                     new InputStreamReader(sock.getInputStream(), StandardCharsets.UTF_8));
             String line;
             while ((line = br.readLine()) != null) {
+                // Whatever the channel carries (kernel console output while the guest is
+                // still booting, a panic, a mount error) is forwarded to the boot log —
+                // otherwise a failed boot reads as a silent "exited during boot".
+                GuestConsole.emit(line + "\n");
                 if (line.contains(PING_MARK)) return true;
             }
             return false;

@@ -35,6 +35,34 @@ final class GuestConsole {
     /** Port: channel the UML engine listens on for its serial console. */
     static final int PORT = 1050;
 
+    /**
+     * Boot-log tap. A UML kernel prints everything to its console (host :1050) once the
+     * console driver is registered, which happens long before the rootfs mount — so on a
+     * failed boot the reason (VFS root-device error, panic, ...) is read by the next console
+     * session and then thrown away, leaving only the pre-console stub lines in the log.
+     * RootlessEngine installs a tap for the lifetime of a boot; without it every UML
+     * failure looks identical and undiagnosable.
+     */
+    public interface Observer {
+        void onConsoleText(String text);
+    }
+
+    private static volatile Observer observer;
+
+    static void setObserver(Observer o) {
+        observer = o;
+    }
+
+    static void emit(String text) {
+        Observer o = observer;
+        if (o != null && text != null && text.length() > 0) {
+            try {
+                o.onConsoleText(text);
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
     private GuestConsole() {
     }
 
@@ -174,7 +202,9 @@ final class GuestConsole {
                 try {
                     int r = is.read(chunk);
                     if (r <= 0) return;
-                    buf.append(new String(chunk, 0, r, StandardCharsets.UTF_8));
+                    String s = new String(chunk, 0, r, StandardCharsets.UTF_8);
+                    emit(s);
+                    buf.append(s);
                 } catch (java.net.SocketTimeoutException ste) {
                     return;
                 }
