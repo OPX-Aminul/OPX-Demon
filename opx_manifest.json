@@ -101,13 +101,13 @@
     }
   },
   "app": {
-    "versionCode": 118,
-    "versionName": "1.1.8",
-    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.8/app-release.apk",
-    "sha256": "",
-    "size": 0,
+    "versionCode": 119,
+    "versionName": "1.1.9",
+    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.1.9/app-release.apk",
+    "sha256": "f79f89be18d128e45956d43bafaeecb2d48cb57417b2b1b00738c141ebd487c3",
+    "size": 22181528,
     "mandatory": false,
-    "changelog": "OPX-Demon 1.1.8 \u2014 AMOLED layering for night mode.\n\n- Night mode depth: window base is true black; cards, sheets and tiles now lift one step so every screen has real layering (before, surfaces vanished into the background).\n- Day mode unchanged (ivory + gold).\n- FIXED: two day-only hardcoded leaks \u2014 arsenal Add-to-Hub chip and drawer activated row now follow the theme.\n- Backend logic untouched."
+    "changelog": "OPX-Demon v1.1.9 — rootless UML engine gets working USB/IP passthrough.\n\n- UML kernel now boots with CONFIG_IP_PNP so vec0 gets its 10.0.2.15 address and answers ARP.\n- New uml-netd gateway: BESS transport daemon on the host, relaying ARP/ICMP/TCP/DNS for the UML guest over 127.0.0.1.\n- console fallback reconfigures vec0 with the same address.\n- QEMU engine unchanged."
   },
   "news": [],
   "notifications": []

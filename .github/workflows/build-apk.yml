@@ -118,13 +118,15 @@ jobs:
         run: |
           set -euo pipefail
           TAG="v${VERSION_NAME}"
-          APK=$(ls -1 app/build/outputs/apk/release/*.apk | head -1)
+          # app-debug.apk can sit in the same folder (stale output); the OTA
+          # must advertise the signed release build, never the debug one.
+          APK=$(ls -1 app/build/outputs/apk/release/app-release*.apk 2>/dev/null | head -1)
           [ -n "$APK" ] || { echo "::error::no APK produced"; exit 1; }
           # The in-app changelog comes from the release notes, so the update
           # dialog describes this build without a manual manifest edit.
           NOTES=$(gh release view "$TAG" --json body --jq .body 2>/dev/null \
             || echo "OPX-Demon $TAG")
-          export APK_NAME NOTES VERSION_CODE VERSION_NAME
+          export APK APK_NAME NOTES VERSION_CODE VERSION_NAME
           python3 - <<'PY'
           import hashlib, json, os
           apk = os.environ["APK"]
