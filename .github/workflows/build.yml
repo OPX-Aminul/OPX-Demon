@@ -25,6 +25,12 @@ on:
       - '.github/workflows/build.yml'
   workflow_dispatch:
 
+# Two pushes in a row only need the newest build: the older run would publish
+# assets and re-pin the manifest for a commit nobody ships any more.
+concurrency:
+  group: build-release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
