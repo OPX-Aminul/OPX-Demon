@@ -170,6 +170,27 @@ Standard Android Gradle build (Java 17 toolchain, R8 minification for release).
 
 Output APKs land in `app/build/outputs/apk/`.
 
+### CI: automatic version bump + release + OTA manifest
+
+`Build & Update Release` (engine binaries) fires `Build APK` on success, and the APK job
+**publishes a new version every time** without any manual step:
+
+1. **Bump** — `versionCode` + 1 and `versionName` patch bumped (`1.1.8 → 1.1.9 → 1.2.0`, rolling
+   into the next minor instead of reaching double-digit patches) in `app/build.gradle`.
+2. **Build** — `./gradlew assembleRelease` (lightweight APK; the engine binaries are downloaded at
+   runtime from the release assets).
+3. **Release** — the APK is uploaded to a release for that exact version tag (`v1.1.9`), created
+   automatically when it does not exist yet; an existing tag is clobbered instead (retry-safe).
+4. **OTA manifest** — the `app` block of `opx_manifest.json` is updated with the new
+   `versionCode`, `versionName`, APK URL, `sha256` and `size` (changelog = the release notes) and
+   committed to `main` together with the bumped `build.gradle`, so installed apps see the update —
+   `UpdateManager` only offers an update when `app.versionCode > BuildConfig.VERSION_CODE`.
+
+Committing the version bump does not re-trigger the release build (its path filter only covers
+`Dockerfile`, `build-tools/**`, `build-rootfs/**`, `rootless-assets/**` and `build.yml` itself), so
+the pipeline cannot loop. Because the bump is committed, each run advances from the version that
+was actually published.
+
 ### Release signing
 
 Release builds are signed with the repository's committed release keystore. The store path and

@@ -2,6 +2,14 @@ name: Build APK
 
 # Builds a lightweight APK (without rootless binaries).
 # Binaries are downloaded at runtime from the all-core-file release.
+#
+# Every run publishes a NEW version automatically: the version in
+# app/build.gradle is bumped (versionCode +1, versionName patch/minor roll)
+# before gradle runs, the APK lands in a freshly created release for that
+# version, and the app block of opx_manifest.json is updated + committed so
+# installed apps see the update (UpdateManager only offers an update when
+# app.versionCode > BuildConfig.VERSION_CODE). The bumped build.gradle is
+# committed too, so the next run bumps from the version that was published.
 
 on:
   workflow_run:
@@ -36,6 +44,40 @@ jobs:
           SDKMANAGER="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" "platforms;android-33" "build-tools;34.0.0" "ndk;25.1.8937393" "cmake;3.22.1"
 
+      - name: Bump app version
+        id: version
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > /tmp/version.txt
+          import re
+          path = "app/build.gradle"
+          src = open(path).read()
+          code = int(re.search(r"versionCode\s+(\d+)", src).group(1))
+          name = re.search(r'versionName\s+"([^"]+)"', src).group(1)
+          parts = name.split(".")
+          while len(parts) < 3:
+              parts.append("0")
+          # 1.1.8 -> 1.1.9 -> 1.2.0: roll over to the next minor on 9, so the
+          # version never accumulates double-digit patch numbers.
+          if int(parts[2]) >= 9:
+              parts[1] = str(int(parts[1]) + 1)
+              parts[2] = "0"
+          else:
+              parts[2] = str(int(parts[2]) + 1)
+          new_code, new_name = code + 1, ".".join(parts)
+          src = re.sub(r"versionCode\s+\d+", f"versionCode {new_code}", src, count=1)
+          src = re.sub(r'versionName\s+"[^"]+"', f'versionName "{new_name}"', src, count=1)
+          open(path, "w").write(src)
+          print(new_code)
+          print(new_name)
+          PY
+          VERSION_CODE=$(sed -n 1p /tmp/version.txt)
+          VERSION_NAME=$(sed -n 2p /tmp/version.txt)
+          echo "Building OPX-Demon $VERSION_NAME (versionCode $VERSION_CODE, was $(git show HEAD:app/build.gradle | grep -oP 'versionCode\s+\K\d+'))"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          grep -E "versionCode|versionName" app/build.gradle
+
       - name: Build APK (lightweight — no bundled binaries)
         run: |
           chmod +x gradlew 2>/dev/null || true
@@ -44,11 +86,13 @@ jobs:
       - name: Create release with APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
         run: |
-          VERSION=$(grep 'versionName' app/build.gradle | grep -oP '[\"\x27]\K[0-9][^"]*')
-          TAG="v${VERSION}"
+          set -euo pipefail
+          TAG="v${VERSION_NAME}"
 
-          # Update an existing release first (keeps the curated release notes untouched)
+          # Update an existing release first (keeps the curated release notes
+          # untouched) — a retried run lands here instead of failing.
           if gh release upload "$TAG" \
             app/build/outputs/apk/release/*.apk \
             --clobber; then
@@ -56,7 +100,7 @@ jobs:
             exit 0
           fi
 
-          # Release does not exist yet: create it with generated notes
+          # New version => new release section, created automatically.
           # Do not overwrite notes on later builds so hand-written changelogs stay intact
           gh release create "$TAG" \
             --title "OPX-Demon $TAG" \
@@ -65,3 +109,59 @@ jobs:
             --latest \
             app/build/outputs/apk/release/*.apk
           echo "APK release created: $TAG"
+
+      - name: Publish version to the OTA manifest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION_NAME}"
+          APK=$(ls -1 app/build/outputs/apk/release/*.apk | head -1)
+          [ -n "$APK" ] || { echo "::error::no APK produced"; exit 1; }
+          # The in-app changelog comes from the release notes, so the update
+          # dialog describes this build without a manual manifest edit.
+          NOTES=$(gh release view "$TAG" --json body --jq .body 2>/dev/null \
+            || echo "OPX-Demon $TAG")
+          export APK_NAME NOTES VERSION_CODE VERSION_NAME
+          python3 - <<'PY'
+          import hashlib, json, os
+          apk = os.environ["APK"]
+          name = os.environ["VERSION_NAME"]
+          with open(apk, "rb") as fh:
+              digest = hashlib.sha256(fh.read()).hexdigest()
+          size = os.path.getsize(apk)
+          manifest = json.load(open("opx_manifest.json"))
+          app = manifest["app"]
+          app["versionCode"] = int(os.environ["VERSION_CODE"])
+          app["versionName"] = name
+          app["url"] = ("https://github.com/OPX-Aminul/OPX-Demon/releases/download/"
+                        + f"v{name}/" + os.path.basename(apk))
+          app["sha256"] = digest
+          app["size"] = size
+          app["changelog"] = os.environ.get("NOTES", "").strip() or f"OPX-Demon v{name}"
+          with open("opx_manifest.json", "w") as fh:
+              json.dump(manifest, fh, indent=2, ensure_ascii=False)
+              fh.write("\n")
+          print(f"manifest app -> v{name} (versionCode {app['versionCode']}), "
+                f"{size} bytes, sha256 {digest[:12]}…")
+          PY
+          git config user.name "OPX-Aminul"
+          git config user.email "305739020+OPX-Aminul@users.noreply.github.com"
+          git add app/build.gradle opx_manifest.json
+          if git diff --cached --quiet; then
+            echo "Manifest already in sync — nothing to commit"
+            exit 0
+          fi
+          git commit -m "ci(apk): publish v${VERSION_NAME} (versionCode ${VERSION_CODE})"
+          # build.yml re-pins the core hashes in the same file, so rebase
+          # instead of pushing blindly when its commit landed in between.
+          git pull --rebase origin main || {
+            echo "⚠️  Could not rebase the version commit — the APK release is published"
+            echo "   but the OTA manifest still points at the previous version"
+            exit 0
+          }
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main \
+            && echo "✅ OTA manifest now advertises v${VERSION_NAME}" \
+            || echo "⚠️  Could not push — OTA manifest still points at the previous version"
