@@ -101,13 +101,13 @@
     }
   },
   "app": {
-    "versionCode": 120,
-    "versionName": "1.2.0",
-    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.2.0/app-release.apk",
-    "sha256": "08134c5e5e899d71f3b6912bb21a3dd8bc3b4900861ad5bb417bf3afda0d3be5",
-    "size": 22181523,
+    "versionCode": 121,
+    "versionName": "1.2.1",
+    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.2.1/app-release.apk",
+    "sha256": "c324b4b171a6af5b55de504adb7ad2708da2ea4cafec8f35615cfe6a4961ca22",
+    "size": 22181522,
     "mandatory": false,
-    "changelog": "OPX-Demon v1.2.0\n\n## What's Changed\n* fix(uml): drop UML_NET_VECTOR so the released static-link config is valid by @freebuff-web[bot] in https://github.com/OPX-Aminul/OPX-Demon/pull/5\n* fix(uml): expose IOMEM/DMA emulation prompts (keeps USB-WiFi drivers in config) by @freebuff-web[bot] in https://github.com/OPX-Aminul/OPX-Demon/pull/6\n* fix(uml): inline Kconfig prompt edit \u2014 builder image lacks patch(1) by @freebuff-web[bot] in https://github.com/OPX-Aminul/OPX-Demon/pull/7\n* fix(uml): strip GCC-only -mabi=lp64 from Makefile.um for clang builds by @freebuff-web[bot] in https://github.com/OPX-Aminul/OPX-Demon/pull/8\n* fix(uml): build from the original zalexdev/linux-um-arm64 tree for exact release parity by @freebuff-web[bot] in https://github.com/OPX-Aminul/OPX-Demon/pull/9\n* fix(uml): re-assert the android --target so kbuild's linux-gnu override loses by @freebuff-web[bot] in https://github.com/OPX-Aminul/OPX-Demon/pull/10\n* fix(uml): point kbuild's CLANG_TARGET_FLAGS at the android triple by @freebuff-web[bot] in https://github.com/OPX-Aminul/OPX-Demon/pull/11\n* fix(uml): build against the API-34 bionic sysroot like the original release by @freebuff-web[bot] in https://github.com/OPX-Aminul/OPX-Demon/pull/12\n* fix(uml): read the release banner without a SIGPIPE-killed strings pipe by @freebuff-web[bot] in https://github.com/OPX-Aminul/OPX-Demon/pull/13\n* ci(uml): copy artifacts from /out \u2014 the build stage never wrote them to / by @freebuff-web[bot] in https://github.com/OPX-Aminul/OPX-Demon/pull/14\n* ci(apk): install SDK packages explicitly \u2014 setup-android's default list wants the removed 'tools' package by @freebuff-web[bot] in https://github.com/OPX-Aminul/OPX-Demon/pull/15\n\n\n**Full Changelog**: https://github.com/OPX-Aminul/OPX-Demon/compare/v1.1.10...v1.2.0"
+    "changelog": "OPX-Demon v1.2.1\n\n**Full Changelog**: https://github.com/OPX-Aminul/OPX-Demon/compare/v1.2.0...v1.2.1"
   },
   "news": [],
   "notifications": []
