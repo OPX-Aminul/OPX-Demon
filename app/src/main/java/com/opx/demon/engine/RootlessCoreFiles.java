@@ -244,6 +244,24 @@ public final class RootlessCoreFiles {
                 out.add(new Gap(kind, dest, asset,
                         "Size mismatch (" + dest.length() + " vs " + expected + " bytes)",
                         true, compressed(asset)));
+                return;
+            }
+            // A rebuild can ship a new binary with an unchanged size; size alone
+            // then hides a stale engine file on the device forever (this is
+            // exactly what happened to the SECCOMP-patched linux-uml: same
+            // 19,763,856 bytes, different code). Small engine binaries are cheap
+            // to verify, so stream-hash them whenever the manifest pins a digest
+            // and mark a re-download on mismatch. The rootfs is excluded: it is
+            // hundreds of MB and re-fetching it over mobile data would be worse
+            // than the disease — its pin did not change with the engine rebuild.
+            if (!rootfs && asset != null && asset.sha256 != null
+                    && asset.sha256.length() == 64) {
+                String actual = sha256(dest);
+                if (actual != null && !actual.equalsIgnoreCase(asset.sha256)) {
+                    out.add(new Gap(kind, dest, asset,
+                            "Content mismatch — engine binary was rebuilt without a size change",
+                            true, compressed(asset)));
+                }
             }
             return;
         }
@@ -256,6 +274,23 @@ public final class RootlessCoreFiles {
             reason = "Too small (" + dest.length() + " bytes) — not a usable image";
         }
         out.add(new Gap(kind, dest, asset, reason, true, compressed(asset)));
+    }
+
+    /** Streaming SHA-256, or null when the file cannot be read/hashed (fail-open:
+     *  keep the local file rather than forcing a re-download loop). */
+    private static String sha256(File f) {
+        try (java.io.InputStream in = new java.io.FileInputStream(f)) {
+            java.security.MessageDigest md =
+                    java.security.MessageDigest.getInstance("SHA-256");
+            byte[] buf = new byte[64 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
+            StringBuilder sb = new StringBuilder();
+            for (byte b : md.digest()) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static boolean compressed(RemoteManifest.Asset asset) {

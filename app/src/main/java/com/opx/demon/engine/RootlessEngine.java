@@ -1370,11 +1370,14 @@ public final class RootlessEngine {
         // init makes its first disallowed call. In SECCOMP mode the stub
         // traps every guest syscall for the UML kernel to emulate, and the
         // stub's own host syscalls sit inside Android's app allowlist.
-        // "2" (on) turns a non-functional SECCOMP into a fatal, visible boot
-        // error instead of a silent ptrace fallback; the kernel-side
-        // close_range fallback (build-tools/uml-android-seccomp.py) is what
-        // makes the probe pass on Android 10's 4.14 kernel at all.
-        a.add("seccomp=2");
+        // uml_seccomp_config() parses STRINGS only (strcmp off/auto/on in
+        // start_up.c) — a numeric value is rejected before the kernel even
+        // boots ("Invalid seccomp option '2'"). "on" (=2, fatal when the
+        // probe fails) turns a broken SECCOMP into a visible boot error
+        // instead of a silent ptrace fallback; the kernel-side close_range
+        // fallback (build-tools/uml-android-seccomp.py) is what makes the
+        // probe pass on Android 10's 4.14 kernel at all.
+        a.add("seccomp=on");
         return a;
     }
 

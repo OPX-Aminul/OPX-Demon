@@ -1,4 +1,5 @@
 name: Build & Update Release
+# v1.2.5 fix round
 
 # Signing: release APK is signed with keystore/opx-demon-release.jks via
 # gradle.properties (see README → Release signing).
