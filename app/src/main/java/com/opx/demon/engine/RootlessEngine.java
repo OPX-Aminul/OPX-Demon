@@ -7,6 +7,7 @@ import com.opx.demon.utils.Core;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -1180,6 +1181,19 @@ public final class RootlessEngine {
             Log.i(TAG, "UML: " + join(a));
             ProcessBuilder pb = new ProcessBuilder(a);
             pb.directory(RootlessPaths.base(app));
+            // Android has no /dev/shm and no /tmp, and UML's early boot hard-exits
+            // with code 1 when it cannot create its memory file: os_early_checks()
+            // -> check_tmpexec() -> create_tmp_file() (arch/um/os-Linux/mem.c) takes
+            // the tempdir from $TMPDIR — accepting a non-tmpfs directory, it only
+            // warns — then open(dir, O_TMPFILE). With no $TMPDIR it falls back to
+            // /tmp, which does not exist, open() fails with ENOENT, and ENOENT is
+            // not in the "kernel does not support O_TMPFILE, retry with mkstemp"
+            // list, so create_tmp_file() calls exit(1) right after the
+            // "Warning: tempdir /tmp is not on tmpfs" line — long before the
+            // kernel prints "Linux version" or registers its console.
+            File tmpDir = umlTempDir();
+            pb.environment().put("TMPDIR", tmpDir.getAbsolutePath());
+            Log.i(TAG, "UML TMPDIR: " + tmpDir.getAbsolutePath());
             pb.redirectErrorStream(true);
             final Process proc = pb.start();
             qemuProcess = proc;
@@ -1228,6 +1242,41 @@ public final class RootlessEngine {
         } catch (Exception e) {
             Log.e(TAG, "UML start failed", e);
             return e.getMessage() == null ? e.toString() : e.getMessage();
+        }
+    }
+
+    /**
+     * $TMPDIR for the UML kernel: the directory it builds the guest's whole memory
+     * image in (an unlinked temp file, so nothing is left behind on a clean exit).
+     * Only the app's own directories qualify on Android — there is no /dev/shm and
+     * no /tmp, and an app uid cannot mount a tmpfs of its own. UML prefers tmpfs
+     * only so guest memory is not subject to the host's vm.dirty_ratio; a plain
+     * directory is accepted with a warning.
+     */
+    private File umlTempDir() {
+        File[] candidates = {
+                new File(RootlessPaths.base(app), "tmp"),
+                new File(app.getCacheDir(), "uml"),
+                app.getFilesDir()
+        };
+        for (File dir : candidates) {
+            if (umlTempUsable(dir)) return dir;
+        }
+        return candidates[0];
+    }
+
+    private boolean umlTempUsable(File dir) {
+        if (!dir.isDirectory() && !dir.mkdirs()) return false;
+        try {
+            File probe = new File(dir, ".uml-tmp-probe");
+            try (FileOutputStream out = new FileOutputStream(probe)) {
+                out.write(0);
+            }
+            //noinspection ResultOfMethodCallIgnored
+            probe.delete();
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 

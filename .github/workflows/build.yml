@@ -13,6 +13,13 @@ name: Build & Update Release
 # workflow once — the engine layers are cached, so that is a ~5 minute no-op.
 #
 # 1.1.8 trigger bump: AMOLED layering — true black window + lifted gold surfaces.
+#
+# UML early-boot fix (v1.2.3): the kernel hard-exited with code 1 right after
+# "Warning: tempdir /tmp is not on tmpfs" because Android has no /dev/shm and
+# no /tmp, and arch/um/os-Linux/mem.c:create_tmp_file() only retries mkstemp
+# when O_TMPFILE fails with EINVAL/EISDIR/EOPNOTSUPP — ENOENT goes straight to
+# exit(1). The app now exports TMPDIR to a directory it owns. Engine binaries
+# are unchanged; this push exists to publish the fixed APK.
 
 on:
   push:
