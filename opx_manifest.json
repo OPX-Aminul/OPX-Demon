@@ -56,13 +56,13 @@
     },
     "uml_kernel": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/uml-mode-all-file/linux-uml",
-      "sha256": "82638886bb9c9eb2cd84b496c6897139bc7c72ad20d73386c7112e60f6cf63c5",
+      "sha256": "1ba1edb2552114afdbaab4ca93f35b9ecc8c95c00a1cff2002d0b6178edb18e9",
       "size": 19763856
     },
     "uml_stub": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/uml-mode-all-file/stub_exe",
-      "sha256": "83f51f7c45133daa135b595562b09c5e2829f1d0f1e00b7fce2a7695370781fc",
-      "size": 1920
+      "sha256": "25d850653085703ef603c83c05d0e075b7843ba3551d97a70261ddfd72cb138d",
+      "size": 1968
     },
     "uml_netd": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/uml-mode-all-file/uml-netd",
