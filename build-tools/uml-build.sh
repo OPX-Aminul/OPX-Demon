@@ -57,6 +57,20 @@ fi
 grep -q 'stub_exe_embed' "${SRC}/arch/um/kernel/skas/Makefile" \
     || die "stub_exe embedding missing from arch/um/kernel/skas/Makefile — wrong tree revision"
 
+# ── Android SECCOMP patch ─────────────────────────────────────────────────────
+# Android installs an unremovable seccomp filter in every app process. The
+# guest can only survive in UML's SECCOMP userspace mode (the stub traps all
+# guest syscalls for the kernel to emulate; in ptrace mode they run as raw
+# host syscalls and Android KILLs the engine with SIGSYS — boot log ends at
+# "Run /sbin/init as init process" with exit code 159). Both the probe and
+# the stub gate on close_range(436), a kernel 5.9+ syscall: Android 10 ships
+# 4.9/4.14, the raw call answers -ENOSYS, and UML silently dropped to ptrace
+# mode. The patcher adds a per-fd close() fallback so SECCOMP engages.
+PYTHON3="$(command -v python3)" && [ -n "${PYTHON3}" ] \
+    || die "python3 not found — uml-android-seccomp.py needs it"
+"${PYTHON3}" "$(dirname "$(readlink -f "$0")")/uml-android-seccomp.py" "${SRC}" \
+    || die "uml-android-seccomp.py failed — wrong tree revision?"
+
 JOBS="$(nproc)"
 KVER_BASELINE="7.2.0-rc4"
 log "Building arm64 UML kernel (baseline ${KVER_BASELINE}, ${JOBS} jobs)"

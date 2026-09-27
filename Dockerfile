@@ -118,6 +118,10 @@ RUN cd linux-um \
 
 COPY build-tools/uml-arm64.config /usr/src/uml-arm64.config
 COPY build-tools/uml-build.sh /usr/src/uml-build.sh
+# SECCOMP-mode fix for Android: without it the engine silently runs in ptrace
+# mode and Android's app seccomp filter kills it with SIGSYS (exit 159) the
+# moment guest init makes its first disallowed host syscall.
+COPY build-tools/uml-android-seccomp.py /usr/src/uml-android-seccomp.py
 RUN chmod +x /usr/src/uml-build.sh
 
 # The UML kernel is a normal userspace program: no cross headers beyond what

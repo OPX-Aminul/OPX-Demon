@@ -18,8 +18,19 @@ name: Build & Update Release
 # "Warning: tempdir /tmp is not on tmpfs" because Android has no /dev/shm and
 # no /tmp, and arch/um/os-Linux/mem.c:create_tmp_file() only retries mkstemp
 # when O_TMPFILE fails with EINVAL/EISDIR/EOPNOTSUPP — ENOENT goes straight to
-# exit(1). The app now exports TMPDIR to a directory it owns. Engine binaries
-# are unchanged; this push exists to publish the fixed APK.
+# exit(1). The app now exports TMPDIR to a directory it owns.
+#
+# UML SIGSYS fix (v1.2.4): the kernel then died at "Run /sbin/init as init
+# process" with exit code 159 = 128+SIGSYS. Android installs an unremovable
+# seccomp filter in every app process; UML's guest can only survive in
+# SECCOMP userspace mode, but the probe and stub gate on close_range(436)
+# (kernel 5.9+; Android 10 ships 4.14) and main() calls personality() — none
+# whitelisted, so the probe failed, UML silently ran in ptrace mode, and the
+# first disallowed guest syscall killed the engine. build-tools/
+# uml-android-seccomp.py adds a per-fd close() fallback, skips personality(),
+# and clears CLOEXEC on the stub's fd 0; the app now passes seccomp=2 so a
+# broken probe is fatal instead of a silent ptrace fallback. Rebuilds
+# linux-uml/stub_exe and republishes the APK.
 
 on:
   push:

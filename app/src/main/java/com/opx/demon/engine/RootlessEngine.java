@@ -388,6 +388,16 @@ public final class RootlessEngine {
     }
 
     private String lastLogProblem() {
+        // 159 = 128 + SIGSYS(31). A UML engine only dies this way when a raw
+        // host syscall is rejected by Android's per-app seccomp filter — which
+        // happens when the guest runs in ptrace mode, i.e. on a kernel built
+        // before the SECCOMP close_range fix. Android reports nothing itself,
+        // so this translation is the whole diagnosis.
+        if ("ptrace".equals(umlUserspaceMode)) {
+            return "guest ran in ptrace mode and Android's seccomp filter "
+                    + "killed a syscall with SIGSYS (exit 159) — reinstall "
+                    + "the engine to get the SECCOMP kernel";
+        }
         try {
             java.util.List<String> tail = tailLog(40);
             for (int i = tail.size() - 1; i >= 0; i--) {
@@ -1108,6 +1118,12 @@ public final class RootlessEngine {
         return out;
     }
 
+    // "Userspace mode: SECCOMP/ptrace" is printed by os_early_checks() before
+    // any guest runs; knowing which mode a failing boot used turns the exit-159
+    // SIGSYS death from a mystery into a diagnosis (ptrace mode = Android's
+    // app filter killed a raw guest syscall).
+    private volatile String umlUserspaceMode;
+
     /** Console tap target: append whatever the engine's console carried to serial.log. */
     private void appendConsoleText(String text) {
         try {
@@ -1118,6 +1134,11 @@ public final class RootlessEngine {
                 //noinspection ResultOfMethodCallIgnored
                 log.delete();
             }
+            // Remember which userspace mode the kernel reported — lastLogProblem()
+            // uses it to translate a SIGSYS death into a real diagnosis.
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("Userspace mode: (SECCOMP|ptrace)").matcher(text);
+            if (m.find()) umlUserspaceMode = m.group(1);
             try (FileWriter fw = new FileWriter(log, true)) {
                 fw.write(text);
             }
@@ -1342,6 +1363,18 @@ public final class RootlessEngine {
             a.add("eth0=tap,,,10.0.2.15");
         }
         a.add("umid=opxdemon-uml");
+        // SECCOMP userspace mode is a hard requirement on Android. The zygote
+        // installs an unremovable seccomp filter in every app process; in
+        // ptrace mode guest syscalls execute as raw host syscalls and the
+        // filter KILLs the engine with SIGSYS (exit 159) the moment guest
+        // init makes its first disallowed call. In SECCOMP mode the stub
+        // traps every guest syscall for the UML kernel to emulate, and the
+        // stub's own host syscalls sit inside Android's app allowlist.
+        // "2" (on) turns a non-functional SECCOMP into a fatal, visible boot
+        // error instead of a silent ptrace fallback; the kernel-side
+        // close_range fallback (build-tools/uml-android-seccomp.py) is what
+        // makes the probe pass on Android 10's 4.14 kernel at all.
+        a.add("seccomp=2");
         return a;
     }
 
