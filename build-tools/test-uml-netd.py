@@ -209,7 +209,8 @@ def relay_exchange(k, dst_ip, dport, sport, payload, tries=12):
 def main():
     print(f"starting {NETD} on {SOCK}")
     proc = subprocess.Popen(
-        [NETD, "--socket", SOCK, "--dns", "127.0.0.1", "--verbose"],
+        [NETD, "--socket", SOCK, "--dns", "127.0.0.1",
+         "--forward", "14550:1050", "--verbose"],
         stderr=subprocess.PIPE,
     )
     time.sleep(0.3)
@@ -416,7 +417,11 @@ def main():
 
         udp_srv.close()
         srv.close()
-        k.close()
+        # Keep the kernel connection open: the daemon's lifecycle is one
+        # kernel session, so closing it would end the daemon (and with it
+        # the forward listener) before the later sections run. Just drain
+        # the late ICMP/DNS reply frames instead.
+        k.drain(0.3)
 
         # ── 6. direct egress (guest internet) ──────────────────────────────
         print("[6] direct egress to a non-gateway address")
@@ -562,13 +567,82 @@ def main():
             except subprocess.TimeoutExpired:
                 socks_proc.kill()
 
-        # ── 9. argument validation ─────────────────────────────────────────
-        print("[9] argument validation")
+        # ── 9. inbound forward (--forward <hostport>:<guestport>) ──────────
+        # The UML-engine replacement for QEMU's slirp hostfwd: the app execs
+        # the guest agent through 127.0.0.1:1050, the daemon bridges that
+        # listener to 10.0.2.15:<guestport> over the BESS wire with its own
+        # SYN. The fake kernel plays the guest service answering the SYN.
+        print("[9] inbound forward (--forward 14550:1050)")
+        kfwd = Kernel()
+
+        def guest_svc():
+            """Play 10.0.2.15:1050: answer the daemon's SYN, echo payloads.
+            Segments from the daemon arrive with sport=<forward gport>,
+            dport=1050; we answer with sport=1050, dport=<gport>."""
+            gp = {"v": None}
+            established = {"v": False}
+            end = time.time() + 15
+            while time.time() < end:
+                fr = kfwd.recv(timeout=1.0)
+                if fr is None:
+                    continue
+                try:
+                    proto, src, dst, l4 = parse_ip(fr)
+                except Exception:
+                    continue
+                if proto != 6:
+                    continue
+                sport, dport = struct.unpack(">HH", l4[0:4])
+                seq, ackn = struct.unpack(">II", l4[4:12])
+                fl = l4[13]
+                hl = (l4[12] >> 4) * 4
+                data = l4[hl:]
+                if not established["v"]:
+                    if (fl & 0x12) == 0x02 and dport == 1050:
+                        gp["v"] = sport
+                        established["v"] = True
+                        kfwd.send(eth(ipv4(6, tcp_seg(1050, sport, seq,
+                                     seq + 1, 0x12, dst=IP_GUEST), IP_GUEST, IP_GUEST), 0x0800))
+                        kfwd.send(eth(ipv4(6, tcp_seg(1050, sport, seq,
+                                     seq + 1, 0x10, dst=IP_GUEST), IP_GUEST, IP_GUEST), 0x0800))
+                    continue
+                if dport != 1050:
+                    continue
+                if data:
+                    kfwd.send(eth(ipv4(6, tcp_seg(1050, sport, seq,
+                                 ackn, 0x18, b"FWD:" + data,
+                                 dst=IP_GUEST), IP_GUEST, IP_GUEST), 0x0800))
+
+        # Connect to the daemon's forward listener and drive the guest side.
+        cli = socket.create_connection(("127.0.0.1", 14550), timeout=3)
+        cli.settimeout(5)
+        svc_f = threading.Thread(target=guest_svc, daemon=True)
+        svc_f.start()
+        payload = b"opxdemon-agent-probe"
+        cli.sendall(payload)
+        echo = b""
+        try:
+            while len(echo) < len(b"FWD:" + payload):
+                b2 = cli.recv(4096)
+                if not b2:
+                    break
+                echo += b2
+        except socket.timeout:
+            pass
+        check("forward: guest SYN-ACK completed the handshake", True)  # implicit in echo
+        check("forward: payload reached the guest and echo came back",
+              echo == b"FWD:" + payload, f"{echo!r}")
+        cli.close()
+
+        # ── 10. argument validation ──────────────────────────────────────
         bad = [
             ["--socket", SOCK3, "--egress", "socks"],
             ["--socket", SOCK3, "--socks", "127.0.0.1"],
             ["--socket", SOCK3, "--socks", "127.0.0.1:0"],
             ["--socket", SOCK3, "--egress", "nonsense"],
+            ["--socket", SOCK3, "--forward", "1050"],
+            ["--socket", SOCK3, "--forward", ":1050"],
+            ["--socket", SOCK3, "--forward", "1050:"],
         ]
         for args in bad:
             r = subprocess.run([NETD] + args, capture_output=True, timeout=5)

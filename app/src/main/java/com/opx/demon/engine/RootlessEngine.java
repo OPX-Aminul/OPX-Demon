@@ -1471,6 +1471,13 @@ public final class RootlessEngine {
                 cmd.add("--egress");
                 cmd.add("direct");
             }
+            // Agent channel inbound forward: QEMU gets 127.0.0.1:1050 ->
+            // guest:1050 from slirp hostfwd; UML has no slirp, so uml-netd
+            // holds the listener itself and bridges to 10.0.2.15:1050 over
+            // the BESS wire. This is what GuestExec/GuestConsole dial on
+            // every command.
+            cmd.add("--forward");
+            cmd.add(RootlessPaths.HOST_EXEC_PORT + ":" + RootlessPaths.GUEST_EXEC_PORT);
             Log.i(TAG, "uml-netd: " + join(cmd));
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.directory(RootlessPaths.base(app));

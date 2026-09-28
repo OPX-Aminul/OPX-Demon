@@ -39,8 +39,18 @@
  * (see RootlessEngine.buildUmlCommand). No root, no /dev/net/tun, no
  * VpnService — an ordinary unprivileged process holds both endpoints.
  *
+ *   5. Inbound forward (--forward <hostport>:<guestport>) — the UML engine
+ *             has no slirp, so the app's 127.0.0.1:<hostport> listener for
+ *             the guest agent (opxdemon-agentd on 10.0.2.15:1050) has no
+ *             hostfwd underneath it. The daemon opens that listener itself
+ *             and serves every accepted connection by connecting the other
+ *             side to the guest through the BESS wire with its own mini TCP
+ *             stack — the same machinery as the outbound relay, driven from
+ *             the other end.
+ *
  * Usage: uml-netd --socket <path> [--dns <ipv4>] [--egress <loopback|direct|socks>]
- *                 [--socks <host:port>] [--verbose]
+ *                 [--socks <host:port>] [--forward <hostport>:<guestport>]
+ *                 [--forward <hostport>:<guestport> ...] [--verbose]
  */
 
 #define _GNU_SOURCE
@@ -469,6 +479,8 @@ struct trelay {
     int guest_fin_acked;
     long last_tx_ms;
     long created_ms;
+    int fwd;               /* 0 = outbound relay; 1 = inbound, SYN in flight;
+                            * 2 = inbound, guest side established */
 };
 static struct trelay relays[RELAY_MAX];
 
@@ -515,10 +527,16 @@ static void tcp_send(struct trelay *r, uint8_t flags,
     if (plen > MSS) plen = MSS;
     memset(seg, 0, sizeof seg);
 
-    seg[0] = (uint8_t)(r->dport >> 8);   /* sport = the port the guest dialed */
-    seg[1] = (uint8_t)r->dport;
-    seg[2] = (uint8_t)(r->gport >> 8);   /* dport = guest's source port */
-    seg[3] = (uint8_t)r->gport;
+    /* Outbound relay: sport = the port the guest dialed, dport = the guest's
+     * source port. Inbound forward: the daemon IS the initiator, so the
+     * segment leaves with sport = our forward gport and dport = the guest
+     * service port — the guest answers into the demux key (gport). */
+    uint16_t sp = r->fwd ? r->gport : r->dport;
+    uint16_t dp = r->fwd ? r->dport : r->gport;
+    seg[0] = (uint8_t)(sp >> 8);
+    seg[1] = (uint8_t)sp;
+    seg[2] = (uint8_t)(dp >> 8);
+    seg[3] = (uint8_t)dp;
     seg[4] = (uint8_t)(seq >> 24);
     seg[5] = (uint8_t)(seq >> 16);
     seg[6] = (uint8_t)(seq >> 8);
@@ -720,12 +738,121 @@ static void relay_on_ack(struct trelay *r, uint32_t una)
 /* Retransmit the first unacked segment when the guest goes quiet on it. */
 static void relay_retx(struct trelay *r, long now)
 {
-    if (r->hsent == 0 || r->dead) return;
+    if (r->dead) return;
+    /* Inbound forward still waiting for the guest's SYN-ACK: retransmit. */
+    if (r->fwd == 1) {
+        if (now - r->last_tx_ms < RETX_MS) return;
+        tcp_send(r, F_SYN, NULL, 0, r->our_isn, 0);
+        r->last_tx_ms = now;
+        return;
+    }
+    if (r->hsent == 0) return;
     if (now - r->last_tx_ms < RETX_MS) return;
     size_t chunk = r->hsent > MSS ? MSS : r->hsent;
     uint32_t base = r->snd_nxt - (uint32_t)r->hsent;
     tcp_send(r, F_ACK | F_PSH, r->hbuf, chunk, base, r->rcv_nxt);
     r->last_tx_ms = now;
+}
+
+/* ── inbound forward: host listener -> guest service ─────────────────────────
+ * The app execs the guest agent through 127.0.0.1:1050 (QEMU provides that
+ * with slirp hostfwd; UML has no slirp). With one --forward argument the
+ * daemon holds that listener and bridges each accepted TCP connection to
+ * 10.0.2.15:<guestport> across the BESS wire. Reuses struct trelay verbatim:
+ * the guest end is exactly the relay's guest side and the "host" end is the
+ * accepted client fd — the only difference is who initiates.
+ *
+ * Demux: a forward relay's guest-side source port (r->gport) is what the
+ * guest answers to, so it must be unique per connection AND outside the
+ * guest's ephemeral source range (Linux default 32768-60999) so an outbound
+ * relay can never collide with it. [2000,6000) satisfies both; collisions
+ * with an outbound gport are skipped via relay_by_gport. */
+static struct fwd {
+    int used;
+    int lfd;                /* 127.0.0.1:<hostport> listener (non-blocking) */
+    uint16_t hport;         /* host-order host port */
+    uint16_t gport;         /* host-order guest port (10.0.2.15) */
+} fwds[8];
+
+#define FWD_GPORT_MIN 2000
+#define FWD_GPORT_MAX 5999
+
+static int fwd_is_gport(uint16_t gport)
+{
+    return gport >= FWD_GPORT_MIN && gport <= FWD_GPORT_MAX;
+}
+
+static uint16_t fwd_next_gport(void)
+{
+    static uint16_t n;
+    for (int i = 0; i < 4000; i++) {
+        uint16_t c = (uint16_t)(FWD_GPORT_MIN + (n++ % 4000));
+        if (!relay_by_gport(c)) return c;
+    }
+    return 0;
+}
+
+/* A forward relay is done only when BOTH directions drained and closed —
+ * it must never hit the 30-minute idle reap while the agent session lives. */
+static int fwd_finished(const struct trelay *r)
+{
+    return r->fwd == 2 && r->host_eof && r->fin_sent && r->guest_fin
+        && r->glen == 0 && r->hlen == r->hsent;
+}
+
+static void fwd_setup_listener(struct fwd *f)
+{
+    f->lfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (f->lfd < 0) return;
+    int one = 1;
+    setsockopt(f->lfd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
+    struct sockaddr_in sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sin_family = AF_INET;
+    sa.sin_addr.s_addr = htonl(0x7F000001u);
+    sa.sin_port = htons(f->hport);
+    if (bind(f->lfd, (struct sockaddr *)&sa, sizeof sa) != 0
+        || listen(f->lfd, 4) != 0) {
+        logf_("uml-netd: forward 127.0.0.1:%u bind/listen failed (errno=%d)",
+              f->hport, errno);
+        close(f->lfd);
+        f->lfd = -1;
+        f->used = 0;
+        return;
+    }
+    set_nonblock(f->lfd); /* fwd_accept_all() drains with accept()==EAGAIN */
+}
+
+/* Accept on every forward listener; wire each connection to the guest. */
+static void fwd_accept_all(void)
+{
+    for (int i = 0; i < (int)(sizeof fwds / sizeof fwds[0]); i++) {
+        struct fwd *f = &fwds[i];
+        if (!f->used || f->lfd < 0) continue;
+        for (;;) {
+            int cfd = accept(f->lfd, NULL, NULL);
+            if (cfd < 0) break;
+            set_nonblock(cfd);
+
+            uint16_t gp = fwd_next_gport();
+            struct trelay *r = gp ? relay_alloc(gp) : NULL;
+            if (!r) { close(cfd); break; }   /* table full / no port */
+            r->dport = f->gport;
+            memcpy(r->dip, IP_GUEST, 4);
+            r->hfd = cfd;
+            r->hs = 0;          /* flips once the guest completes the handshake */
+            r->connecting = 0;  /* the client fd is usable from the start */
+            r->egress = EGRESS_LOOPBACK;      /* never leaves the device */
+            r->our_isn = make_isn(gp);
+            r->snd_nxt = r->our_isn;
+            r->rcv_nxt = 0;
+            r->fwd = 1;
+            tcp_send(r, F_SYN, NULL, 0, r->snd_nxt, 0);
+            r->snd_nxt = r->our_isn + 1;
+            logf_("uml-netd: forward 127.0.0.1:%u -> 10.0.2.15:%u (gport=%u)",
+                  f->hport, f->gport, r->gport);
+        }
+    }
 }
 
 /* Inbound TCP segment from the guest. `dip` is the frame's destination IP —
@@ -746,15 +873,37 @@ static void tcp_input(const uint8_t *seg, size_t len, const uint8_t dip[4])
     size_t plen = len - hlen;
 
     struct trelay *r = relay_by_gport(sport);
+    /* Segments belonging to an inbound forward arrive with the daemon's
+     * forward gport in the DESTINATION field (the guest service is the
+     * source). The sport lookup cannot see them. */
+    if (!r && fwd_is_gport(dport)) r = relay_by_gport(dport);
 
     if (flags & F_RST) {
-        if (r) relay_free(r);
+        if (r) relay_free(r); /* closes the client fd too: connect() fails fast */
+        return;
+    }
+
+    /* A forward relay's SYN answered: complete the 3-way handshake. */
+    if (r && r->fwd == 1 && (flags & (F_SYN | F_ACK)) == (F_SYN | F_ACK)
+        && SEQ_EQ(ackn, r->snd_nxt)) {
+        r->fwd = 2;
+        r->hs = 1;
+        r->rcv_nxt = seq + 1;
+        tcp_send(r, F_ACK, NULL, 0, r->snd_nxt, r->rcv_nxt);
+        logf_("uml-netd: forward to 10.0.2.15:%u established (gport=%u)",
+              r->dport, r->gport);
+        pump_to_guest(r);
         return;
     }
 
     if (flags & F_SYN) {
-        if (r) { /* SYN retransmission: re-send SYN-ACK */
-            tcp_send(r, F_SYN | F_ACK, NULL, 0, r->our_isn, r->rcv_nxt);
+        if (r) {
+            if (r->fwd == 1) {         /* guest retransmitting its SYN-ACK */
+                tcp_send(r, F_SYN, NULL, 0, r->our_isn, 0);
+                r->last_tx_ms = now_ms();
+            } else if (!r->fwd) {      /* SYN retransmission: re-send SYN-ACK */
+                tcp_send(r, F_SYN | F_ACK, NULL, 0, r->our_isn, r->rcv_nxt);
+            }
             return;
         }
         if (dport == 0) return;
@@ -890,7 +1039,12 @@ static void host_pump_all(void)
         }
 
         if (rev & (POLLIN | POLLHUP | POLLERR)) {
-            if (!r->hs) continue; /* connect still in flight */
+            if (!r->hs) {
+                /* A forwarded client that gives up before the guest
+                 * completes the handshake must free its slot. */
+                if (r->fwd && (rev & POLLHUP)) r->dead = 1;
+                continue;
+            }
             for (;;) {
                 size_t space = sizeof r->hbuf - r->hlen;
                 if (space == 0) break;
@@ -955,13 +1109,39 @@ int main(int argc, char **argv)
                 return 2;
             }
             g_egress = EGRESS_SOCKS;
+        } else if (!strcmp(argv[i], "--forward") && i + 1 < argc) {
+            /* --forward <hostport>:<guestport>: serve the guest service on
+             * 127.0.0.1:<hostport>. The agent channel (1050:1050) is what
+             * replaces QEMU's slirp hostfwd on the UML engine. */
+            const char *spec = argv[++i];
+            const char *colon = strchr(spec, ':');
+            if (!colon || colon == spec || colon[1] == '\0') {
+                fprintf(stderr, "uml-netd: --forward expects <hostport>:<guestport>\n");
+                return 2;
+            }
+            struct fwd *slot = NULL;
+            for (int j = 0; j < (int)(sizeof fwds / sizeof fwds[0]); j++)
+                if (!fwds[j].used) { slot = &fwds[j]; break; }
+            if (!slot) {
+                fprintf(stderr, "uml-netd: too many --forward entries\n");
+                return 2;
+            }
+            memset(slot, 0, sizeof *slot);
+            slot->used = 1;
+            slot->lfd = -1;
+            slot->hport = (uint16_t)atoi(spec);
+            slot->gport = (uint16_t)atoi(colon + 1);
+            if (slot->hport == 0 || slot->gport == 0) {
+                fprintf(stderr, "uml-netd: --forward expects <hostport>:<guestport>\n");
+                return 2;
+            }
         } else if (!strcmp(argv[i], "--verbose")) {
             g_verbose = 1;
         } else {
             fprintf(stderr,
                     "usage: uml-netd --socket <path> [--dns <ipv4>] "
                     "[--egress <loopback|direct|socks>] [--socks <host:port>] "
-                    "[--verbose]\n");
+                    "[--forward <hostport>:<guestport>] [--verbose]\n");
             return 2;
         }
     }
@@ -978,11 +1158,17 @@ int main(int argc, char **argv)
         fprintf(stderr, "uml-netd: cannot listen on %s: %s\n", path, strerror(errno));
         return 1;
     }
+    for (int j = 0; j < (int)(sizeof fwds / sizeof fwds[0]); j++)
+        if (fwds[j].used && fwds[j].lfd < 0) fwd_setup_listener(&fwds[j]);
     logf_("uml-netd: listening on %s (dns=%u.%u.%u.%u egress=%s%s)", path,
           g_dns_ip & 0xFF, (g_dns_ip >> 8) & 0xFF,
           (g_dns_ip >> 16) & 0xFF, (g_dns_ip >> 24) & 0xFF,
           egress_name(g_egress),
           g_socks_set ? "/socks-proxy" : "");
+    for (int j = 0; j < (int)(sizeof fwds / sizeof fwds[0]); j++)
+        if (fwds[j].used && fwds[j].lfd >= 0)
+            logf_("uml-netd: forwarding 127.0.0.1:%u -> 10.0.2.15:%u",
+                  fwds[j].hport, fwds[j].gport);
 
     long last_gratuitous = 0;
     long last_activity = now_ms();
@@ -995,6 +1181,7 @@ int main(int argc, char **argv)
         pfds[npfd].events = POLLIN;
         pfds[npfd].revents = 0;
         npfd++;
+        fwd_accept_all();
         if (kfd >= 0) {
             pfds[npfd].fd = kfd;
             pfds[npfd].events = POLLIN;
@@ -1087,6 +1274,17 @@ int main(int argc, char **argv)
         for (int i = 0; i < RELAY_MAX; i++) {
             struct trelay *r = &relays[i];
             if (!r->used) continue;
+            if (r->fwd) {
+                /* A forwarded agent connection lives as long as the session;
+                 * free it only when both directions drained and closed (or
+                 * one side gave up while the handshake was in flight). */
+                if (r->dead || fwd_finished(r)) {
+                    relay_free(r);
+                    continue;
+                }
+                relay_retx(r, now);
+                continue;
+            }
             if (now - r->created_ms > IDLE_MS) {
                 relay_free(r);
                 continue;
