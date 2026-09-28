@@ -1263,6 +1263,7 @@ public final class RootlessEngine {
 
             long deadline = System.currentTimeMillis() + BOOT_TIMEOUT_MS;
             int bootstraps = 0;
+            long lastProbeNoteMs = 0;
             while (System.currentTimeMillis() < deadline) {
                 if (stopRequested) return "stopped";
                 if (!isAlive(proc)) {
@@ -1288,6 +1289,21 @@ public final class RootlessEngine {
                             : "Agent still not answering — retrying the console bootstrap ("
                               + bootstraps + ")");
                     bootstrapAgentOverConsole();
+                }
+                // A boot that stalls on the agent probe must be visible in the
+                // exported log: every 15 s say which side of 127.0.0.1:1050 the
+                // handshake is stuck on (listener down = daemon/forward problem;
+                // listener up but silent = guest-side agent/vec0 problem).
+                long nowMs = System.currentTimeMillis();
+                if (nowMs - lastProbeNoteMs >= 15_000) {
+                    lastProbeNoteMs = nowMs;
+                    boolean listenerUp = netd && tcpListenerUp(RootlessPaths.HOST_EXEC_PORT);
+                    boolean agentAnswers = GuestExec.ping(1200);
+                    GuestExec.logToStore("boot wait: agent probe — 127.0.0.1:"
+                            + RootlessPaths.HOST_EXEC_PORT + " listener "
+                            + (listenerUp ? "UP" : "DOWN")
+                            + (listenerUp ? "" : " (uml-netd forward missing)")
+                            + ", guest agent " + (agentAnswers ? "answering" : "silent"));
                 }
                 sleep(1000);
             }
@@ -1448,6 +1464,34 @@ public final class RootlessEngine {
             File sock = RootlessPaths.umlNetdSock(app);
             // Best-effort cleanup of a dead daemon's socket
             try { sock.delete(); } catch (Throwable ignored) {}
+            // A daemon from a previous app session can still be alive (Android
+            // keeps same-uid children after the app process dies) and still
+            // holds the forward listener — the fresh daemon's bind would fail
+            // silently and every agent dial would land on a dead guest. The
+            // daemon writes its pid next to the socket; retire the old one.
+            try {
+                File pidFile = new File(sock.getAbsolutePath() + ".pid");
+                if (pidFile.isFile()) {
+                    String txt = new String(
+                            java.nio.file.Files.readAllBytes(pidFile.toPath()),
+                            StandardCharsets.UTF_8).trim();
+                    long pid = Long.parseLong(txt);
+                    if (pid > 1) {
+                        // Same-uid only: Android enforces this, and the signal
+                        // is a no-op if the pid was recycled by another process.
+                        android.os.Process.sendSignal((int) pid,
+                                android.os.Process.SIGNAL_KILL);
+                        // Give the kernel a beat to release the listener port.
+                        for (int i = 0; i < 20 && tcpListenerUp(RootlessPaths.HOST_EXEC_PORT); i++) {
+                            Thread.sleep(100);
+                        }
+                        GuestExec.logToStore("retired stale uml-netd (pid " + pid + ")");
+                    }
+                    //noinspection ResultOfMethodCallIgnored
+                    pidFile.delete();
+                }
+            } catch (Throwable ignored) {
+            }
             List<String> cmd = new ArrayList<>();
             cmd.add(netd.getAbsolutePath());
             cmd.add("--socket");
@@ -1471,6 +1515,10 @@ public final class RootlessEngine {
                 cmd.add("--egress");
                 cmd.add("direct");
             }
+            // Verbose: kernel-connect / ARP / forward-establish lines are the
+            // only visibility into the UML agent channel — without them a
+            // silent 1050 is undiagnosable from the exported log.
+            cmd.add("--verbose");
             // Agent channel inbound forward: QEMU gets 127.0.0.1:1050 ->
             // guest:1050 from slirp hostfwd; UML has no slirp, so uml-netd
             // holds the listener itself and bridges to 10.0.2.15:1050 over
@@ -1490,6 +1538,17 @@ public final class RootlessEngine {
                     String line;
                     while ((line = br.readLine()) != null) {
                         Log.d(TAG, "uml-netd: " + line);
+                        // The agent channel's fate is decided inside this daemon:
+                        // kernel connect, forward bind, SYN-ACK waits and guest
+                        // refusals all print here and nowhere else. Surface them
+                        // in the exported session log.
+                        if (line.contains("forward") || line.contains("kernel")
+                                || line.contains("REFUSED") || line.contains("SYN-ACK")
+                                || line.contains("failed") || line.contains("established")
+                                || line.contains("watchdog")) {
+                            GuestExec.logToStore("uml-netd: "
+                                    + line.replaceFirst("^uml-netd: ", ""));
+                        }
                     }
                 } catch (Throwable ignored) {
                 }
@@ -1712,6 +1771,16 @@ public final class RootlessEngine {
                 if (listener != null) listener.onBootLine(line);
             }
         } catch (Exception ignored) {}
+    }
+
+    /** True when something on this host accepts TCP on the port (no data exchanged). */
+    private static boolean tcpListenerUp(int port) {
+        try (java.net.Socket s = new java.net.Socket()) {
+            s.connect(new java.net.InetSocketAddress(RootlessPaths.HOST_LOOPBACK, port), 800);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     private static boolean isAlive(Process p) {

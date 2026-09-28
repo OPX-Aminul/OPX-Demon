@@ -182,6 +182,19 @@ static long now_ms(void)
     return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
 }
 
+/* Always-on log for the agent-forward path: the app cannot see anything else
+ * this daemon does, so the bind/established/refused events print regardless
+ * of --verbose. */
+static void fwd_logf_(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    fputc('\n', stderr);
+    fflush(stderr);
+}
+
 static void logf_(const char *fmt, ...)
 {
     if (!g_verbose) return;
@@ -481,6 +494,7 @@ struct trelay {
     long created_ms;
     int fwd;               /* 0 = outbound relay; 1 = inbound, SYN in flight;
                             * 2 = inbound, guest side established */
+    long syn_retx;         /* forward: SYN retransmit counter (diagnostics) */
 };
 static struct trelay relays[RELAY_MAX];
 
@@ -744,6 +758,11 @@ static void relay_retx(struct trelay *r, long now)
         if (now - r->last_tx_ms < RETX_MS) return;
         tcp_send(r, F_SYN, NULL, 0, r->our_isn, 0);
         r->last_tx_ms = now;
+        r->syn_retx++;
+        if (r->syn_retx == 6)
+            fwd_logf_("uml-netd: forward 10.0.2.15:%u — no SYN-ACK after %ld tries "
+                      "(vec0 has no 10.0.2.15 address, or the frame path is dead)",
+                      r->dport, r->syn_retx);
         return;
     }
     if (r->hsent == 0) return;
@@ -776,6 +795,10 @@ static struct fwd {
 
 #define FWD_GPORT_MIN 2000
 #define FWD_GPORT_MAX 5999
+
+/* Port channel the UML kernel serves its console on (RootlessEngine passes
+ * port=1050; the app and this daemon share that single TCP host port). */
+static uint16_t fwd_console_port = 1050;
 
 static int fwd_is_gport(uint16_t gport)
 {
@@ -813,7 +836,7 @@ static void fwd_setup_listener(struct fwd *f)
     sa.sin_port = htons(f->hport);
     if (bind(f->lfd, (struct sockaddr *)&sa, sizeof sa) != 0
         || listen(f->lfd, 4) != 0) {
-        logf_("uml-netd: forward 127.0.0.1:%u bind/listen failed (errno=%d)",
+        fwd_logf_("uml-netd: forward 127.0.0.1:%u bind/listen failed (errno=%d)",
               f->hport, errno);
         close(f->lfd);
         f->lfd = -1;
@@ -849,7 +872,7 @@ static void fwd_accept_all(void)
             r->fwd = 1;
             tcp_send(r, F_SYN, NULL, 0, r->snd_nxt, 0);
             r->snd_nxt = r->our_isn + 1;
-            logf_("uml-netd: forward 127.0.0.1:%u -> 10.0.2.15:%u (gport=%u)",
+            fwd_logf_("uml-netd: forward 127.0.0.1:%u -> 10.0.2.15:%u (gport=%u)",
                   f->hport, f->gport, r->gport);
         }
     }
@@ -879,7 +902,16 @@ static void tcp_input(const uint8_t *seg, size_t len, const uint8_t dip[4])
     if (!r && fwd_is_gport(dport)) r = relay_by_gport(dport);
 
     if (flags & F_RST) {
-        if (r) relay_free(r); /* closes the client fd too: connect() fails fast */
+        if (r) {
+            /* The guest itself refused: with the forward path this means
+             * nothing is listening on the guest service (agent dead) —
+             * always surface it, it is the one fact the app cannot learn
+             * otherwise (its client socket just sees EOF). */
+            if (r->fwd)
+                fwd_logf_("uml-netd: forward 10.0.2.15:%u REFUSED by guest (RST) "
+                          "— nothing listening inside the guest", r->dport);
+            relay_free(r); /* closes the client fd too: connect() fails fast */
+        }
         return;
     }
 
@@ -890,7 +922,7 @@ static void tcp_input(const uint8_t *seg, size_t len, const uint8_t dip[4])
         r->hs = 1;
         r->rcv_nxt = seq + 1;
         tcp_send(r, F_ACK, NULL, 0, r->snd_nxt, r->rcv_nxt);
-        logf_("uml-netd: forward to 10.0.2.15:%u established (gport=%u)",
+        fwd_logf_("uml-netd: forward to 10.0.2.15:%u established (gport=%u)",
               r->dport, r->gport);
         pump_to_guest(r);
         return;
@@ -1158,6 +1190,15 @@ int main(int argc, char **argv)
         fprintf(stderr, "uml-netd: cannot listen on %s: %s\n", path, strerror(errno));
         return 1;
     }
+    {
+        char pidpath[512];
+        snprintf(pidpath, sizeof pidpath, "%s.pid", path);
+        FILE *pf = fopen(pidpath, "w");
+        if (pf) {
+            fprintf(pf, "%ld\n", (long)getpid());
+            fclose(pf);
+        }
+    }
     for (int j = 0; j < (int)(sizeof fwds / sizeof fwds[0]); j++)
         if (fwds[j].used && fwds[j].lfd < 0) fwd_setup_listener(&fwds[j]);
     logf_("uml-netd: listening on %s (dns=%u.%u.%u.%u egress=%s%s)", path,
@@ -1172,6 +1213,8 @@ int main(int argc, char **argv)
 
     long last_gratuitous = 0;
     long last_activity = now_ms();
+    long last_console = 0;        /* 10 s console watchdog beat */
+    int console_connected = 0;    /* guest's tty0 shell dialed in */
     const long IDLE_SPAWN_MS = 5L * 60 * 1000; /* never connected: give up */
 
     for (;;) {
@@ -1195,7 +1238,7 @@ int main(int argc, char **argv)
 
         /* nobody ever connected — spawned without a boot following */
         if (kfd < 0 && now - last_activity > IDLE_SPAWN_MS) {
-            logf_("uml-netd: no kernel ever connected — exiting");
+            fwd_logf_("uml-netd: no kernel ever connected — exiting");
             break;
         }
 
@@ -1206,7 +1249,7 @@ int main(int argc, char **argv)
                 set_nonblock(cfd);
                 if (kfd >= 0) close(kfd);
                 kfd = cfd;
-                logf_("uml-netd: kernel connected");
+                fwd_logf_("uml-netd: kernel connected (BESS)");
                 last_activity = now;
                 last_gratuitous = now;
                 send_gratuitous_arp();
@@ -1225,12 +1268,22 @@ int main(int argc, char **argv)
                     n = 0;
                 }
                 if (n <= 0) {
-                    logf_("uml-netd: kernel disconnected (n=%zd errno=%d) — exiting", n, errno);
+                    /* A disconnect is not fatal by itself: Android freezes and
+                     * thaws the whole app process group (SIGSTOP/SIGCONT), and
+                     * during the freeze the SEQPACKET peer can drop. The
+                     * kernel always redials after a thaw; exiting here would
+                     * also close the forward listeners and make the app's
+                     * agent dial fail with ECONNREFUSED mid-boot. Keep the
+                     * daemon and its listeners up; the 5 min never-connected
+                     * idle timer below is the real give-up path. */
+                    fwd_logf_("uml-netd: kernel disconnected (n=%zd errno=%d) — "
+                              "waiting for it to redial", n, errno);
                     close(kfd);
                     kfd = -1;
                     for (int i = 0; i < RELAY_MAX; i++)
                         if (relays[i].used) relay_free(&relays[i]);
-                    goto out; /* one daemon per kernel session */
+                    last_activity = now;
+                    break;
                 }
                 last_activity = now;
                 if (n < 14) continue;
@@ -1267,6 +1320,32 @@ int main(int argc, char **argv)
         /* host-side sockets */
         host_pump_all();
 
+        /* Console watchdog: after boot settles (t>60 s, agent still silent)
+         * the engine never opens its console — that is exactly when the app
+         * must. Dialing it is idempotent (raw mode is restored on close),
+         * and the app stays out of the way until the agent had its chance. */
+        if (kfd >= 0 && !console_connected && now - last_activity > 60000
+            && now - last_console >= 10000) {
+            last_console = now;
+            int cfd = socket(AF_INET, SOCK_STREAM, 0);
+            if (cfd >= 0) {
+                struct sockaddr_in ca;
+                memset(&ca, 0, sizeof ca);
+                ca.sin_family = AF_INET;
+                ca.sin_port = htons(fwd_console_port);
+                ca.sin_addr.s_addr = htonl(0x7F000001u);
+                if (connect(cfd, (struct sockaddr *)&ca, sizeof ca) == 0) {
+                    console_connected = 1;
+                    close(cfd);
+                    fwd_logf_("uml-netd: console watchdog dialed 127.0.0.1:%u "
+                              "(agent silent, handing the guest tty to the app)",
+                              fwd_console_port);
+                } else {
+                    close(cfd);
+                }
+            }
+        }
+
         /* DNS responses */
         udp_relay_poll();
 
@@ -1300,9 +1379,13 @@ int main(int argc, char **argv)
         }
     }
 
-out:
     if (kfd >= 0) close(kfd);
     if (lfd >= 0) close(lfd);
     unlink(sock_path);
+    {
+        char pidpath[512];
+        snprintf(pidpath, sizeof pidpath, "%s.pid", sock_path);
+        unlink(pidpath);
+    }
     return 0;
 }
