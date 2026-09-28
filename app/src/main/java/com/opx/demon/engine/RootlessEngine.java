@@ -413,8 +413,18 @@ public final class RootlessEngine {
                     + "SECCOMP probe failed on this kernel and the ptrace fallback "
                     + "cannot survive the app filter";
         }
+        // The stub died or was never exec'd: on Android the usual cause is
+        // the untrusted_app SELinux domain refusing to exec the stub from an
+        // anonymous memfd — which buildUmlCommand() avoids by passing
+        // stub_exe=<path>. Seeing this text on a current kernel means the
+        // stub file itself is unusable (wrong build, truncated download).
         try {
             java.util.List<String> tail = tailLog(40);
+            if (tail.stream().anyMatch(l -> l != null
+                    && l.contains("wait_stub_done_seccomp : the stub is gone"))) {
+                return "the UML stub died — on Android this means the stub file is "
+                        + "unusable (build or download problem); reinstall the engine";
+            }
             for (int i = tail.size() - 1; i >= 0; i--) {
                 String l = tail.get(i);
                 if (l == null) continue;
@@ -1388,6 +1398,14 @@ public final class RootlessEngine {
             a.add("eth0=tap,,,10.0.2.15");
         }
         a.add("umid=opxdemon-uml");
+        // Android refuses to exec the stub from an anonymous memfd (SELinux
+        // untrusted_app: "the stub is gone... the host refused to exec it
+        // from a memfd" right after /sbin/init starts). The tree carries the
+        // stub_exe= boot parameter for exactly this: open the installed
+        // stub_exe file instead of memfd_create — see init_stub_exe_fd() in
+        // arch/um/os-Linux/skas/process.c. The file is the binary CI pins as
+        // uml_stub, installed next to the kernel and marked executable.
+        a.add("stub_exe=" + stub.getAbsolutePath());
         // SECCOMP userspace mode is a hard requirement on Android. The zygote
         // installs an unremovable seccomp filter in every app process; in
         // ptrace mode guest syscalls execute as raw host syscalls and the
