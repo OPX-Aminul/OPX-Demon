@@ -373,14 +373,38 @@ public final class QemuInstaller {
     public static boolean ensureUmlNetd(Context context) {
         File dest = RootlessPaths.umlNetd(context);
         if (dest.isFile() && dest.length() > 64 * 1024) {
-            //noinspection ResultOfMethodCallIgnored
-            dest.setExecutable(true, false);
-            return true;
+            // A rebuild can ship a new uml-netd with the SAME size — and the
+            // boot path adds new command-line flags to it (v1.2.8 added
+            // --forward). Size alone would then boot with a stale daemon
+            // that exits on the unknown flag, so verify the manifest digest
+            // here too. Fail-open keeps the local file when it cannot be
+            // hashed; repair() re-checks with the full Gap pipeline anyway.
+            com.opx.demon.ota.RemoteManifest.Asset a0 = null;
+            try {
+                a0 = QemuDownloader.resolve(context).umlNetd;
+            } catch (Throwable ignored) {}
+            if (a0 != null && a0.sha256 != null && a0.sha256.length() == 64) {
+                String actual = RootlessCoreFiles.sha256For(dest);
+                if (actual != null && !actual.equalsIgnoreCase(a0.sha256)) {
+                    Log.i(TAG, "uml-netd is stale (sha256 mismatch) — re-downloading");
+                    //noinspection ResultOfMethodCallIgnored
+                    dest.delete();
+                    // fall through to the fetch below
+                } else {
+                    //noinspection ResultOfMethodCallIgnored
+                    dest.setExecutable(true, false);
+                    return true;
+                }
+            } else {
+                //noinspection ResultOfMethodCallIgnored
+                dest.setExecutable(true, false);
+                return true;
+            }
         }
         try {
             com.opx.demon.ota.RemoteManifest.Asset a = QemuDownloader.resolve(context).umlNetd;
             if (a == null || !a.isUsable()) return false;
-            Log.i(TAG, "uml-netd missing — fetching " + a.url);
+            Log.i(TAG, "uml-netd missing or stale — fetching " + a.url);
             //noinspection ResultOfMethodCallIgnored
             boolean ok = fetch(a, dest, "UML netd", null);
             if (ok) //noinspection ResultOfMethodCallIgnored

@@ -278,6 +278,8 @@ public final class RootlessCoreFiles {
 
     /** Streaming SHA-256, or null when the file cannot be read/hashed (fail-open:
      *  keep the local file rather than forcing a re-download loop). */
+    static String sha256For(File f) { return sha256(f); }
+
     private static String sha256(File f) {
         try (java.io.InputStream in = new java.io.FileInputStream(f)) {
             java.security.MessageDigest md =
