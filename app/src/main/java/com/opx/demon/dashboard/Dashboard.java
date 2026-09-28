@@ -239,6 +239,12 @@ public class Dashboard extends Fragment {
 
     private void startCoreRepair() {
         if (context == null || !coreRepairing.compareAndSet(false, true)) return;
+        // The VM service waits on the shared flag via RootlessGate: hold it
+        // for the whole repair so a boot can never start mid-download.
+        final java.util.concurrent.atomic.AtomicBoolean gateHeld =
+                new java.util.concurrent.atomic.AtomicBoolean(
+                        RootlessCoreFiles.runExclusiveForDashboard());
+        if (!gateHeld.get()) { coreRepairing.set(false); return; }
         if (coreRepairDownload != null) {
             coreRepairDownload.setEnabled(false);
             coreRepairDownload.setText(R.string.dashboard_core_repair_working);
@@ -272,6 +278,7 @@ public class Dashboard extends Fragment {
             final boolean repaired = ok;
             host.runOnUiThread(() -> {
                 coreRepairing.set(false);
+                if (gateHeld.get()) RootlessCoreFiles.releaseExclusive();
                 if (coreRepairProgress != null) coreRepairProgress.setVisibility(View.GONE);
                 if (repaired) {
                     if (coreRepairCard != null) coreRepairCard.setVisibility(View.GONE);

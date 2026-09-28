@@ -166,6 +166,40 @@ public final class RootlessCoreFiles {
         return n;
     }
 
+    /** True while a repair (Dashboard button / auto-repair / boot gate) is
+     * running. The VM service waits on this before booting so a repair and a
+     * boot never race each other. */
+    private static final java.util.concurrent.atomic.AtomicBoolean REPAIR_RUNNING =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    public static boolean isRepairing() { return REPAIR_RUNNING.get(); }
+
+    /** Dashboard callers hold the flag across their whole repair UI flow and
+     * release it when done. Returns false when a repair is already running. */
+    public static boolean runExclusiveForDashboard() {
+        return REPAIR_RUNNING.compareAndSet(false, true);
+    }
+
+    /** Releases the flag taken by {@link #runExclusiveForDashboard()}. */
+    public static void releaseExclusive() { REPAIR_RUNNING.set(false); }
+
+    /** Runs {@code body} while holding the shared repair flag. Returns false
+     * WITHOUT running it when another repair is already in progress — the
+     * caller should wait for {@link #isRepairing()} to clear and re-scan. */
+    static boolean runExclusive(Runnable body) {
+        if (!REPAIR_RUNNING.compareAndSet(false, true)) return false;
+        try { body.run(); } finally { REPAIR_RUNNING.set(false); }
+        return true;
+    }
+
+    /** Waits (up to {@code timeoutMs}) for any running repair to finish. */
+    public static void awaitRepairIdle(long timeoutMs) {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (isRepairing() && System.currentTimeMillis() < deadline) {
+            try { Thread.sleep(500); } catch (InterruptedException e) { return; }
+        }
+    }
+
     public static boolean repair(Context context, QemuInstaller.Progress p) {
         File base = RootlessPaths.base(context);
         if (!base.exists() && !base.mkdirs()) {

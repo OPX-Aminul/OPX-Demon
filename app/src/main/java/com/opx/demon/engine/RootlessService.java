@@ -43,6 +43,13 @@ public class RootlessService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         try { VmStatsCollector.get(getApplicationContext()).start(); } catch (Throwable ignored) {}
         new Thread(() -> {
+            // Boot gate: the engine must match the release manifest BEFORE the
+            // VM starts. A stale engine binary (e.g. uml-netd without --forward)
+            // would otherwise boot and die while the repair is still running.
+            if (!RootlessGate.awaitEngineReady(getApplicationContext())) {
+                updateNotification("Engine update unfinished — retry from the dashboard");
+                return;
+            }
             boolean ok = RootlessEngine.get(this).startBlocking(new RootlessEngine.BootListener() {
                 @Override public void onBootLine(String line) {}
                 @Override public void onBooted() { updateNotification("Linux VM ready"); }
