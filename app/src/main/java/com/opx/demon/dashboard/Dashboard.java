@@ -36,6 +36,7 @@ import com.opx.demon.arsenal.ArsenalFragment;
 import com.opx.demon.engine.EngineStatus;
 import com.opx.demon.engine.QemuInstaller;
 import com.opx.demon.engine.RootlessCoreFiles;
+import com.opx.demon.engine.RootlessGate;
 import com.opx.demon.engine.RootlessEngine;
 import com.opx.demon.engine.RootlessPaths;
 import com.opx.demon.engine.RootlessService;
@@ -169,12 +170,9 @@ public class Dashboard extends Fragment {
         if (!core.getBoolean("exploits_v30")) {
             new Thread(() -> {
                 if (!core.checkFile(core.getShareRoot() + "/exploits/checker.py")) {
-                    Snackbar s = Snackbar.make(activity.findViewById(android.R.id.content), "Updating please wait...", 60000);
-                    activity.runOnUiThread(s::show);
                     com.opx.demon.engine.GuestCore.ensure(core);
                     core.customChrootCommand("mkdir -p /sdcard/OPX-Demon/exploits; "
                             + "cp -f /exploits/* /sdcard/OPX-Demon/exploits/ 2>/dev/null", true);
-                    activity.runOnUiThread(s::dismiss);
                     core.putListString("installed_modules", new ArrayList<>());
                 }
                 core.putBoolean("exploits_v30", true);
@@ -258,6 +256,18 @@ public class Dashboard extends Fragment {
             coreRepairProgressText.setText("");
         }
         final Context app = context.getApplicationContext();
+        // Live per-file progress in THIS card: "uml-netd 1.2/2.9 MB (41%)".
+        RootlessGate.setProgressListener(new RootlessGate.UpdateProgress() {
+            @Override public void onFile(String file, long done, long total, int pct) {
+                String t = total > 0
+                        ? String.format(Locale.US, "%s · %.1f/%.1f MB (%d%%)",
+                                file, done / 1048576.0, total / 1048576.0, pct)
+                        : String.format(Locale.US, "%s · %.1f MB", file, done / 1048576.0);
+                postRepairText(t);
+            }
+            @Override public void onMessage(String msg) { postRepairText(msg); }
+            @Override public void onDone(boolean ok) { }
+        });
         new Thread(() -> {
             boolean ok = QemuInstaller.repair(app, new QemuInstaller.Progress() {
                 @Override public void onStage(QemuInstaller.Stage stage) {
@@ -278,6 +288,7 @@ public class Dashboard extends Fragment {
             final boolean repaired = ok;
             host.runOnUiThread(() -> {
                 coreRepairing.set(false);
+                RootlessGate.setProgressListener(null);
                 if (gateHeld.get()) RootlessCoreFiles.releaseExclusive();
                 if (coreRepairProgress != null) coreRepairProgress.setVisibility(View.GONE);
                 if (repaired) {
