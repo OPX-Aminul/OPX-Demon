@@ -1,5 +1,5 @@
 name: Build & Update Release
-# v1.2.5 fix round
+# v1.2.6 fix round — kernel probe closes fds without close_range (Android kills the syscall number)
 
 # Signing: release APK is signed with keystore/opx-demon-release.jks via
 # gradle.properties (see README → Release signing).

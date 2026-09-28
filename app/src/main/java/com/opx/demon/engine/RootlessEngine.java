@@ -138,6 +138,8 @@ public final class RootlessEngine {
             return false;
         }
         lastBootUsedFallback = false;
+        umlSeccompOff = false;
+        umlSeccompRetryUsed = false;
         stopRequested = false;
         lastBootAgentTimeout = false;
         String reason = attemptBoot(listener);
@@ -208,7 +210,19 @@ public final class RootlessEngine {
             ensureExecutable();
             autoGrowDisk();
             if (EngineType.isUml(prefs())) {
-                return attemptBootUml(listener);
+                String uml = attemptBootUml(listener);
+                // exit 159 = 128 + SIGSYS: Android's app filter killed the engine
+                // during boot. Retry once with seccomp=off (ptrace userspace) so
+                // the second attempt's failure message is the diagnosis the user
+                // gets instead of a bare exit code.
+                if (uml != null && !umlSeccompRetryUsed && safeExit(qemuProcess) == 159) {
+                    umlSeccompRetryUsed = true;
+                    GuestExec.logToStore("UML died with SIGSYS under seccomp=auto (" + uml
+                            + ") — retrying once with seccomp=off (ptrace userspace)");
+                    umlSeccompOff = true;
+                    uml = attemptBootUml(listener);
+                }
+                return uml;
             }
             RootlessPaths.ensureLibslirpNames(app);
             VmProbe.ensureCpuProfileVerified(app, prefs());
@@ -388,15 +402,16 @@ public final class RootlessEngine {
     }
 
     private String lastLogProblem() {
-        // 159 = 128 + SIGSYS(31). A UML engine only dies this way when a raw
-        // host syscall is rejected by Android's per-app seccomp filter — which
-        // happens when the guest runs in ptrace mode, i.e. on a kernel built
-        // before the SECCOMP close_range fix. Android reports nothing itself,
-        // so this translation is the whole diagnosis.
+        // 159 = 128 + SIGSYS(31). A UML engine dies this way when Android's
+        // per-app seccomp filter rejects a raw host syscall — in ptrace mode
+        // (probe fell back, guest syscalls run raw) or while the SECCOMP probe
+        // itself touches a syscall the host's syscall table lacks. Android
+        // reports nothing itself, so this translation is the whole diagnosis.
         if ("ptrace".equals(umlUserspaceMode)) {
-            return "guest ran in ptrace mode and Android's seccomp filter "
-                    + "killed a syscall with SIGSYS (exit 159) — reinstall "
-                    + "the engine to get the SECCOMP kernel";
+            return "guest fell back to ptrace userspace and Android's app seccomp "
+                    + "filter killed a raw syscall with SIGSYS (exit 159) — the "
+                    + "SECCOMP probe failed on this kernel and the ptrace fallback "
+                    + "cannot survive the app filter";
         }
         try {
             java.util.List<String> tail = tailLog(40);
@@ -1124,6 +1139,13 @@ public final class RootlessEngine {
     // app filter killed a raw guest syscall).
     private volatile String umlUserspaceMode;
 
+    // One-shot SECCOMP retry state. seccomp=auto probes SECCOMP and falls back
+    // to ptrace; when even the ptrace fallback dies with SIGSYS (exit 159),
+    // the retry pass boots once with seccomp=off so the failure text is the
+    // ptrace diagnosis instead of a bare exit code. Both reset at startBlocking().
+    private boolean umlSeccompOff;
+    private boolean umlSeccompRetryUsed;
+
     /** Console tap target: append whatever the engine's console carried to serial.log. */
     private void appendConsoleText(String text) {
         try {
@@ -1220,6 +1242,9 @@ public final class RootlessEngine {
             qemuProcess = proc;
             umlProcess = true;
             booted = false;
+            // Fresh per attempt: a stale "ptrace" captured on a previous boot
+            // would mislabel this attempt's exit-159 diagnosis.
+            umlUserspaceMode = null;
 
             new Thread(() -> pumpBootLog(proc, listener), "opxdemon-uml-log").start();
             // Everything the kernel prints after it registers its console arrives here, not
@@ -1372,12 +1397,16 @@ public final class RootlessEngine {
         // stub's own host syscalls sit inside Android's app allowlist.
         // uml_seccomp_config() parses STRINGS only (strcmp off/auto/on in
         // start_up.c) — a numeric value is rejected before the kernel even
-        // boots ("Invalid seccomp option '2'"). "on" (=2, fatal when the
-        // probe fails) turns a broken SECCOMP into a visible boot error
-        // instead of a silent ptrace fallback; the kernel-side close_range
-        // fallback (build-tools/uml-android-seccomp.py) is what makes the
-        // probe pass on Android 10's 4.14 kernel at all.
-        a.add("seccomp=on");
+        // boots ("Invalid seccomp option '2'").
+        //
+        // "auto" (=1) probes SECCOMP and falls back to ptrace when the probe
+        // fails: the right default for a consumer app. The kernel-side patch
+        // build-tools/uml-android-seccomp.py keeps close_range out of the
+        // probe entirely (Android kills that syscall number with SIGSYS
+        // instead of answering -ENOSYS — the exit 159 of v1.2.5), and when
+        // even so a host kills the boot with SIGSYS, startBlocking() retries
+        // once with seccomp=off so the failure text is a real diagnosis.
+        a.add(umlSeccompOff ? "seccomp=off" : "seccomp=auto");
         return a;
     }
 
