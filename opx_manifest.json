@@ -101,13 +101,13 @@
     }
   },
   "app": {
-    "versionCode": 132,
-    "versionName": "1.3.2",
-    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.3.2/app-release.apk",
-    "sha256": "256644865d7dd4d0a50bfbf37229c1fa6f2ac2ef9e9b683d36dd0bc893c53a9d",
-    "size": 22185625,
+    "versionCode": 133,
+    "versionName": "1.3.3",
+    "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/v1.3.3/app-release.apk",
+    "sha256": "4ca22ecfd189751affc1d208e638274671cc5e44a7c49d6ac3a69f99012ef051",
+    "size": 22189711,
     "mandatory": false,
-    "changelog": "OPX-Demon v1.3.2\n\n**Full Changelog**: https://github.com/OPX-Aminul/OPX-Demon/compare/v1.3.1...v1.3.2"
+    "changelog": "OPX-Demon v1.3.3\n\n**Full Changelog**: https://github.com/OPX-Aminul/OPX-Demon/compare/v1.3.2...v1.3.3"
   },
   "news": [],
   "notifications": []
