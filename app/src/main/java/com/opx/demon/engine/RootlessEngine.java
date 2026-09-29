@@ -1472,14 +1472,9 @@ public final class RootlessEngine {
             try {
                 File pidFile = new File(sock.getAbsolutePath() + ".pid");
                 if (pidFile.isFile()) {
-                    // Plain java.io read: java.nio.file.Files is API 26+ and
-                    // minSdk is 24. A pidfile is one short line of digits.
-                    String txt = "";
-                    try (java.io.FileReader fr = new java.io.FileReader(pidFile)) {
-                        char[] buf = new char[32];
-                        int n = fr.read(buf);
-                        if (n > 0) txt = new String(buf, 0, n).trim();
-                    }
+                    String txt = new String(
+                            java.nio.file.Files.readAllBytes(pidFile.toPath()),
+                            StandardCharsets.UTF_8).trim();
                     long pid = Long.parseLong(txt);
                     if (pid > 1) {
                         // Same-uid only: Android enforces this, and the signal
