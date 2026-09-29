@@ -1,5 +1,5 @@
 name: Build & Update Release
-# v1.3.2 build round — java.io pidfile fix (minSdk 24); rerun to chain signed APK publish
+# v1.3.3 build round — console-pty agent bootstrap + OTA fallback pin sync; chain signed APK publish
 
 # Signing: release APK is signed with keystore/opx-demon-release.jks via
 # gradle.properties (see README → Release signing).

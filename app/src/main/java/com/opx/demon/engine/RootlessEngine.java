@@ -239,6 +239,9 @@ public final class RootlessEngine {
             qemuProcess = proc;
             umlProcess = false;
             booted = false;
+            // Engine switch insurance: a pty announced by a previous UML boot
+            // belongs to a dead kernel and must never be consulted here.
+            GuestConsole.setUmlPtsDevice(null);
 
             new Thread(() -> pumpBootLog(proc, listener), "opxdemon-qemu-log").start();
 
@@ -865,6 +868,11 @@ public final class RootlessEngine {
         GuestExec.logToStore("guest agent unreachable — bootstrapping it over the serial console");
         // The vector device is vec0 in UML, eth0 under QEMU/slirp.
         String netIf = EngineType.isUml(prefs()) ? "vec0" : "eth0";
+        // On UML, GuestConsole.run(..., null, ...) routes to the kernel's console
+        // pty when one was captured, else to 127.0.0.1:1050 (uml-netd's forward).
+        // The forward only works when vec0 carries 10.0.2.15 — the guest-side
+        // __OPX_NET__FAIL gate below makes a failed address attempt visible, and
+        // the pty path in attemptBootUml() fixes the address first when needed.
         configureGuestNetIf(netIf, sock);
         // deployGuestCore() removes the payload after itself, so put a fresh copy in the share
         // before asking the console to unpack it.
@@ -901,6 +909,8 @@ public final class RootlessEngine {
            .append(" inet static\\n    address 10.0.2.15\\n    netmask 255.255.255.0\\n    gateway 10.0.2.2\\n' > /etc/network/interfaces; ")
            .append("touch /run/opxdemon/net-ok; ")
            .append("fi; ")
+           .append("ip -4 addr show dev ").append(netIf)
+           .append(" 2>/dev/null | grep -q '10.0.2.15' || { echo __OPX_NET__FAIL; exit 0; }; ")
            .append("(systemctl restart opxdemon-agent.service >/dev/null 2>&1 ")
            .append("|| (pkill -f opxdemon-agentd >/dev/null 2>&1; ")
            .append("setsid /usr/local/sbin/opxdemon-agentd >/dev/null 2>&1 &)); ")
@@ -911,12 +921,19 @@ public final class RootlessEngine {
            .append("&& ss -ltn 2>/dev/null | grep -q ':1050' && echo __AGENT_UP__ || echo __AGENT_DOWN__");
 
         boolean up = false;
+        boolean netFailed = false;
         // One attempt is often not enough: DHCP-less first-boot races (address applied before
         // slirp finishes wiring the NIC) and slow apt fallbacks both need a second try.
         for (int attempt = 0; attempt < 2 && !up; attempt++) {
             for (String l : GuestConsole.run(cmd.toString(), sock, 180_000)) {
-                if (l != null && l.contains("__AGENT_UP__")) up = true;
+                if (l == null) continue;
+                if (l.contains("__AGENT_UP__")) up = true;
+                if (l.contains("__OPX_NET__FAIL")) netFailed = true;
             }
+        }
+        if (netFailed) {
+            GuestExec.logToStore("console bootstrap: the guest could not bring up"
+                    + " 10.0.2.15 on " + netIf + " — vec0 addressing failed");
         }
         if (staged != null) {
             //noinspection ResultOfMethodCallIgnored
@@ -935,6 +952,63 @@ public final class RootlessEngine {
                 GuestExec.logToStore("console bootstrap failed — guest reports " + l.trim());
             }
         }
+        return false;
+    }
+
+    /**
+     * Agent bootstrap over the raw UML console pty — the out-of-band path that
+     * needs neither vec0 addressing nor uml-netd. Brings 10.0.2.15 up on vec0 and
+     * starts the guest's command server on 1050, so the host's TCP probe and
+     * uml-netd's forward both start working again. Runs at most twice per boot
+     * (the caller caps the attempts).
+     */
+    private boolean bootstrapAgentOverConsolePts(String ptsPath) {
+        // The pty is a single line of console: if this first write is consumed by
+        // agetty's login prompt, nothing answers — probe once and bail honestly.
+        java.util.List<String> alive = GuestConsole.run(
+                "echo __CONSOLE_ALIVE__$?", ptsPath, 25_000);
+        boolean shell = false;
+        for (String l : alive) {
+            if (l != null && l.contains("__CONSOLE_ALIVE__")) shell = true;
+        }
+        if (!shell) {
+            GuestExec.logToStore("console pty bootstrap: no shell answered on "
+                    + ptsPath + " — will retry over the network console");
+            return false;
+        }
+        StringBuilder c = new StringBuilder();
+        c.append("ip link set vec0 up 2>/dev/null; ")
+         .append("ip -4 addr show dev vec0 2>/dev/null | grep -q '10.0.2.15' || { ")
+         .append("ip addr flush dev vec0 2>/dev/null; ")
+         .append("ip addr add 10.0.2.15/24 dev vec0 2>/dev/null; }; ")
+         .append("ip route show default dev vec0 2>/dev/null | grep -q 'via 10.0.2.2' || ")
+         .append("ip route add default via 10.0.2.2 dev vec0 2>/dev/null; ")
+         .append("mkdir -p /sdcard/OPX-Demon/hs /sdcard/OPX-Demon/captured 2>/dev/null; ")
+         .append("ss -ltn 2>/dev/null | grep -q ':1050' || { ")
+         .append("command -v socat >/dev/null 2>&1 || { echo __PTS_AGENT__NO_SOCAT__; exit 0; }; ")
+         .append("if [ -x /usr/local/sbin/opxdemon-agentd ]; then ")
+         .append("setsid /usr/local/sbin/opxdemon-agentd >/dev/null 2>&1 & ")
+         .append("else ")
+         .append("setsid socat TCP-LISTEN:1050,reuseaddr,fork EXEC:/bin/sh,stderr >/dev/null 2>&1 & ")
+         .append("fi; ")
+         .append("}; ")
+         .append("sleep 2; ")
+         .append("ip -4 addr show dev vec0 2>/dev/null | grep -q '10.0.2.15' ")
+         .append("&& ss -ltn 2>/dev/null | grep -q ':1050' ")
+         .append("&& echo __PTS_AGENT__UP__ || echo __PTS_AGENT__DOWN__");
+        String result = "";
+        for (String l : GuestConsole.run(c.toString(), ptsPath, 60_000)) {
+            if (l == null) continue;
+            if (l.contains("__PTS_AGENT__UP__")) {
+                GuestExec.logToStore("guest agent started from the raw console pty"
+                        + " — vec0 now carries 10.0.2.15 and 1050 listens");
+                return true;
+            }
+            if (l.contains("__PTS_AGENT__NO_SOCAT__")) result = "socat is missing in the guest";
+            else if (l.contains("__PTS_AGENT__DOWN__")) result = "the guest could not open 1050";
+        }
+        GuestExec.logToStore("console pty bootstrap failed"
+                + (result.isEmpty() ? "" : " — " + result));
         return false;
     }
 
@@ -1255,6 +1329,10 @@ public final class RootlessEngine {
             // Fresh per attempt: a stale "ptrace" captured on a previous boot
             // would mislabel this attempt's exit-159 diagnosis.
             umlUserspaceMode = null;
+            // Same for the console pty: this attempt's kernel will announce its
+            // own /dev/pts node on stdout; a leftover node from a killed engine
+            // must never be trusted.
+            GuestConsole.setUmlPtsDevice(null);
 
             new Thread(() -> pumpBootLog(proc, listener), "opxdemon-uml-log").start();
             // Everything the kernel prints after it registers its console arrives here, not
@@ -1263,6 +1341,8 @@ public final class RootlessEngine {
 
             long deadline = System.currentTimeMillis() + BOOT_TIMEOUT_MS;
             int bootstraps = 0;
+            int ptsAttempts = 0;
+            int ptsNoteCount = 0;
             long lastProbeNoteMs = 0;
             while (System.currentTimeMillis() < deadline) {
                 if (stopRequested) return "stopped";
@@ -1279,6 +1359,12 @@ public final class RootlessEngine {
                 }
                 // Same agent bootstrap contract as the QEMU path: the rootfs ships
                 // opxdemon-agentd, and only the transport underneath it differs.
+                String umlPts = GuestConsole.umlPts();
+                if (umlPts != null && ptsNoteCount == 0) {
+                    ptsNoteCount++;
+                    GuestExec.logToStore("uml console pty available: " + umlPts
+                            + " — agent bootstrap can proceed even without vec0");
+                }
                 if (VmBootStage.detect(tailLog(120)) >= VmBootStage.AGENT
                         && (bootstraps == 0 || lastConsoleBootstrapMs + CONSOLE_RETRY_MS
                                 <= System.currentTimeMillis())) {
@@ -1288,7 +1374,14 @@ public final class RootlessEngine {
                             ? "Guest is up but the agent is not answering — starting it"
                             : "Agent still not answering — retrying the console bootstrap ("
                               + bootstraps + ")");
-                    bootstrapAgentOverConsole();
+                    if (umlPts != null && ptsAttempts < 2) {
+                        ptsAttempts++;
+                        GuestExec.logToStore("bootstrapping the agent over the raw"
+                                + " console pty (" + umlPts + ") — bypassing vec0");
+                        bootstrapAgentOverConsolePts(umlPts);
+                    } else {
+                        bootstrapAgentOverConsole();
+                    }
                 }
                 // A boot that stalls on the agent probe must be visible in the
                 // exported log: every 15 s say which side of 127.0.0.1:1050 the
@@ -1402,9 +1495,11 @@ public final class RootlessEngine {
             // No CAP_NET_ADMIN, no /dev/net/tun, no VpnService — both endpoints
             // are ordinary app processes.
             a.add("vec0:transport=bess,dst=" + RootlessPaths.umlNetdSock(app).getAbsolutePath());
-            // Give vec0 the QEMU/slirp-equivalent addressing. Only CONFIG_IP_PNP parses
-            // this (do_ipauto in drivers/net/ipv4/devinet.c) - without it vec0 has no
-            // address, never ARPs 10.0.2.2, and uml-netd never sees a frame.
+            // Give vec0 the QEMU/slirp-equivalent addressing. Parsed when CONFIG_IP_PNP
+            // is on (do_ipauto in drivers/net/ipv4/devinet.c); on kernels without it
+            // the parameter is ignored by the kernel and vec0 is configured from the
+            // console instead — either way, keeping it costs nothing and fixes the
+            // no-address case the moment the kernel supports it.
             a.add("ip=10.0.2.15::10.0.2.2:255.255.255.0:opxdemon:vec0:off");
             // guestfwd-equivalent: nothing else needed — uml-netd relays
             // guest -> 10.0.2.2:<port> to 127.0.0.1:<same port>.
@@ -1774,6 +1869,19 @@ public final class RootlessEngine {
             while ((line = br.readLine()) != null) {
                 fw.write(line); fw.write("\n"); fw.flush();
                 if (listener != null) listener.onBootLine(line);
+                // UML announces its console's host-side pty on stdout. That pty is
+                // a /dev/pts node created inside this process, so the app (same
+                // uid) can read and write it directly — a console path that needs
+                // no vec0 address and no uml-netd forward at all.
+                if (umlProcess && line != null && line.contains("assigned device '/dev/pts/")) {
+                    try {
+                        int a = line.indexOf("'/dev/pts/");
+                        int e2 = line.indexOf('\'', a + 1);
+                        String dev = line.substring(a + 1, e2);
+                        GuestConsole.setUmlPtsDevice(dev);
+                        GuestExec.logToStore("uml console pty captured: " + dev);
+                    } catch (Exception ignored) {}
+                }
             }
         } catch (Exception ignored) {}
     }

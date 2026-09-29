@@ -71,13 +71,31 @@ final class GuestConsole {
      * marker. Empty when the console could not be reached — the caller cannot distinguish that
      * from a command that printed nothing, so probe with something that always prints.
      *
-     * UML note: the UML engine serves its console on TCP 127.0.0.1:1050 (a port: channel)
-     * instead of a unix socket, so {@code socketPath == null} routes through the TCP backend.
+     * UML note: {@code socketPath == null} routes to the kernel's console pty
+     * (no vec0 address needed) when one has been captured, else to TCP
+     * 127.0.0.1:1050 — uml-netd's forward, which requires a healthy vec0.
      */
     static ArrayList<String> run(String command, String socketPath, int timeoutMs) {
         ArrayList<String> out = new ArrayList<>();
         if (command == null) return out;
-        if (socketPath == null) return runTcp(command, timeoutMs);
+        // An explicit /dev/pts path is the UML console pty — a terminal device,
+        // NOT a LocalSocket address; route it to the raw-stream backend.
+        if (socketPath != null && socketPath.startsWith("/dev/pts/")) {
+            return runPts(socketPath, command, timeoutMs);
+        }
+        if (socketPath == null) {
+            // UML routing. The pty backend is preferred when the kernel has told us
+            // its console device: it needs no vec0 address and no uml-netd, so it
+            // works exactly when the network story is broken — which is when the
+            // bootstrap is needed most. TCP 127.0.0.1:1050 stays as the fallback
+            // (it lands on uml-netd's forward and only works when that is healthy).
+            String pts = umlPtsDevice;
+            if (pts != null && pts.startsWith("/dev/pts/")
+                    && new java.io.File(pts).exists()) {
+                return runPts(pts, command, timeoutMs);
+            }
+            return runTcp(command, timeoutMs);
+        }
         LocalSocket sock = open(socketPath, timeoutMs);
         if (sock == null) return out;
         try {
@@ -147,6 +165,89 @@ final class GuestConsole {
             Log.w(TAG, "console connect failed: " + e.getMessage());
             try { sock.close(); } catch (Exception ignored) {}
             return null;
+        }
+    }
+
+    /**
+     * Host-side pty slave of the UML console (e.g. /dev/pts/1), reported by the
+     * kernel on stdout ("Virtual console 1 assigned device '/dev/pts/1'") and set
+     * by RootlessEngine for the lifetime of the current boot.
+     */
+    private static volatile String umlPtsDevice;
+
+    static void setUmlPtsDevice(String path) {
+        umlPtsDevice = (path != null && path.startsWith("/dev/pts/")) ? path : null;
+    }
+
+    /** Current console pty, or null before the kernel has reported one. */
+    static String umlPts() {
+        return umlPtsDevice;
+    }
+
+    /**
+     * pts console backend for the UML engine: the kernel creates its console pty
+     * inside our process and keeps it open, so the app — running as the same uid —
+     * can read and write it directly. Same write/handshake/collect contract as the
+     * TCP backend, including the root/opxdemon login handshake for rootfs images
+     * that still boot to "opxdemon login:".
+     */
+    private static ArrayList<String> runPts(String ptsPath, String command, int timeoutMs) {
+        ArrayList<String> out = new ArrayList<>();
+        try (java.io.FileInputStream is = new java.io.FileInputStream(ptsPath);
+             java.io.FileOutputStream os = new java.io.FileOutputStream(ptsPath)) {
+            StringBuilder buf = new StringBuilder();
+            drainStream(is, buf, 3000);
+            if (!promptSeen(buf.toString())) {
+                os.write("\nroot\n".getBytes(StandardCharsets.UTF_8));
+                os.flush();
+                buf.setLength(0);
+                drainStream(is, buf, 3000);
+                if (buf.toString().toLowerCase(Locale.ROOT).contains("password")) {
+                    os.write("opxdemon\n".getBytes(StandardCharsets.UTF_8));
+                    os.flush();
+                }
+                buf.setLength(0);
+                drainStream(is, buf, 3000);
+            }
+            os.write(("\n" + command + "\n" + "echo " + MARK + "$?\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            os.flush();
+            buf.setLength(0);
+            drainStream(is, buf, timeoutMs > 0 ? timeoutMs : READ_TIMEOUT_MS);
+            collect(buf.toString(), out);
+        } catch (Exception e) {
+            Log.w(TAG, "pts console command failed: " + e.getMessage());
+        }
+        return out;
+    }
+
+    /**
+     * Reads a raw console stream until it has been quiet for {@code quietMs} — the
+     * FileInputStream analogue of drainTcp(). available()-polling with a silence
+     * timer, because a plain blocking read() would wait forever on a console that
+     * has nothing more to say.
+     */
+    private static void drainStream(InputStream is, StringBuilder buf, int quietMs) {
+        long deadline = System.currentTimeMillis() + quietMs;
+        byte[] chunk = new byte[4096];
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                int avail = is.available();
+                if (avail <= 0) {
+                    Thread.sleep(50);
+                    continue;
+                }
+                int r = is.read(chunk, 0, Math.min(avail, chunk.length));
+                if (r <= 0) return;
+                String s = new String(chunk, 0, r, StandardCharsets.UTF_8);
+                emit(s);
+                buf.append(s);
+                deadline = System.currentTimeMillis() + quietMs; // still receiving
+            } catch (InterruptedException ie) {
+                return;
+            } catch (Exception e) {
+                return;
+            }
         }
     }
 
