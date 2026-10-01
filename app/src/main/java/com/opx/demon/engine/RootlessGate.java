@@ -59,6 +59,20 @@ public final class RootlessGate {
     private static void msg(String m) {
         UpdateProgress l = sProgress;
         if (l != null) l.onMessage(m);
+        // The progress card is transient and the app's log pane is a different
+        // screen: without this the engine check left no trace anywhere once the
+        // card went away, which made "the binaries never auto-update" impossible
+        // to tell apart from "the check ran and found nothing to do".
+        GuestExec.logToStore("engine check: " + m);
+    }
+
+    private static String names(List<RootlessCoreFiles.Gap> gaps) {
+        StringBuilder sb = new StringBuilder();
+        for (RootlessCoreFiles.Gap g : gaps) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(g.dest.getName());
+        }
+        return sb.toString();
     }
 
     private static String mb(long b) {
@@ -70,6 +84,10 @@ public final class RootlessGate {
      * Runs on the VM service's boot thread.
      */
     public static boolean awaitEngineReady(Context context) {
+        // Do this before anything else: the check's own verdict has to reach the
+        // same file the boot diagnostics go to, or the first thing the user sees
+        // is a silent engine boot with no evidence the check ever ran.
+        GuestExec.setDiagnosticsFile(RootlessPaths.engineLog(context));
         Core core = new Core(context);
         int verified = core.getInt(KEY_LAST_VERIFIED, 0);
 
@@ -87,9 +105,13 @@ public final class RootlessGate {
         // everything against the manifest before any boot. No shortcuts.
         if (verified == ENGINE_RELEASE_FINGERPRINT
                 && RootlessCoreFiles.missing(context).isEmpty()) {
+            msg("already verified for this release (versionCode "
+                    + ENGINE_RELEASE_FINGERPRINT + ") — every engine file matches"
+                    + " the release manifest, nothing to download");
             return true;
         }
-        msg("App updated — verifying engine files for this release…");
+        msg("verifying every engine file against the release manifest (app"
+                + " versionCode " + ENGINE_RELEASE_FINGERPRINT + ")…");
 
         final boolean[] ok = {false};
         boolean ran = RootlessCoreFiles.runExclusive(() ->
@@ -98,7 +120,7 @@ public final class RootlessGate {
 
         if (ok[0]) {
             core.putInt(KEY_LAST_VERIFIED, ENGINE_RELEASE_FINGERPRINT);
-            msg("Engine verified for this release — starting the VM");
+            msg("engine verified for this release — starting the VM");
         } else {
             msg("Engine update failed — tap Download missing to retry");
         }
@@ -113,6 +135,13 @@ public final class RootlessGate {
      */
     private static boolean repairWithProgress(Context context) {
         final List<RootlessCoreFiles.Gap> gaps = RootlessCoreFiles.missing(context);
+        if (gaps.isEmpty()) {
+            msg("all engine files already match the release manifest —"
+                    + " no download needed");
+            return true;
+        }
+        msg(gaps.size() + " engine file(s) differ from the release manifest:"
+                + " " + names(gaps));
         for (RootlessCoreFiles.Gap g : gaps) {
             if (!g.download) continue;
             long size = g.asset != null ? g.asset.size : 0;

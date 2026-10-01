@@ -29,7 +29,10 @@ import java.util.Locale;
 final class GuestConsole {
 
     private static final String TAG = "GuestConsole";
-    private static final String MARK = "__OPX_DEMON_CON__";
+    /** Completion marker echoed by the guest shell to prove a command finished. */
+    static final String MARK = "__OPX_DEMON_CON__";
+    /** Printed by the channel-liveness probe; never a real command. */
+    private static final String PROBE_MARK = "__OPX_DEMON_CONSOLE__";
     private static final int READ_TIMEOUT_MS = 20000;
     private static final int CONNECT_TIMEOUT_MS = 4000;
     /** Port: channel the UML engine listens on for its serial console. */
@@ -66,6 +69,14 @@ final class GuestConsole {
     private GuestConsole() {
     }
 
+    private static void sleep(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     /**
      * Runs {@code command} and returns the console output between the echoed command and the
      * marker. Empty when the console could not be reached — the caller cannot distinguish that
@@ -83,19 +94,7 @@ final class GuestConsole {
         if (socketPath != null && socketPath.startsWith("/dev/pts/")) {
             return runPts(socketPath, command, timeoutMs);
         }
-        if (socketPath == null) {
-            // UML routing. The pty backend is preferred when the kernel has told us
-            // its console device: it needs no vec0 address and no uml-netd, so it
-            // works exactly when the network story is broken — which is when the
-            // bootstrap is needed most. TCP 127.0.0.1:1050 stays as the fallback
-            // (it lands on uml-netd's forward and only works when that is healthy).
-            String pts = umlPtsDevice;
-            if (pts != null && pts.startsWith("/dev/pts/")
-                    && new java.io.File(pts).exists()) {
-                return runPts(pts, command, timeoutMs);
-            }
-            return runTcp(command, timeoutMs);
-        }
+        if (socketPath == null) return runUml(command, timeoutMs);
         LocalSocket sock = open(socketPath, timeoutMs);
         if (sock == null) return out;
         try {
@@ -174,6 +173,8 @@ final class GuestConsole {
      * by RootlessEngine for the lifetime of the current boot.
      */
     private static volatile String umlPtsDevice;
+    /** Set by runPts(): the last command's completion marker came back. */
+    private static volatile boolean ptsAlive;
 
     static void setUmlPtsDevice(String path) {
         umlPtsDevice = (path != null && path.startsWith("/dev/pts/")) ? path : null;
@@ -182,6 +183,152 @@ final class GuestConsole {
     /** Current console pty, or null before the kernel has reported one. */
     static String umlPts() {
         return umlPtsDevice;
+    }
+
+    /**
+     * Runs a command on whichever UML console channel is actually alive.
+     *
+     * <p>Three channels exist and which one carries a shell depends on the
+     * guest, not on us: the kernel process's own stdin/stdout (tty0, where the
+     * kernel and systemd print), the /dev/pts node the kernel announces for
+     * tty1, and a TCP forward that only works once vec0 has an address. A
+     * channel with no getty on it echoes nothing forever, so trying them in turn
+     * with the caller's full timeout would spend the whole timeout on the first
+     * dead one. {@link #umlChannel()} therefore probes each one with a short
+     * echo and remembers the winner for the rest of the boot; the probe costs a
+     * few seconds once instead of minutes per command.
+     */
+    private static ArrayList<String> runUml(String command, int timeoutMs) {
+        switch (umlChannel()) {
+            case "stdio": {
+                UmlStdio stdio = UmlStdio.current();
+                if (stdio != null) return runStdio(stdio, command, timeoutMs);
+                break;
+            }
+            case "pts": {
+                String pts = umlPtsDevice;
+                if (pts != null && new java.io.File(pts).exists()) {
+                    return runPts(pts, command, timeoutMs);
+                }
+                break;
+            }
+            case "tcp":
+                return runTcp(command, timeoutMs);
+            default:
+                break;
+        }
+        // No channel is known to answer (the console has not spoken yet, or the
+        // winner died). Walk the full ladder with a short budget each, so one
+        // dead channel cannot eat the caller's whole timeout.
+        UmlStdio stdio = UmlStdio.current();
+        if (stdio != null) {
+            ArrayList<String> r = runStdio(stdio, command, Math.min(timeoutMs, 20_000));
+            // answered() is the only honest success test: a command that
+            // legitimately prints nothing still reached a shell, and a console
+            // that echoed nothing must fall through instead of looking like a
+            // silent success.
+            if (stdio.answered()) { umlChannelName = "stdio"; return r; }
+        }
+        String pts = umlPtsDevice;
+        if (pts != null && pts.startsWith("/dev/pts/") && new java.io.File(pts).exists()) {
+            ArrayList<String> r = runPts(pts, command, Math.min(timeoutMs, 20_000));
+            if (ptsAlive) { umlChannelName = "pts"; return r; }
+        }
+        return runTcp(command, timeoutMs);
+    }
+
+    /**
+     * True when the QEMU serial socket is carrying a shell.
+     *
+     * <p>The socket file exists the moment QEMU starts, long before the guest's
+     * agetty is on it, so its existence proves nothing. This sends one short
+     * echo and looks for the completion marker; the login handshake inside
+     * {@link #open} runs first, so a console sitting at "opxdemon login:" counts
+     * as usable instead of being mistaken for a dead channel.
+     */
+    static boolean probeSerialSocket(String socketPath) {
+        if (socketPath == null || !new java.io.File(socketPath).exists()) return false;
+        for (String l : run("echo " + PROBE_MARK, socketPath, 10_000)) {
+            if (l != null && l.contains(PROBE_MARK)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * The UML console channel that answered a live echo, or "none" while the
+     * guest console has not spoken yet. Cheap by design: one short echo per
+     * candidate, then the answer is cached for the whole boot.
+     */
+    static String umlChannel() {
+        String known = umlChannelName;
+        if (known != null) return known;
+        UmlStdio stdio = UmlStdio.current();
+        if (stdio != null && !stdio.recent(4000).isEmpty()) {
+            // The console has printed, so something is listening on it. Ask it
+            // directly rather than guessing from log text.
+            probeStdio(stdio);
+            if (umlChannelName != null) return umlChannelName;
+        }
+        String pts = umlPtsDevice;
+        if (pts != null && pts.startsWith("/dev/pts/") && new java.io.File(pts).exists()) {
+            ptsAlive = false;
+            runPts(pts, "echo " + PROBE_MARK, 8000);
+            if (ptsAlive) { umlChannelName = "pts"; return "pts"; }
+        }
+        return "none";
+    }
+
+    /**
+     * Sends the probe echo and lets runStdio()'s command path decide whether a
+     * shell is there. Sets the cached channel name when it is.
+     */
+    private static void probeStdio(UmlStdio stdio) {
+        runStdio(stdio, "echo " + PROBE_MARK, 6000);
+        if (stdio.answered()) umlChannelName = "stdio";
+    }
+
+    /** Drops the cached console-channel decision; called per boot attempt. */
+    static void resetUmlChannel() {
+        umlChannelName = null;
+        ptsAlive = false;
+    }
+
+    /** Cached winner of {@link #umlChannel()}; null = not probed yet. */
+    private static volatile String umlChannelName;
+
+    /**
+     * stdin/stdout console backend for the UML engine.
+     *
+     * Same write/handshake/collect contract as the other backends, but over the
+     * kernel process's own pipes. Before running the command it clears any
+     * pending output and, when no shell prompt is visible, drives agetty's login
+     * program the same way the pty/TCP backends do — a guest console that boots
+     * to "opxdemon login:" would otherwise eat every command as a username.
+     *
+     * Returns an empty list when the console never answered, so the caller can
+     * fall through to the next backend instead of believing a dead console.
+     */
+    private static ArrayList<String> runStdio(UmlStdio stdio, String command, int timeoutMs) {
+        ArrayList<String> out = new ArrayList<>();
+        try {
+            // Look at the console's recent output, not a fresh window: agetty
+            // printed "opxdemon login:" long before this call.
+            String recent = stdio.recent(4000);
+            if (!promptSeen(recent) && recent.toLowerCase(Locale.ROOT).contains("login")) {
+                // agetty is up: log in with the rootfs credentials (root/opxdemon).
+                // Raw sends, not exchange(): agetty takes the first line as the
+                // username and the second as the password, so nothing may be
+                // appended to either of them.
+                stdio.send("root");
+                sleep(1500);
+                stdio.send("opxdemon");
+                sleep(2500);
+            }
+            out = stdio.exchange(command, timeoutMs);
+        } catch (Throwable t) {
+            Log.w(TAG, "stdio console command failed: " + t.getMessage());
+        }
+        return out;
     }
 
     /**
@@ -214,7 +361,13 @@ final class GuestConsole {
             os.flush();
             buf.setLength(0);
             drainStream(is, buf, timeoutMs > 0 ? timeoutMs : READ_TIMEOUT_MS);
-            collect(buf.toString(), out);
+            String raw = buf.toString();
+            // The marker comes back only when a shell consumed the line, so this
+            // is the channel's liveness signal — the callers that have to choose
+            // between channels cannot see it any other way (collect() strips the
+            // marker out of the returned lines on purpose).
+            ptsAlive = countOf(raw, MARK) >= 1;
+            collect(raw, out);
         } catch (Exception e) {
             Log.w(TAG, "pts console command failed: " + e.getMessage());
         }
@@ -337,7 +490,7 @@ final class GuestConsole {
     }
 
     /** True when the console looks like a shell rather than agetty's login prompt. */
-    private static boolean promptSeen(String text) {
+    static boolean promptSeen(String text) {
         String t = text.replace("\r", "").toLowerCase(java.util.Locale.ROOT);
         if (t.contains("login:")) return false;
         for (String line : text.split("\r?\n")) {
@@ -360,11 +513,14 @@ final class GuestConsole {
     }
 
     /** Keeps the real output: drops the echoed command line, the marker lines, prompts and login noise. */
-    private static void collect(String raw, ArrayList<String> out) {
+    static void collect(String raw, ArrayList<String> out) {
         for (String line : raw.split("\r?\n")) {
             String t = line.replace("\r", "").trim();
             if (t.isEmpty()) continue;
             if (t.contains(MARK)) continue;
+            // The liveness probe needs its marker: callers that only want to know
+            // "did a shell answer" cannot see it once it has been filtered out.
+            if (t.contains(PROBE_MARK)) { out.add(t); continue; }
             if (t.startsWith("echo " + MARK)) continue;
             if (t.endsWith("#") && t.contains("@")) continue;
             // Login noise our handshake can produce; none of it is command output.

@@ -74,6 +74,15 @@ public final class RootlessPaths {
     public static File serialLog(Context c){ return new File(base(c), "serial.log"); }
     public static File termSock(Context c)  { return new File(base(c), "term.sock"); }
     public static File bootLog(Context c)   { return new File(base(c), "boot.log"); }
+    /**
+     * Engine diagnostics: the app's own "what am I waiting for and why" notes.
+     * Kept separate from boot.log (the guest's own output) so the two can be
+     * told apart, and merged back together by RootlessEngine.tailLog() so the
+     * dashboard's Console pane shows guest output and engine reasoning
+     * together. Without this the pane was empty during exactly the boot stalls
+     * it exists to explain.
+     */
+    public static File engineLog(Context c){ return new File(base(c), "engine.log"); }
 
     public static final int GUEST_EXEC_PORT = 1050;
     public static final int HOST_EXEC_PORT  = 1050;

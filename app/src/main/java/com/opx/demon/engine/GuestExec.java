@@ -106,10 +106,39 @@ public final class GuestExec {
         return out;
     }
 
+    /**
+     * Where the engine's own diagnostics are mirrored, so they survive in a file
+     * the dashboard's Console pane reads. Set once by RootlessEngine; null
+     * everywhere else, in which case this is just the in-app log store again.
+     */
+    private static volatile java.io.File diagnosticsFile;
+
+    static void setDiagnosticsFile(java.io.File f) {
+        diagnosticsFile = f;
+    }
+
     static void logToStore(String msg) {
+        if (msg == null) return;
         try {
             com.opx.demon.logger.LogStore st = com.opx.demon.logger.LogStore.peek();
             if (st != null) st.add(com.opx.demon.logger.LogEntry.ERR, "guest", msg);
+        } catch (Throwable ignored) {}
+        // The in-app log store lives in a different pane from the VM console, and
+        // is empty whenever the engine runs before the store is initialised
+        // (logToStore swallows that failure silently). This file is the copy
+        // the user is actually looking at while the VM boots.
+        java.io.File f = diagnosticsFile;
+        if (f == null) return;
+        try {
+            if (f.length() > 512L * 1024L) {
+                //noinspection ResultOfMethodCallIgnored
+                f.delete();
+            }
+            String stamp = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+                    .format(new java.util.Date());
+            try (java.io.FileWriter w = new java.io.FileWriter(f, true)) {
+                w.write(stamp + "  [engine] " + msg + "\n");
+            }
         } catch (Throwable ignored) {}
     }
 

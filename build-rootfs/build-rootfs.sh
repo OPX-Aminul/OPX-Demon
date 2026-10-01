@@ -190,22 +190,25 @@ sed -i "s|^root:[^:]*:|root:\$y\$j9T\$zm4PGDwVGyQUURgnce.do0\$dcGRwd7TaU1tZivI0v
 # ── Set hostname (exact match) ───────────────────────────────────────────────
 echo "opxdemon" > "$ROOTFS/etc/hostname"
 
-# ── Networking (CRITICAL: QEMU user-net expects 10.0.2.15) ──────────────────
-# Without this the guest boots with NO IP address: port 1050 never becomes
-# reachable through the slirp hostfwd, the app sees "opxdemon-agentd never came
+# ── Networking (CRITICAL: the host gateway is 10.0.2.2 in BOTH engines) ─────
+# Without 10.0.2.15 the guest boots with NO IP address: port 1050 never becomes
+# reachable through the host forward, the app sees "opxdemon-agentd never came
 # up", and every boot burns the full timeout before failing.
+#
+# The interface NAME differs by engine and the old hardcoded "eth0" only ever
+# worked under QEMU/slirp:
+#   QEMU + libslirp user-net  -> eth0
+#   UML  + vector transport   -> vec0   (build-tools/uml-netd.c, the BESS socket)
+# So the address is applied to whichever non-loopback interface actually exists,
+# and the unit only reports success when an address really landed. The previous
+# version ended in an unconditional `touch /run/opxdemon/net-ok`, so a guest
+# whose interface was missing still looked configured and every later diagnosis
+# was built on that lie.
 if [ -f "$ROOTFS/usr/sbin/ifup" ]; then
     mkdir -p "$ROOTFS/etc/network"
     cat > "$ROOTFS/etc/network/interfaces" <<'NETEOF'
 auto lo
 iface lo inet loopback
-
-auto eth0
-iface eth0 inet static
-    address 10.0.2.15
-    netmask 255.255.255.0
-    gateway 10.0.2.2
-    dns-nameservers 10.0.2.3
 NETEOF
 fi
 
@@ -218,15 +221,24 @@ printf 'nameserver 10.0.2.3\n' > "$ROOTFS/etc/resolv.conf"
 mkdir -p "$ROOTFS/etc/systemd/system"
 cat > "$ROOTFS/etc/systemd/system/opxdemon-net.service" <<'NETEOF'
 [Unit]
-Description=OpxDemon VM network (static 10.0.2.15 for slirp user-net)
+Description=OpxDemon VM network (static 10.0.2.15/24 via the host gateway)
 DefaultDependencies=no
 After=systemd-modules-load.service
 Before=network-pre.target
 Wants=network-pre.target
+# The vector/bridge NIC is registered by the kernel's network init, which runs
+# after modules-load. Without this ordering the unit can run before vec0 exists,
+# find no interface, and give up.
+After=systemd-networkd.service network-pre.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'ip link set eth0 up 2>/dev/null; ip addr flush dev eth0 2>/dev/null; ip addr add 10.0.2.15/24 dev eth0 2>/dev/null; ip route add default via 10.0.2.2 dev eth0 2>/dev/null; mkdir -p /run/opxdemon; touch /run/opxdemon/net-ok'
+# Wait briefly for the NIC: under UML vec0 appears only once the stub is up.
+# Then take the first non-loopback interface that is not already addressed —
+# vec0 under UML, eth0 under QEMU/slirp — and only report success if the
+# address really landed. No interface, no net-ok: the app's diagnostics depend
+# on this marker telling the truth.
+ExecStart=/bin/sh -c 'i=0; while [ $i -lt 15 ]; do dev=$(ip -o link show 2>/dev/null | awk -F": " "{print \$2}" | sed "s/@.*//" | grep -v "^lo$" | head -n1); [ -n "$dev" ] && break; i=$((i+1)); sleep 1; done; [ -n "$dev" ] || { echo "opxdemon-net: no non-loopback interface found" >&2; exit 1; }; mkdir -p /run/opxdemon; ip link set "$dev" up 2>/dev/null; ip addr flush dev "$dev" 2>/dev/null; ip addr add 10.0.2.15/24 dev "$dev" 2>/dev/null; ip route replace default via 10.0.2.2 dev "$dev" 2>/dev/null; if ip -4 addr show dev "$dev" 2>/dev/null | grep -q "10.0.2.15"; then printf "auto lo\niface lo inet loopback\n\nauto %s\niface %s inet static\n    address 10.0.2.15\n    netmask 255.255.255.0\n    gateway 10.0.2.2\n    dns-nameservers 10.0.2.3\n" "$dev" "$dev" > /etc/network/interfaces; echo opxdemon > /run/opxdemon/net-if; : > /run/opxdemon/net-ok; else echo "opxdemon-net: could not address $dev" >&2; exit 1; fi'
 [Install]
 WantedBy=multi-user.target
 NETEOF
@@ -314,6 +326,26 @@ cat > "$ROOTFS/etc/systemd/system/serial-getty@ttyAMA0.service.d/autologin.conf"
 ExecStart=
 ExecStart=-/sbin/agetty --autologin root --keep-baud 115200,38400,9600 %I $TERM
 AUTOEOF
+
+# The UML engine has no ttyAMA0 at all. Its kernel console is tty0, and tty0 is
+# the UML PROCESS's own stdin/stdout (CONFIG_CON_ZERO_CHAN="fd:0,fd:1") — the
+# channel the app reads and writes. Without a getty there, that console carries
+# kernel and systemd output and nothing else: every command the app sends is
+# written into a terminal with no shell reading it, and the bootstrap waits
+# forever for a marker that can never come back. That is the whole reason the
+# UML boot stalled after "Reached target multi-user.target".
+#
+# Drop-in for getty@tty0, applied whatever the console is called, so the same
+# rootfs works under QEMU (ttyAMA0) and UML (tty0). %I is the tty name.
+mkdir -p "$ROOTFS/etc/systemd/system/getty@tty0.service.d"
+cat > "$ROOTFS/etc/systemd/system/getty@tty0.service.d/autologin.conf" <<'AUTOEOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
+AUTOEOF
+# getty@tty0 has no generator that starts it, so enable it explicitly.
+mkdir -p "$ROOTFS/etc/systemd/system/getty.target.wants"
+ln -sf /lib/systemd/system/getty@.service "$ROOTFS/etc/systemd/system/getty.target.wants/getty@tty0.service"
 
 # ── Strip docs/man/locale to shrink image ────────────────────────────────────
 rm -rf "$ROOTFS/usr/share/man" "$ROOTFS/usr/share/doc" \

@@ -140,6 +140,17 @@ public final class RootlessEngine {
         lastBootUsedFallback = false;
         umlSeccompOff = false;
         umlSeccompRetryUsed = false;
+        // Tell GuestExec where to mirror its diagnostics, and mark where this
+        // attempt starts. NOT a delete: the engine-file check runs before this
+        // point and its verdict lives in the same file, and wiping it here is
+        // what made "the update never ran" indistinguishable from "the update
+        // ran and found nothing". The file is size-capped at the writer.
+        try {
+            File diag = RootlessPaths.engineLog(app);
+            GuestExec.setDiagnosticsFile(diag);
+            GuestExec.logToStore("--- VM start requested (attempt "
+                    + (consecutiveBootFailures + 1) + ") ---");
+        } catch (Exception ignored) {}
         stopRequested = false;
         lastBootAgentTimeout = false;
         String reason = attemptBoot(listener);
@@ -240,8 +251,10 @@ public final class RootlessEngine {
             umlProcess = false;
             booted = false;
             // Engine switch insurance: a pty announced by a previous UML boot
-            // belongs to a dead kernel and must never be consulted here.
+            // belongs to a dead kernel and must never be consulted here, and the
+            // QEMU serial socket is a completely different console.
             GuestConsole.setUmlPtsDevice(null);
+            GuestConsole.resetUmlChannel();
 
             new Thread(() -> pumpBootLog(proc, listener), "opxdemon-qemu-log").start();
 
@@ -265,7 +278,13 @@ public final class RootlessEngine {
                     if (listener != null) listener.onBooted();
                     return null;
                 }
-                if (VmBootStage.detect(tailLog(120)) >= VmBootStage.AGENT
+                // Same reasoning as the UML path, and the same bug removed: this
+                // used to require VmBootStage.detect() to reach AGENT, which only
+                // happens when the words "login:" or "root@" appear in the log
+                // tail. A rootfs that autologins prints neither, so the gate
+                // never opened and the bootstrap never ran. Gate on the console
+                // being usable instead — that is the actual precondition.
+                if (consoleShellUsable()
                         && (bootstraps == 0 || lastConsoleBootstrapMs + CONSOLE_RETRY_MS
                                 <= System.currentTimeMillis())) {
                     bootstraps++;
@@ -493,6 +512,10 @@ public final class RootlessEngine {
         umlNetdProcess = null;
         // Stop the console tap so a dead VM's console cannot keep appending to serial.log.
         GuestConsole.setObserver(null);
+        // The kernel's stdin/stdout belong to the process that is about to die.
+        // Leaving them attached would let the next boot's console reads land in
+        // this one's dead pipe.
+        UmlStdio.detach();
         final Process p = qemuProcess;
         qemuProcess = null;
         if (p != null) dyingProcess = p;
@@ -859,20 +882,21 @@ public final class RootlessEngine {
      * so it exits on startup, or simply not running.
      */
     public boolean bootstrapAgentOverConsole() {
-        String sock = RootlessPaths.serialSock(app).getAbsolutePath();
-        // UML has no QEMU serial unix socket — its console is a TCP port: channel.
-        // GuestConsole.run(null, …) routes to that TCP backend.
-        if (EngineType.isUml(prefs())) sock = null;
-        else if (!new File(sock).exists()) return false;
+        boolean uml = EngineType.isUml(prefs());
+        String sock = uml ? null : RootlessPaths.serialSock(app).getAbsolutePath();
+        // UML has no QEMU serial unix socket: its console is the kernel process's
+        // own stdin/stdout (tty0), with the announced tty1 pty and a TCP
+        // 127.0.0.1:1050 forward behind it as fallbacks. GuestConsole.run(null, …)
+        // picks the first that answers.
+        if (!uml && !new File(sock).exists()) return false;
 
-        GuestExec.logToStore("guest agent unreachable — bootstrapping it over the serial console");
+        GuestExec.logToStore("guest agent unreachable — bootstrapping it over the guest console ("
+                + consoleState() + ")");
         // The vector device is vec0 in UML, eth0 under QEMU/slirp.
-        String netIf = EngineType.isUml(prefs()) ? "vec0" : "eth0";
-        // On UML, GuestConsole.run(..., null, ...) routes to the kernel's console
-        // pty when one was captured, else to 127.0.0.1:1050 (uml-netd's forward).
-        // The forward only works when vec0 carries 10.0.2.15 — the guest-side
-        // __OPX_NET__FAIL gate below makes a failed address attempt visible, and
-        // the pty path in attemptBootUml() fixes the address first when needed.
+        String netIf = uml ? "vec0" : "eth0";
+        // Fix the address first: the guest-side __OPX_NET__FAIL gate below turns
+        // a failed address attempt into a visible diagnosis instead of a silent
+        // timeout, and everything after it needs 10.0.2.15 to be reachable.
         configureGuestNetIf(netIf, sock);
         // deployGuestCore() removes the payload after itself, so put a fresh copy in the share
         // before asking the console to unpack it.
@@ -940,7 +964,9 @@ public final class RootlessEngine {
             staged.delete();
         }
         if (up) {
-            GuestExec.logToStore("guest agent started from the console");
+            GuestExec.logToStore("guest agent started from the console ("
+                    + consoleState() + ") — vec0 now carries 10.0.2.15 and the"
+                    + " guest listens on 1050");
             return true;
         }
         // Nothing to lose by naming what is missing: the same console can tell us.
@@ -952,63 +978,6 @@ public final class RootlessEngine {
                 GuestExec.logToStore("console bootstrap failed — guest reports " + l.trim());
             }
         }
-        return false;
-    }
-
-    /**
-     * Agent bootstrap over the raw UML console pty — the out-of-band path that
-     * needs neither vec0 addressing nor uml-netd. Brings 10.0.2.15 up on vec0 and
-     * starts the guest's command server on 1050, so the host's TCP probe and
-     * uml-netd's forward both start working again. Runs at most twice per boot
-     * (the caller caps the attempts).
-     */
-    private boolean bootstrapAgentOverConsolePts(String ptsPath) {
-        // The pty is a single line of console: if this first write is consumed by
-        // agetty's login prompt, nothing answers — probe once and bail honestly.
-        java.util.List<String> alive = GuestConsole.run(
-                "echo __CONSOLE_ALIVE__$?", ptsPath, 25_000);
-        boolean shell = false;
-        for (String l : alive) {
-            if (l != null && l.contains("__CONSOLE_ALIVE__")) shell = true;
-        }
-        if (!shell) {
-            GuestExec.logToStore("console pty bootstrap: no shell answered on "
-                    + ptsPath + " — will retry over the network console");
-            return false;
-        }
-        StringBuilder c = new StringBuilder();
-        c.append("ip link set vec0 up 2>/dev/null; ")
-         .append("ip -4 addr show dev vec0 2>/dev/null | grep -q '10.0.2.15' || { ")
-         .append("ip addr flush dev vec0 2>/dev/null; ")
-         .append("ip addr add 10.0.2.15/24 dev vec0 2>/dev/null; }; ")
-         .append("ip route show default dev vec0 2>/dev/null | grep -q 'via 10.0.2.2' || ")
-         .append("ip route add default via 10.0.2.2 dev vec0 2>/dev/null; ")
-         .append("mkdir -p /sdcard/OPX-Demon/hs /sdcard/OPX-Demon/captured 2>/dev/null; ")
-         .append("ss -ltn 2>/dev/null | grep -q ':1050' || { ")
-         .append("command -v socat >/dev/null 2>&1 || { echo __PTS_AGENT__NO_SOCAT__; exit 0; }; ")
-         .append("if [ -x /usr/local/sbin/opxdemon-agentd ]; then ")
-         .append("setsid /usr/local/sbin/opxdemon-agentd >/dev/null 2>&1 & ")
-         .append("else ")
-         .append("setsid socat TCP-LISTEN:1050,reuseaddr,fork EXEC:/bin/sh,stderr >/dev/null 2>&1 & ")
-         .append("fi; ")
-         .append("}; ")
-         .append("sleep 2; ")
-         .append("ip -4 addr show dev vec0 2>/dev/null | grep -q '10.0.2.15' ")
-         .append("&& ss -ltn 2>/dev/null | grep -q ':1050' ")
-         .append("&& echo __PTS_AGENT__UP__ || echo __PTS_AGENT__DOWN__");
-        String result = "";
-        for (String l : GuestConsole.run(c.toString(), ptsPath, 60_000)) {
-            if (l == null) continue;
-            if (l.contains("__PTS_AGENT__UP__")) {
-                GuestExec.logToStore("guest agent started from the raw console pty"
-                        + " — vec0 now carries 10.0.2.15 and 1050 listens");
-                return true;
-            }
-            if (l.contains("__PTS_AGENT__NO_SOCAT__")) result = "socat is missing in the guest";
-            else if (l.contains("__PTS_AGENT__DOWN__")) result = "the guest could not open 1050";
-        }
-        GuestExec.logToStore("console pty bootstrap failed"
-                + (result.isEmpty() ? "" : " — " + result));
         return false;
     }
 
@@ -1032,8 +1001,17 @@ public final class RootlessEngine {
         for (String l : GuestConsole.run(c.toString(), consoleSock, 30_000)) {
             if (l != null && l.contains("__NET_CFG_DONE__")) done = true;
         }
-        if (done) GuestExec.logToStore("guest network: " + netIf + " = 10.0.2.15/24 via 10.0.2.2");
-        else Log.w(TAG, "could not configure " + netIf + " in the guest");
+        if (done) {
+            GuestExec.logToStore("guest network: " + netIf + " = 10.0.2.15/24 via 10.0.2.2");
+        } else {
+            // Silently dropping this was a real diagnostic hole: a console that
+            // cannot be reached produces exactly this, and the boot then failed
+            // for fifteen minutes with nothing on record about the network.
+            GuestExec.logToStore("guest network: could not set 10.0.2.15 on " + netIf
+                    + " over the console — the guest has no route to the app, so"
+                    + " port 1050 will stay unreachable");
+            Log.w(TAG, "could not configure " + netIf + " in the guest");
+        }
     }
 
     private void restartGuestAgent() {
@@ -1195,11 +1173,34 @@ public final class RootlessEngine {
     }
 
     public java.util.List<String> tailLog(int maxLines) {
-        java.util.ArrayList<String> out = new java.util.ArrayList<>();
-        // The process stdout log (boot.log) holds everything the engine printed before it
-        // registered its console; serial.log holds the console tap, which is everything
-        // after that — including the VFS/panic line that explains a failed UML boot.
-        // Reading only one of them is what made every failure look identical.
+        java.util.List<String> out = new java.util.ArrayList<>();
+
+        // The engine's own diagnostics come first and are NOT subject to the
+        // guest-output budget. They are the only lines that say why the boot is
+        // where it is, and a plain concatenation into one capped ring threw them
+        // away first — which is exactly why the Console pane went blank while
+        // the engine had plenty to report.
+        java.util.ArrayDeque<String> diag = new java.util.ArrayDeque<>();
+        File engineLog = RootlessPaths.engineLog(app);
+        if (engineLog.exists() && engineLog.length() > 0) {
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(new java.io.FileInputStream(engineLog)))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    if (line.trim().isEmpty()) continue;
+                    diag.addLast(line);
+                    // Bounded: a long session appends continuously, and the
+                    // newest lines are the ones that explain the current stall.
+                    while (diag.size() > 200) diag.removeFirst();
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // The process stdout log (boot.log) holds everything the engine printed
+        // before its console was usable; serial.log holds the console tap, which
+        // is everything after that — including the VFS/panic line that explains a
+        // failed UML boot. Reading only one of them is what made every failure
+        // look identical.
         java.util.ArrayDeque<String> ring = new java.util.ArrayDeque<>();
         for (File log : new File[]{RootlessPaths.bootLog(app), RootlessPaths.serialLog(app)}) {
             if (!log.exists() || log.length() == 0) continue;
@@ -1213,6 +1214,7 @@ public final class RootlessEngine {
                 }
             } catch (Exception ignored) {}
         }
+        out.addAll(diag);
         out.addAll(ring);
         return out;
     }
@@ -1240,15 +1242,26 @@ public final class RootlessEngine {
                 //noinspection ResultOfMethodCallIgnored
                 log.delete();
             }
-            // Remember which userspace mode the kernel reported — lastLogProblem()
-            // uses it to translate a SIGSYS death into a real diagnosis.
-            java.util.regex.Matcher m = java.util.regex.Pattern
-                    .compile("Userspace mode: (SECCOMP|ptrace)").matcher(text);
-            if (m.find()) umlUserspaceMode = m.group(1);
+            noteUserspaceMode(text);
             try (FileWriter fw = new FileWriter(log, true)) {
                 fw.write(text);
             }
         } catch (Exception ignored) {}
+    }
+
+    /**
+     * Remembers which userspace mode the kernel reported ("Userspace mode:
+     * SECCOMP|ptrace"). lastLogProblem() turns it into a real diagnosis for the
+     * exit-159 SIGSYS death, so it has to be picked up from EVERY path the
+     * kernel's output can take: the console tap and the boot log. Reading it
+     * from the tap alone stopped working once the primary console became the
+     * kernel's own stdout, which is where that line is printed.
+     */
+    private void noteUserspaceMode(String text) {
+        if (text == null || text.indexOf("Userspace mode:") < 0) return;
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("Userspace mode: (SECCOMP|ptrace)").matcher(text);
+        if (m.find()) umlUserspaceMode = m.group(1);
     }
 
     private void connectControl() {
@@ -1329,21 +1342,26 @@ public final class RootlessEngine {
             // Fresh per attempt: a stale "ptrace" captured on a previous boot
             // would mislabel this attempt's exit-159 diagnosis.
             umlUserspaceMode = null;
-            // Same for the console pty: this attempt's kernel will announce its
-            // own /dev/pts node on stdout; a leftover node from a killed engine
-            // must never be trusted.
+            // Same for the console channels: this attempt's kernel announces its
+            // own /dev/pts node on stdout, and a leftover node or a cached
+            // "which channel works" answer from a killed engine must never be
+            // trusted for this boot.
             GuestConsole.setUmlPtsDevice(null);
+            GuestConsole.resetUmlChannel();
 
             new Thread(() -> pumpBootLog(proc, listener), "opxdemon-uml-log").start();
             // Everything the kernel prints after it registers its console arrives here, not
             // on stdout — without the tap a failed UML boot has no error text at all.
             GuestConsole.setObserver(this::appendConsoleText);
 
-            long deadline = System.currentTimeMillis() + BOOT_TIMEOUT_MS;
+            long bootStartMs = System.currentTimeMillis();
+            long deadline = bootStartMs + BOOT_TIMEOUT_MS;
             int bootstraps = 0;
-            int ptsAttempts = 0;
-            int ptsNoteCount = 0;
             long lastProbeNoteMs = 0;
+            long lastConsoleNoteMs = 0;
+            GuestExec.logToStore("UML kernel started (pid " + safePid(proc)
+                    + ") — the guest console is the kernel process's own"
+                    + " stdin/stdout (tty0); the app reads and writes it directly");
             while (System.currentTimeMillis() < deadline) {
                 if (stopRequested) return "stopped";
                 if (!isAlive(proc)) {
@@ -1354,49 +1372,58 @@ public final class RootlessEngine {
                     // vec0 addressing: set by ip= on kernels with CONFIG_IP_PNP,
                     // re-applied here for the already-released kernels that ignore it.
                     if (netd) configureGuestNetIf("vec0", null);
+                    GuestExec.logToStore("guest agent is answering — the VM is READY");
                     if (listener != null) listener.onBooted();
                     return null;
                 }
-                // Same agent bootstrap contract as the QEMU path: the rootfs ships
-                // opxdemon-agentd, and only the transport underneath it differs.
-                String umlPts = GuestConsole.umlPts();
-                if (umlPts != null && ptsNoteCount == 0) {
-                    ptsNoteCount++;
-                    GuestExec.logToStore("uml console pty available: " + umlPts
-                            + " — agent bootstrap can proceed even without vec0");
+                long nowMs = System.currentTimeMillis();
+
+                // Progress note, throttled. Without it a stalled boot is silent,
+                // which is the single biggest reason these rounds were blind:
+                // the pane showed the same last line for fifteen minutes.
+                if (nowMs - lastConsoleNoteMs >= 20_000) {
+                    lastConsoleNoteMs = nowMs;
+                    GuestExec.logToStore("boot +" + ((nowMs - bootStartMs) / 1000)
+                            + "s — stage " + bootStageName(VmBootStage.detect(tailLog(120)))
+                            + ", console " + consoleState()
+                            + ", agent " + (GuestExec.ping(1200) ? "answering" : "silent"));
                 }
-                if (VmBootStage.detect(tailLog(120)) >= VmBootStage.AGENT
-                        && (bootstraps == 0 || lastConsoleBootstrapMs + CONSOLE_RETRY_MS
-                                <= System.currentTimeMillis())) {
+
+                // Agent bootstrap over the guest console.
+                //
+                // NOT gated on VmBootStage any more. That gate required the text
+                // "login:" or "root@" to appear in the tail of the boot log — but
+                // under UML the console is the kernel's own stdout, the rootfs
+                // autologins root with no prompt at all, and the agent's own
+                // systemd unit never logs the words the detector looks for. So
+                // the stage never reached AGENT, the bootstrap never ran, and
+                // the boot burned its whole budget doing nothing. What actually
+                // matters is only "a shell exists and the agent is not answering",
+                // and the console can report that directly.
+                if ((bootstraps == 0 || lastConsoleBootstrapMs + CONSOLE_RETRY_MS <= nowMs)
+                        && consoleShellUsable()) {
                     bootstraps++;
-                    lastConsoleBootstrapMs = System.currentTimeMillis();
+                    lastConsoleBootstrapMs = nowMs;
                     note(listener, bootstraps == 1
                             ? "Guest is up but the agent is not answering — starting it"
                             : "Agent still not answering — retrying the console bootstrap ("
                               + bootstraps + ")");
-                    if (umlPts != null && ptsAttempts < 2) {
-                        ptsAttempts++;
-                        GuestExec.logToStore("bootstrapping the agent over the raw"
-                                + " console pty (" + umlPts + ") — bypassing vec0");
-                        bootstrapAgentOverConsolePts(umlPts);
-                    } else {
-                        bootstrapAgentOverConsole();
-                    }
+                    GuestExec.logToStore("bootstrapping the agent over the guest console ("
+                            + consoleState() + ") — bypassing vec0 and uml-netd");
+                    bootstrapAgentOverConsole();
                 }
-                // A boot that stalls on the agent probe must be visible in the
-                // exported log: every 15 s say which side of 127.0.0.1:1050 the
-                // handshake is stuck on (listener down = daemon/forward problem;
-                // listener up but silent = guest-side agent/vec0 problem).
-                long nowMs = System.currentTimeMillis();
+
+                // Which side of 127.0.0.1:1050 the handshake is stuck on:
+                // listener down = uml-netd/forward problem; listener up but
+                // silent = guest-side agent or vec0 addressing problem.
                 if (nowMs - lastProbeNoteMs >= 15_000) {
                     lastProbeNoteMs = nowMs;
                     boolean listenerUp = netd && tcpListenerUp(RootlessPaths.HOST_EXEC_PORT);
-                    boolean agentAnswers = GuestExec.ping(1200);
                     GuestExec.logToStore("boot wait: agent probe — 127.0.0.1:"
                             + RootlessPaths.HOST_EXEC_PORT + " listener "
                             + (listenerUp ? "UP" : "DOWN")
                             + (listenerUp ? "" : " (uml-netd forward missing)")
-                            + ", guest agent " + (agentAnswers ? "answering" : "silent"));
+                            + ", guest agent " + (GuestExec.ping(1200) ? "answering" : "silent"));
                 }
                 sleep(1000);
             }
@@ -1862,28 +1889,54 @@ public final class RootlessEngine {
 
     private void pumpBootLog(Process proc, BootListener listener) {
         File log = RootlessPaths.bootLog(app);
+        // Fresh per attempt, whichever engine: an append onto the previous
+        // attempt's log makes every diagnosis point at stale lines.
+        try { //noinspection ResultOfMethodCallIgnored
+            log.delete(); } catch (Exception ignored) {}
+        if (umlProcess) {
+            // The UML kernel process's stdout IS the guest's tty0 console
+            // (CONFIG_CON_ZERO_CHAN="fd:0,fd:1"), and it is also the only way to
+            // write a command back into the guest. UmlStdio therefore owns the
+            // single reader on that stream and hands each line to the boot log —
+            // a second reader here would split the stream and lose lines.
+            UmlStdio.attach(proc, line -> appendBootLine(line, listener));
+            return;
+        }
         try (InputStream in = proc.getInputStream();
              BufferedReader br = new BufferedReader(new InputStreamReader(in));
-             FileWriter fw = new FileWriter(log, false)) {
+             FileWriter fw = new FileWriter(log, true)) {
             String line;
             while ((line = br.readLine()) != null) {
                 fw.write(line); fw.write("\n"); fw.flush();
                 if (listener != null) listener.onBootLine(line);
-                // UML announces its console's host-side pty on stdout. That pty is
-                // a /dev/pts node created inside this process, so the app (same
-                // uid) can read and write it directly — a console path that needs
-                // no vec0 address and no uml-netd forward at all.
-                if (umlProcess && line != null && line.contains("assigned device '/dev/pts/")) {
-                    try {
-                        int a = line.indexOf("'/dev/pts/");
-                        int e2 = line.indexOf('\'', a + 1);
-                        String dev = line.substring(a + 1, e2);
-                        GuestConsole.setUmlPtsDevice(dev);
-                        GuestExec.logToStore("uml console pty captured: " + dev);
-                    } catch (Exception ignored) {}
-                }
             }
         } catch (Exception ignored) {}
+    }
+
+    /** Appends one guest console line to boot.log and hands it to the listener. */
+    private void appendBootLine(String line, BootListener listener) {
+        if (line == null) return;
+        noteUserspaceMode(line);
+        try (FileWriter fw = new FileWriter(RootlessPaths.bootLog(app), true)) {
+            fw.write(line);
+            fw.write("\n");
+        } catch (Exception ignored) {}
+        if (listener != null) listener.onBootLine(line);
+        // UML announces its second console's host-side pty on stdout. That pty is
+        // a /dev/pts node created inside this process, so the app (same uid) can
+        // read and write it directly. It is tty1, NOT the console systemd writes
+        // to (that one is the kernel's own stdin/stdout) — kept only as a
+        // fallback channel.
+        if (line.contains("assigned device '/dev/pts/")) {
+            try {
+                int a = line.indexOf("'/dev/pts/");
+                int e2 = line.indexOf('\'', a + 1);
+                String dev = line.substring(a + 1, e2);
+                GuestConsole.setUmlPtsDevice(dev);
+                GuestExec.logToStore("uml fallback pty (tty1) announced: " + dev
+                        + " — the primary console is the kernel's own stdin/stdout");
+            } catch (Exception ignored) {}
+        }
     }
 
     /** True when something on this host accepts TCP on the port (no data exchanged). */
@@ -1898,6 +1951,84 @@ public final class RootlessEngine {
 
     private static boolean isAlive(Process p) {
         try { p.exitValue(); return false; } catch (IllegalThreadStateException e) { return true; }
+    }
+
+    /** Plain-text boot stage name for the engine diagnostics file. */
+    private static String bootStageName(int stage) {
+        switch (stage) {
+            case VmBootStage.KERNEL: return "kernel";
+            case VmBootStage.ROOTFS: return "rootfs";
+            case VmBootStage.SERVICES: return "services";
+            case VmBootStage.AGENT: return "agent";
+            case VmBootStage.READY: return "ready";
+            default: return "start";
+        }
+    }
+
+    /**
+     * One-line description of the guest console, for the diagnostics the user
+     * reads while the VM boots. Names the channel the app would use and whether
+     * a shell is answering on it, which is the difference between "waiting for
+     * the guest" and "waiting for a console that will never answer".
+     */
+    private String consoleState() {
+        UmlStdio stdio = UmlStdio.current();
+        if (stdio != null) {
+            return "kernel stdio (tty0)" + (stdio.shellSeen() ? " with a shell" : ", no shell yet");
+        }
+        String pts = GuestConsole.umlPts();
+        if (pts != null) return "fallback pty " + pts + " (tty1)";
+        return "not available";
+    }
+
+    /**
+     * True when there is a guest console worth typing into. A console that has
+     * printed nothing at all yet is not a failure — the guest may still be
+     * mounting its rootfs — so this only says yes once the console is attached
+     * and has produced output, prompt or not: agetty waiting for a username is
+     * precisely a case the bootstrap knows how to log into.
+     */
+    private boolean consoleShellUsable() {
+        UmlStdio stdio = UmlStdio.current();
+        if (stdio != null) {
+            if (stdio.shellSeen()) return true;
+            // The kernel prints within a second of start, so "the console said
+            // something" is true far too early to act on — the first attempt
+            // would be spent on a console with no userspace behind it yet. Wait
+            // for the guest's own userspace instead. This is deliberately NOT
+            // VmBootStage: it looks for the guest actually being alive, not for
+            // the specific wording its agent unit happens to use.
+            String tail = stdio.recent(6000).toLowerCase(java.util.Locale.ROOT);
+            return tail.contains("systemd") || tail.contains("reached target")
+                    || tail.contains("starting ") || tail.contains("login:")
+                    || tail.contains("root@") || tail.contains("welcome to");
+        }
+        if (umlProcess) return GuestConsole.umlPts() != null;
+        // QEMU: the serial unix socket exists as soon as QEMU starts, but it only
+        // carries a shell once the guest's agetty is on it, so the socket's
+        // existence proves nothing. Probing is the only honest test — and it
+        // blocks for seconds, hence the throttle: the boot loop asks once a
+        // second and must not pay for a probe every time.
+        long now = System.currentTimeMillis();
+        if (now - lastSerialProbeMs < 15_000) return lastSerialProbeOk;
+        lastSerialProbeMs = now;
+        lastSerialProbeOk = GuestConsole.probeSerialSocket(
+                RootlessPaths.serialSock(app).getAbsolutePath());
+        return lastSerialProbeOk;
+    }
+
+    /** Throttle for the blocking QEMU serial-socket probe. */
+    private long lastSerialProbeMs;
+    private boolean lastSerialProbeOk;
+
+    private static String safePid(Process p) {
+        try {
+            java.lang.reflect.Field f = p.getClass().getDeclaredField("pid");
+            f.setAccessible(true);
+            Object v = f.get(p);
+            if (v instanceof Number) return String.valueOf(((Number) v).longValue());
+        } catch (Throwable ignored) {}
+        return "?";
     }
 
     private static int safeExit(Process p) {
