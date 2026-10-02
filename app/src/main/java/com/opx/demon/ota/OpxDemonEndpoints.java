@@ -30,7 +30,7 @@ public final class OpxDemonEndpoints {
     public static final String FALLBACK_UML_NETD   = UML_BASE + "uml-netd";
 
     // IMPORTANT: these must match the binaries currently uploaded to the
-    // all-core-file release (kept in sync with opx_manifest.json, 2026-09-29). The Dockerfile pipeline patches the QEMU binary (links
+    // all-core-file release (kept in sync with opx_manifest.json, 2026-10-01). The Dockerfile pipeline patches the QEMU binary (links
     // libslirp.so), so a core rebuild changes its size/hash — build.yml re-pins
     // opx_manifest.json after every upload, keep these in sync with it. A stale
     // pin makes every install download the file, fail verification at 100%, and then
@@ -44,16 +44,16 @@ public final class OpxDemonEndpoints {
     public static final long FALLBACK_ROOTLESS_KERNEL_SIZE = 48517632L;
 
     public static final String FALLBACK_ROOTLESS_INITRD_SHA256 =
-            "d874296ac2df0569d1f9bda85364ade9c54f774f95162d31192596d9b7358df9";
-    public static final long FALLBACK_ROOTLESS_INITRD_SIZE = 39101407L;
+            "ff8cbf0158936c8c201d437fb69a16a748bb3648947d85a8a4b4b566fd41b2cf";
+    public static final long FALLBACK_ROOTLESS_INITRD_SIZE = 39098942L;
 
     public static final String FALLBACK_ROOTLESS_LIBSLIRP_SHA256 =
             "0ffd8937e252d50a5ded386059856523d083769b7e49160bab41f32fb66376e7";
     public static final long FALLBACK_ROOTLESS_LIBSLIRP_SIZE = 3371272L;
 
     public static final String FALLBACK_ROOTLESS_ROOTFS_SHA256 =
-            "3ff3b0d7a8c44990ef741f9bdda561c3953c294650dd1b12cea95ffa771d9b90";
-    public static final long FALLBACK_ROOTLESS_ROOTFS_SIZE = 366784674L;
+            "905851a1b978f743e1f434527cd3ff6005c95a0f145165b03e5412b5534d557d";
+    public static final long FALLBACK_ROOTLESS_ROOTFS_SIZE = 366790810L;
 
     public static final String PREFS = "opxdemon_ota";
 

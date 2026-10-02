@@ -1,6 +1,9 @@
 name: Build & Update Release
-# v1.3.4 build round — the UML console is the kernel's own stdin/stdout (tty0),
-# not the announced /dev/pts (tty1); the agent bootstrap is no longer gated on a
+# v1.3.6 build round — v1.3.4 engine fixes plus OTA fallback pin resync
+# (initrd/rootfs sha256+size were still pinned to the pre-rebuild core files, so
+# an offline-manifest install failed verification and re-downloaded forever).
+# Also: the UML console is the kernel's own stdin/stdout (tty0), not the
+# announced /dev/pts (tty1); the agent bootstrap is no longer gated on a
 # log-text stage detector that could never fire; engine diagnostics are mirrored
 # into the dashboard Console pane; the rootfs addresses whichever NIC exists
 # (vec0 under UML, eth0 under QEMU) and autologins root on tty0. Chain signed APK publish.
