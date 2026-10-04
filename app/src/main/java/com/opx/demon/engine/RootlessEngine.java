@@ -102,6 +102,30 @@ public final class RootlessEngine {
                 && RootlessPaths.rootfs(app).isFile();
     }
 
+    /**
+     * Names the engine files that are not on disk yet, for the UI to show.
+     *
+     * Added alongside the Wi-Fi guest setup flow, which has to tell the user
+     * WHICH file is missing rather than only that something is: "linux-uml"
+     * and "Image" send them to completely different places. Empty when the
+     * engine is fully installed, which is the case
+     * {@link #isInstalled()} already reports.
+     */
+    public List<String> missing() {
+        List<String> out = new ArrayList<>();
+        if (EngineType.isUml(prefs())) {
+            if (!RootlessPaths.umlKernel(app).isFile()) out.add("linux-uml");
+            if (!RootlessPaths.umlStub(app).isFile()) out.add("stub_exe");
+        } else {
+            if (!RootlessPaths.qemuBin(app).isFile()) out.add("qemu-system-aarch64");
+            if (!RootlessPaths.kernel(app).isFile()) out.add("Image");
+            if (!RootlessPaths.initrd(app).isFile()) out.add("initrd.img");
+            if (!RootlessPaths.libslirp(app).isFile()) out.add("libslirp.so");
+        }
+        if (!RootlessPaths.rootfs(app).isFile()) out.add("rootfs.img");
+        return out;
+    }
+
     public boolean isRunning() {
         Process p = qemuProcess;
         return p != null && isAlive(p);

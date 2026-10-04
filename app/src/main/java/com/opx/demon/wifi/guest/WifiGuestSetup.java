@@ -5,8 +5,7 @@ import android.hardware.usb.UsbDevice;
 
 import com.opx.demon.R;
 import com.opx.demon.engine.EngineType;
-import com.opx.demon.engine.Engines;
-import com.opx.demon.engine.GuestEngine;
+import com.opx.demon.engine.RootlessEngine;
 import com.opx.demon.engine.QemuInstaller;
 import com.opx.demon.engine.RootlessService;
 import com.opx.demon.engine.UmlProbe;
@@ -110,24 +109,22 @@ public final class WifiGuestSetup {
             step(Step.ENGINE, s(R.string.wg_probing));
             UmlProbe.Result probe = UmlProbe.run(app);
             for (String note : probe.notes) log("  " + note);
-            engineType = probe.ruledOut() ? EngineType.ROOTLESS : EngineType.UML;
+            engineType = probe.ruledOut() ? EngineType.ROOTLESS : EngineType.ROOTLESS_UML;
             log("kernel probe: " + probe.verdict + " — " + probe.detail);
             ok(Step.ENGINE, displayName(engineType));
         }
         if (cancelled()) return;
 
         WifiEngine.choose(core, engineType);
-        final GuestEngine engine = Engines.active(app, engineType);
+        final RootlessEngine engine = RootlessEngine.get(app);
 
         step(Step.FILES, s(engine.isInstalled() ? R.string.wg_checking : R.string.wg_downloading));
         if (!engine.isInstalled()) {
-            QemuInstaller.Outcome outcome = QemuInstaller.install(app, installProgress(), engineType);
-            if (outcome == QemuInstaller.Outcome.OFFLINE) {
-                WifiEngine.disarm(core);
-                fail(Step.FILES, s(R.string.wg_offline), s(R.string.wg_offline_body), true);
-                return;
-            }
-            if (outcome != QemuInstaller.Outcome.OK) {
+            // Adapted: our installer returns a boolean and does not take an
+            // engine type (it provisions whichever engine the user has chosen),
+            // so the upstream three-way Outcome collapses to ok/failed here.
+            boolean installed = QemuInstaller.install(app, installProgress());
+            if (!installed) {
                 WifiEngine.disarm(core);
                 fail(Step.FILES, s(R.string.wg_install_failed), s(R.string.wg_check_log), true);
                 return;
@@ -183,8 +180,8 @@ public final class WifiGuestSetup {
 
     private EngineType alreadyInstalled() {
         try {
-            if (Engines.active(app, EngineType.UML).isInstalled()) return EngineType.UML;
-            if (Engines.active(app, EngineType.ROOTLESS).isInstalled()) return EngineType.ROOTLESS;
+            if (RootlessEngine.get(app).isInstalled()) return EngineType.ROOTLESS_UML;
+            if (RootlessEngine.get(app).isInstalled()) return EngineType.ROOTLESS;
         } catch (Throwable ignored) {
         }
         return null;
@@ -198,12 +195,12 @@ public final class WifiGuestSetup {
         }
     }
 
-    private boolean bootWithDeadline(GuestEngine engine) {
+    private boolean bootWithDeadline(RootlessEngine engine) {
         if (engine.isReady()) return true;
         final AtomicBoolean booted = new AtomicBoolean(false);
         Thread t = new Thread(() -> {
             try {
-                booted.set(engine.startBlocking(new GuestEngine.BootListener() {
+                booted.set(engine.startBlocking(new RootlessEngine.BootListener() {
                     @Override public void onBootLine(String line) { log(line); }
                     @Override public void onBooted() { }
                     @Override public void onFailed(String reason) { log("boot failed: " + reason); }
@@ -281,7 +278,7 @@ public final class WifiGuestSetup {
     }
 
     private String displayName(EngineType t) {
-        return app.getString(t == EngineType.UML
+        return app.getString(t == EngineType.ROOTLESS_UML
                 ? com.opx.demon.R.string.engine_uml_name
                 : com.opx.demon.R.string.engine_vm_name);
     }
@@ -296,7 +293,7 @@ public final class WifiGuestSetup {
         return sb.toString();
     }
 
-    private String shortError(GuestEngine engine) {
+    private String shortError(RootlessEngine engine) {
         String why;
         try {
             why = engine.lastError();

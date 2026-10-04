@@ -14,6 +14,8 @@
     <string name="wifi_guest_subtitle">Everything else keeps using root</string>
     <string name="wifi_guest_cancel">Cancel</string>
     <string name="wifi_guest_start">Start</string>
+    <!-- Shared by the install-log dialog's copy button. -->
+    <string name="hc_copied">Copied</string>
     <string name="engine_uml_name">UML-ARM64 (Experimental)</string>
     <string name="engine_vm_name">Virtual machine</string>
     <string name="hc_copied">Copied</string>
