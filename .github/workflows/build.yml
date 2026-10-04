@@ -1,4 +1,10 @@
 name: Build & Update Release
+# v1.4.8 build round — chains a signed APK for the vec0 link-up fix (the guest
+# could receive but not transmit: the console bootstrap kept 'ip link set up'
+# inside the branch that runs only when the address is missing, and the
+# kernel's ip= parameter means it never ran). App-only change, so build.yml
+# has to be touched for the chain to fire.
+#
 # v1.4.5 build round — publishes the 6.5 visuals we could actually place
 # (AuroraView behind the engine card, IntroBackgroundView behind the app
 # intro, the credits screen reachable from About) plus the guest Wi-Fi entry
