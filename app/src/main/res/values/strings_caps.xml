@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Device capability probe (DeviceCapabilities). These are the labels for the
+  checks the setup flow runs before it recommends an engine, and the one-line
+  summary it shows when the probe finishes.
+-->
+<resources>
+    <!-- Check labels: "the processor", "root access", ... -->
+    <string name="caps_check_arch">the processor</string>
+    <string name="caps_check_root">root access</string>
+    <string name="caps_check_memory">memory</string>
+    <string name="caps_check_storage">storage</string>
+    <string name="caps_check_network">the network</string>
+    <string name="caps_check_uml">UML-ARM64</string>
+    <string name="caps_check_vm">the virtual machine</string>
+
+    <!-- Verdict summary: one line telling the user which engine they get. -->
+    <string name="caps_sum_root">Root granted. Nothing to download.</string>
+    <string name="caps_sum_uml">No root. The kernel runs here.</string>
+    <string name="caps_sum_uml_fallback">No root. The kernel runs here, with the VM as backup.</string>
+    <string name="caps_sum_vm">No root, and the kernel will not start here.</string>
+    <string name="caps_sum_none">Nothing here can run an engine.</string>
+
+    <!-- Appended to the summary when the matching check only warned. -->
+    <string name="caps_warn_data">On mobile data.</string>
+    <string name="caps_warn_storage">Storage is tight.</string>
+    <string name="caps_warn_memory">Memory is tight.</string>
+
+    <!-- Engine picker: shown on the card the device probe recommended. -->
+    <string name="engine_recommended">Recommended on this device: %1$s</string>
+    <string name="engine_uml_blocked">The kernel would not start on this device (checked by a real boot test)</string>
+
+    <!-- Short engine names, used inside engine_recommended. -->
+    <string name="engine_uml">UML-ARM64</string>
+    <string name="engine_vm">the virtual machine</string>
+    <string name="engine_chroot">the root chroot</string>
+</resources>

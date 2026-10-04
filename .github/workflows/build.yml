@@ -1,4 +1,16 @@
 name: Build & Update Release
+# v1.3.9 build round — port of strykerapp 6.5's engine-selection and Wi-Fi UI fixes.
+# DeviceCapabilities: probes the device (ABI + memory-page size, RAM, storage,
+# network, root) and actually LAUNCHES the UML kernel for up to 12s via UmlProbe,
+# then turns that into an ordered engine plan and a recommended engine. A phone
+# whose ABI is arm64 but whose memory pages are 16 KB cannot load the kernel and
+# only ever says ENOEXEC, so the recommendation has to come from a real start.
+# SlidePCheck runs the probe off the UI thread; SlideEngineSelect shows the
+# recommendation and stops offering UML once it has been probed and refused.
+# Wi-Fi export fix: saved_networks.csv now goes to core.getShareRoot() instead of
+# a hardcoded /sdcard path that does not exist under the rootless engines, the
+# root fallback appends (>>) instead of truncating (>) on every line, and the
+# permission branch no longer NPEs on a null exception message.
 # v1.3.7 build round — port of strykerapp 6.5's UML boot fixes.
 # (1) Kernel command line now matches what strykerapp 6.5 boots UML with:
 # con=null + con0=fd:0,fd:1 pins the kernel console to the process's own

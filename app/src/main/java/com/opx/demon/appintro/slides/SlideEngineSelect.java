@@ -17,8 +17,11 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.opx.demon.R;
 import com.opx.demon.appintro.AppIntroActivity;
+import com.opx.demon.engine.DeviceCapabilities;
 import com.opx.demon.engine.EngineType;
 import com.opx.demon.utils.Core;
+
+import java.util.List;
 
 public class SlideEngineSelect extends Fragment {
 
@@ -71,6 +74,25 @@ public class SlideEngineSelect extends Fragment {
         }
         cardChroot.setOnClickListener(v -> select(EngineType.CHROOT));
 
+        // What this phone can actually run, decided by DeviceCapabilities:
+        // it launched the UML kernel and checked ABI, RAM, storage and network
+        // before it got here. Without this the user picks blind and only finds
+        // out minutes into a boot attempt.
+        EngineType recommended = DeviceCapabilities.recommended(core);
+        if (recommended != null && (rootlessSupported || recommended == EngineType.CHROOT)) {
+            selected = recommended;
+            showRecommendation(recommended, rootlessNote, umlNote);
+        }
+        if (umlRuledOut()) {
+            // Probed and refused: stop offering it rather than letting the user
+            // pick an engine this phone has already been shown it cannot run.
+            umlNote.setVisibility(View.VISIBLE);
+            ((android.widget.TextView) umlNote).setText(R.string.engine_uml_blocked);
+            cardUml.setAlpha(0.4f);
+            cardUml.setOnClickListener(null);
+            if (selected == EngineType.ROOTLESS_UML) selected = EngineType.ROOTLESS;
+        }
+
         applySelectionUi();
 
         continueBtn.setOnClickListener(v -> {
@@ -82,10 +104,41 @@ public class SlideEngineSelect extends Fragment {
     }
 
     private void select(EngineType type) {
+        if (type == EngineType.ROOTLESS_UML && umlRuledOut()) return;
         if ((type == EngineType.ROOTLESS || type == EngineType.ROOTLESS_UML)
                 && !rootlessSupported) return;
         selected = type;
         applySelectionUi();
+    }
+
+    /**
+     * True when a completed probe tried UML on this phone and the kernel did
+     * not start. An empty plan means the probe never ran, which is NOT a
+     * verdict — the option must stay available in that case.
+     */
+    private boolean umlRuledOut() {
+        List<EngineType> detected = DeviceCapabilities.plan(core);
+        return !detected.isEmpty()
+                && !detected.contains(EngineType.CHROOT)
+                && !detected.contains(EngineType.ROOTLESS_UML);
+    }
+
+    /** Marks the probed-recommended engine in the note under its card. */
+    private void showRecommendation(EngineType recommended, View rootlessNote, View umlNote) {
+        String text = context.getString(R.string.engine_recommended,
+                context.getString(labelFor(recommended)));
+        View target = recommended == EngineType.ROOTLESS_UML ? umlNote : rootlessNote;
+        if (target instanceof android.widget.TextView) {
+            android.widget.TextView tv = (android.widget.TextView) target;
+            tv.setVisibility(View.VISIBLE);
+            tv.setText(text);
+        }
+    }
+
+    private static int labelFor(EngineType type) {
+        if (type == EngineType.ROOTLESS_UML) return R.string.engine_uml;
+        if (type == EngineType.ROOTLESS) return R.string.engine_vm;
+        return R.string.engine_chroot;
     }
 
     private void applySelectionUi() {

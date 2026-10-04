@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.StatFs;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -25,6 +26,7 @@ import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.opx.demon.R;
 import com.opx.demon.appintro.AppIntroActivity;
+import com.opx.demon.engine.DeviceCapabilities;
 import com.opx.demon.engine.EngineType;
 import com.opx.demon.utils.Core;
 
@@ -113,6 +115,8 @@ public class SlidePCheck extends Fragment {
 
         if (core.getBoolean(PREF_CHECKED)) {
             restoreResults();
+        } else {
+            probeEngineCapabilities();
         }
         return view;
     }
@@ -249,6 +253,33 @@ public class SlidePCheck extends Fragment {
                 applyGate(rootOk);
             });
         }).start();
+    }
+
+    /**
+     * Asks {@link DeviceCapabilities} what this phone can actually run and
+     * stores the answer, so the engine picker recommends instead of guessing.
+     *
+     * Runs on its own thread and entirely off the UI path: it launches the UML
+     * kernel for up to 12s to see whether it starts, which is the only
+     * trustworthy answer on a phone whose ABI matches but whose memory-page
+     * size does not. Its result is deliberately NOT awaited here — the checks
+     * above must not wait on a 12s kernel start — so a user who reaches the
+     * engine picker faster than the probe simply sees no recommendation yet and
+     * picks for themselves.
+     */
+    private void probeEngineCapabilities() {
+        if (DeviceCapabilities.probed(core)) return;
+        new Thread(() -> {
+            try {
+                DeviceCapabilities.Report report =
+                        DeviceCapabilities.probe(context, core, null);
+                DeviceCapabilities.persist(core, report);
+            } catch (Throwable t) {
+                // A probe that throws must never block the setup flow; the
+                // engine picker falls back to letting the user choose.
+                Log.w("SlidePCheck", "engine capability probe failed", t);
+            }
+        }, "engine-caps").start();
     }
 
     private void applyRow(boolean ok, TextView subtitle, TextView badge,

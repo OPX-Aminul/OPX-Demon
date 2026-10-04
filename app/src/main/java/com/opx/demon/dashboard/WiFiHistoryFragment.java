@@ -64,25 +64,39 @@ public class WiFiHistoryFragment extends Fragment {
             for (ArrayList<String> network : networks) {
                 builder.append(network.get(2)).append(",").append(network.get(0)).append(",").append(network.get(1)).append(",").append(network.get(3)).append("\n");
             }
+            // Export into the app's own share root instead of a hardcoded
+            // /sdcard path. Under the rootless engines /sdcard/OPX-Demon does
+            // not exist at all — the share is a 9p mount at getShareRoot() —
+            // so the hardcoded path failed on exactly the devices this app is
+            // built for, and the fallback below then wrote every line with '>'
+            // (truncating) instead of '>>' (appending), leaving only the last
+            // saved network on disk.
+            File shareDir = new File(core.getShareRoot());
+            shareDir.mkdirs();
+            final File file = new File(shareDir, "saved_networks.csv");
             try {
-                @SuppressLint("SdCardPath") File file = new File("/sdcard/OPX-Demon/saved_networks.csv");
                 FileWriter writer = new FileWriter(file);
                 writer.append(builder.toString());
                 writer.flush();
                 writer.close();
-                core.toaster("Saved networks exported to /sdcard/OPX-Demon/saved_networks.csv");
+                core.toaster("Saved networks exported to " + file.getAbsolutePath());
             } catch (Exception e) {
                 e.printStackTrace();
-                if (e.getMessage().contains("EPERM")) {
+                String msg = e.getMessage() == null ? "" : e.getMessage();
+                if (msg.contains("EPERM") || msg.contains("EACCES")
+                        || msg.contains("Permission denied")) {
                     new MaterialAlertDialogBuilder(context)
                             .setTitle("Permission denied")
                             .setMessage("Failed to write file, use write as root?")
                             .setPositiveButton(android.R.string.yes, (di, i) -> {
+                                String target = file.getAbsolutePath();
+                                core.customCommand("mkdir -p '" + shareDir.getAbsolutePath() + "'", true);
+                                core.customCommand(": > '" + target + "'", true);
                                 String[] lines = builder.toString().split("\n");
                                 for (String line : lines) {
-                                    core.customCommand("echo '" + line.replace("'", "\\'") + "' > /sdcard/OPX-Demon/saved_networks.csv", true);
+                                    core.customCommand("echo '" + line.replace("'", "\\'") + "' >> '" + target + "'", true);
                                 }
-                                core.toaster("Saved networks exported to /sdcard/OPX-Demon/saved_networks.csv");
+                                core.toaster("Saved networks exported to " + target);
                             })
                             .setNegativeButton(android.R.string.no, (di, i) -> {
                             })
