@@ -5,6 +5,15 @@
   names; copying from there would import translated text).
 -->
 <resources>
+    <!--
+      Wi-Fi guest setup dialog. These four were referenced by
+      dialog_wifi_guest.xml but live in a separate upstream strings file, so
+      they are not covered by the wifi_guest_* block below.
+    -->
+    <string name="wifi_guest_title">Run Wi‑Fi in Linux</string>
+    <string name="wifi_guest_subtitle">Everything else keeps using root</string>
+    <string name="wifi_guest_cancel">Cancel</string>
+    <string name="wifi_guest_start">Start</string>
     <string name="engine_uml_name">UML-ARM64 (Experimental)</string>
     <string name="engine_vm_name">Virtual machine</string>
     <string name="hc_copied">Copied</string>

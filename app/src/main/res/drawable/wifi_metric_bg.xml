@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Background for a single metric tile in the Wi-Fi attack monitor.
+
+  Ported from strykerapp 6.5, where it fills with @color/light_lite_contrast.
+  This app has no stryker_* colour tokens; light_lite_contrast is the same
+  neutral surface token the rest of our cards use, so the tiles sit correctly
+  in both light and night mode without introducing a duplicate colour.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="12dp" />
+    <solid android:color="@color/light_lite_contrast" />
+</shape>

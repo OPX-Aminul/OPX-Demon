@@ -17,8 +17,6 @@
     <string name="hc_title">Hash cracking</string>
     <string name="hc_type">Format</string>
     <string name="intro_show_details">View log</string>
-    <color name="stryker_accent">#1565C0</color>
-    <color name="stryker_logo_accent">#1565C0</color>
     <string name="wl_action_download">Download</string>
     <string name="wl_action_generate">Generate</string>
     <string name="wl_action_hash">Hashes</string>
