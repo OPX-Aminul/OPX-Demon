@@ -378,6 +378,10 @@
             layout="@layout/drawer_row" />
 
         <include
+            android:id="@+id/wifi_guest_item"
+            layout="@layout/drawer_row" />
+
+        <include
             android:id="@+id/usb_arsenal_item"
             layout="@layout/drawer_row" />
 

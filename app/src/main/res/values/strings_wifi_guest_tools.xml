@@ -76,4 +76,10 @@
     <string name="wifi_guest_step_files">Download</string>
     <string name="wifi_guest_step_interface">Wi-Fi interface</string>
     <string name="wifi_guest_step_passthrough">Adapter handover</string>
+
+    <!-- Entry point for the guest Wi-Fi setup, shown from the Wi-Fi screen
+         when Android\'s own kernel has no driver for the attached adapter.
+         Android cannot load a driver into a running kernel, but Linux can, so
+         we offer to hand the adapter over to the Linux engine instead. -->
+    <string name="wifi_guest_setup_action">Run Wi-Fi in Linux</string>
 </resources>

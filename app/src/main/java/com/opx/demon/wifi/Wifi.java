@@ -80,6 +80,7 @@ public class Wifi extends Fragment {
     public Activity activity;
     public Context context;
     public MaterialButton tryagain;
+    public MaterialButton guestSetup;
     public int failedscancount = 0;
     public MainActivity mainActivity;
     public ExpandableFab fab;
@@ -118,6 +119,7 @@ public class Wifi extends Fragment {
         text1 = view.findViewById(R.id.scan_text);
         textSub = view.findViewById(R.id.scan_subtext);
         tryagain = view.findViewById(R.id.try_again);
+        guestSetup = view.findViewById(R.id.wifi_guest_setup);
         subtitle = view.findViewById(R.id.wifi_subtitle);
         ifaceValue = view.findViewById(R.id.wifi_iface_value);
         ifaceMeta = view.findViewById(R.id.wifi_iface_meta);
@@ -322,6 +324,9 @@ public class Wifi extends Fragment {
                         tryagain.setVisibility(View.VISIBLE);
                         tryagain.setText(R.string.try_again);
                         tryagain.setOnClickListener(v -> scan());
+                        // An empty scan is not a driver problem, so the Linux
+                        // guest-setup offer does not apply here.
+                        guestSetup.setVisibility(View.GONE);
                         scanProgress.setVisibility(View.GONE);
                         statusValue.setText(R.string.wifi_status_failed);
                         subtitle.setText(R.string.wifi_subtitle_none);
@@ -371,6 +376,7 @@ public class Wifi extends Fragment {
         tryagain.setVisibility(View.VISIBLE);
         tryagain.setText("Attach adapter");
         tryagain.setOnClickListener(v -> { if (mainActivity != null) mainActivity.openUsbSheet(); });
+        guestSetup.setVisibility(View.GONE);
         scanProgress.setVisibility(View.GONE);
         statusValue.setText(R.string.wifi_status_failed);
         subtitle.setText("No adapter attached");
@@ -388,6 +394,11 @@ public class Wifi extends Fragment {
         tryagain.setVisibility(View.VISIBLE);
         tryagain.setText(R.string.try_again);
         tryagain.setOnClickListener(v -> scan());
+        // Android cannot load a driver into its running kernel, but the Linux
+        // engine can, so offer to hand the adapter over (ported from
+        // strykerapp 6.5, which offers the same from its no-driver state).
+        guestSetup.setVisibility(View.VISIBLE);
+        guestSetup.setOnClickListener(v -> startWifiGuestSetup());
         scanProgress.setVisibility(View.GONE);
         statusValue.setText(R.string.wifi_status_failed);
         subtitle.setText(R.string.wifi_no_driver_subtitle);
@@ -483,6 +494,18 @@ public class Wifi extends Fragment {
             applyWifiInterface(entered);
         });
         valueDialog.show();
+    }
+
+    /**
+     * Hands the attached USB adapter over to the Linux engine and, once it is
+     * armed, adopts the interface Linux gave it and rescans.
+     */
+    private void startWifiGuestSetup() {
+        if (activity == null || guestSetup == null) return;
+        com.opx.demon.wifi.guest.WifiGuestSetupDialog.show(activity, (armed, iface) -> {
+            if (!armed || activity == null) return;
+            activity.runOnUiThread(() -> applyWifiInterface(iface));
+        });
     }
 
     private void applyWifiInterface(String iface) {
