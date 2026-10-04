@@ -7,6 +7,7 @@ import com.opx.demon.utils.Core;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.InputStream;
@@ -507,6 +508,9 @@ public final class RootlessEngine {
         usb = null;
         qmp = null;
         umlUsbServer = null;
+        // Captured before the flag is cleared below, so the sweeper thread
+        // knows a UML (not a QEMU) was what it is retiring.
+        final boolean umlProcessHint = umlProcess;
         umlProcess = false;
         final Process oldNetd = umlNetdProcess;
         umlNetdProcess = null;
@@ -530,6 +534,14 @@ public final class RootlessEngine {
             if (isAlive(p)) p.destroy();
             sleep(1500);
             if (isAlive(p)) destroyForcibly(p);
+            // destroy() only kills the process we spawned; the guest's own
+            // children (and a UML that outlived an earlier app session) are not
+            // in that tree, so sweep for them explicitly — otherwise the next
+            // boot races a guest that is still holding the rootfs.
+            try {
+                if (umlProcessHint) reapStrayUmlGuests(4000);
+            } catch (Throwable ignored) {
+            }
         }, "opxdemon-qemu-stop").start();
     }
 
@@ -1300,12 +1312,27 @@ public final class RootlessEngine {
         try {
             File kern = RootlessPaths.umlKernel(app);
             File stub = RootlessPaths.umlStub(app);
-            if (!kern.isFile()) return "linux-uml is missing";
-            if (!stub.isFile()) return "stub_exe is missing";
             File rootfs = RootlessPaths.rootfs(app);
-            if (!rootfs.isFile()) return "rootfs.img is missing";
-            kern.setExecutable(true, false);
-            stub.setExecutable(true, false);
+            // Ported from strykerapp 6.5: check every binary for presence, size
+            // and the execute bit BEFORE spawning anything, so a truncated
+            // download reports itself instead of turning into a bare
+            // IOException with Android's error=13 in it.
+            String execProblem = NativeExec.check(kern, stub, rootfs);
+            if (execProblem != null) {
+                GuestExec.logToStore(execProblem);
+                return execProblem;
+            }
+
+            // Same port: Android keeps same-uid children alive after the app
+            // process dies, so a UML left running by a previous session still
+            // holds its rootfs and its memory temp file. The new boot then
+            // fails on the very first mount with no live process of its own to
+            // look at — "retire the strays first" is what makes retries work.
+            int reaped = reapStrayUmlGuests(4000);
+            if (reaped > 0) {
+                GuestExec.logToStore("cleared " + reaped + " leftover UML process(es)"
+                        + " from a previous run before starting");
+            }
 
             // Start the rootless network gateway before the kernel connects.
             // Without it the guest has no 10.0.2.2 and `usbip attach` (and any
@@ -1335,7 +1362,16 @@ public final class RootlessEngine {
             pb.environment().put("TMPDIR", tmpDir.getAbsolutePath());
             Log.i(TAG, "UML TMPDIR: " + tmpDir.getAbsolutePath());
             pb.redirectErrorStream(true);
-            final Process proc = pb.start();
+            final Process proc;
+            try {
+                proc = pb.start();
+            } catch (java.io.IOException e) {
+                // Android's errmsg is terse and ambiguous; say which of the four
+                // causes it actually was.
+                String why = NativeExec.explain(kern, e);
+                GuestExec.logToStore(why);
+                return why;
+            }
             qemuProcess = proc;
             umlProcess = true;
             booted = false;
@@ -1365,7 +1401,8 @@ public final class RootlessEngine {
             while (System.currentTimeMillis() < deadline) {
                 if (stopRequested) return "stopped";
                 if (!isAlive(proc)) {
-                    return "UML exited during boot (code " + safeExit(proc) + "): " + lastLogProblem();
+                    return "UML exited during boot (code " + safeExit(proc) + "): "
+                            + lastLogProblem() + umlProbeNote();
                 }
                 if (GuestExec.ping(1500) && guestShellReady()) {
                     markBooted();
@@ -1438,6 +1475,28 @@ public final class RootlessEngine {
     }
 
     /**
+     * A one-line verdict from the 6.5-style kernel-start probe, appended to a
+     * failed UML boot.
+     *
+     * The boot log alone cannot say whether the kernel ever ran: a binary that
+     * the host refuses to exec, and a rootfs that fails to mount, produce very
+     * similar-looking "it stopped" symptoms. The probe launches the kernel with
+     * no rootfs at all and only reports whether the banner appeared, which
+     * separates "this phone cannot run the kernel" from "the kernel ran and the
+     * guest did not come up". Best-effort: any failure here is silent, because
+     * the probe is a diagnostic and must never replace the real error.
+     */
+    private String umlProbeNote() {
+        try {
+            UmlProbe.Result r = UmlProbe.run(app, 8_000);
+            return " · kernel probe: " + r.verdict.name().toLowerCase(java.util.Locale.ROOT)
+                    + " — " + r.detail;
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    /**
      * $TMPDIR for the UML kernel: the directory it builds the guest's whole memory
      * image in (an unlinked temp file, so nothing is left behind on a clean exit).
      * Only the app's own directories qualify on Android — there is no /dev/shm and
@@ -1446,6 +1505,23 @@ public final class RootlessEngine {
      * directory is accepted with a warning.
      */
     private File umlTempDir() {
+        // strykerapp 6.5's fallbackTempDir order, which we now match: an
+        // existing TMPDIR/TMP/TEMP the host already provides wins (UML would
+        // use it anyway, and forcing ours over it can only make things worse),
+        // then the shared tmpfs mounts if this device has them, and only then
+        // the app's own directories.
+        String[] vars = {"TMPDIR", "TMP", "TEMP"};
+        for (String v : vars) {
+            String value = System.getenv(v);
+            if (value != null && !value.trim().isEmpty()
+                    && umlTempUsable(new File(value))) {
+                return new File(value);
+            }
+        }
+        for (String candidate : new String[]{"/dev/shm", "/tmp"}) {
+            File d = new File(candidate);
+            if (d.isDirectory() && d.canWrite() && umlTempUsable(d)) return d;
+        }
         File[] candidates = {
                 new File(RootlessPaths.base(app), "tmp"),
                 new File(app.getCacheDir(), "uml"),
@@ -1455,6 +1531,75 @@ public final class RootlessEngine {
             if (umlTempUsable(dir)) return dir;
         }
         return candidates[0];
+    }
+
+    /**
+     * Finds UML kernel processes left behind by a previous app session.
+     *
+     * Android does not reap same-uid children when the app process dies, so a
+     * UML the user killed by swiping the app away keeps running, keeps its
+     * rootfs open and keeps its memory temp file. The next boot then collides
+     * with it. Matching is by cmdline because we own no pidfile: the engine's
+     * own install directory appears in argv, together with the kernel binary's
+     * name.
+     *
+     * SIGTERM first so the kernel can unwind, kill for the ones that ignore it.
+     */
+    private int reapStrayUmlGuests(long graceMs) {
+        List<Integer> pids = findStrayUmlPids();
+        if (pids.isEmpty()) return 0;
+        Log.i(TAG, "reaping " + pids.size() + " stray UML process(es): " + pids);
+        for (int pid : pids) {
+            try {
+                android.os.Process.sendSignal(pid, 15);
+            } catch (Throwable ignored) {
+            }
+        }
+        long deadline = System.currentTimeMillis() + graceMs;
+        while (System.currentTimeMillis() < deadline && !findStrayUmlPids().isEmpty()) {
+            sleep(200);
+        }
+        List<Integer> left = findStrayUmlPids();
+        for (int pid : left) {
+            Log.w(TAG, "stray UML pid " + pid + " ignored SIGTERM, killing");
+            try {
+                android.os.Process.killProcess(pid);
+            } catch (Throwable ignored) {
+            }
+        }
+        deadline = System.currentTimeMillis() + 3000;
+        while (System.currentTimeMillis() < deadline && !findStrayUmlPids().isEmpty()) {
+            sleep(100);
+        }
+        return pids.size();
+    }
+
+    private List<Integer> findStrayUmlPids() {
+        List<Integer> out = new ArrayList<>();
+        String marker = RootlessPaths.base(app).getAbsolutePath();
+        String[] entries = new File("/proc").list();
+        if (entries == null) return out;
+        for (String entry : entries) {
+            int pid;
+            try {
+                pid = Integer.parseInt(entry);
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            if (pid == android.os.Process.myPid()) continue;
+            try (FileInputStream in = new FileInputStream("/proc/" + pid + "/cmdline")) {
+                byte[] buf = new byte[1024];
+                int n = in.read(buf);
+                if (n <= 0) continue;
+                String cmd = new String(buf, 0, n, "UTF-8").replace('\0', ' ');
+                if (cmd.contains(marker)
+                        && (cmd.contains("linux-uml") || cmd.contains("uml-netd"))) {
+                    out.add(pid);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return out;
     }
 
     private boolean umlTempUsable(File dir) {
@@ -1508,10 +1653,35 @@ public final class RootlessEngine {
         // Same console contract as QEMU's ttyAMA0: getty/autologin root, app drives commands.
         a.add("console=tty0");
         a.add("mem=" + ramMb + "M");
-        // SMP: the released kernel is CONFIG_SMP=y (NR_CPUS up to 64).
-        a.add(String.valueOf(cpus));
+        // panic=-1: never reboot on panic. A UML panic with a non-zero
+        // panic_timeout makes the kernel re-exec itself, which on Android means
+        // a fresh process with no one left holding its stdout — the console
+        // mirror then stops mid-line and the boot looks like it died for no
+        // reason. -1 = keep the same process alive so the panicking guest stays
+        // visible in the boot log.
+        a.add("panic=-1");
+        // con=null + con0=fd:0,fd:1: pin the kernel console to this process's
+        // stdin/stdout and switch every OTHER console channel off. This is the
+        // flag pair strykerapp 6.5 boots UML with, and it is the fix for the
+        // "empty console pane" symptom: without it the kernel also opens its
+        // compiled-in channels (tty0 + the pts channels), two of them try to
+        // grab the same fd, and the kernel messages end up on a /dev/pts node
+        // nothing in this app ever reads. Both go through the single
+        // __setup("con", console_chan_setup) -> line_setup() parser
+        // (arch/um/drivers/stdio_console.c), where "con=" sets the default for
+        // all lines and "con0=" overrides line 0.
+        a.add("con=null");
+        a.add("con0=fd:0,fd:1");
+        // SMP: the released kernel is CONFIG_SMP=y (NR_CPUS up to 64). The count
+        // has to be a NAMED parameter — a bare number is not a kernel command
+        // line option at all, so the previous line was silently dropped and the
+        // guest came up with um_ncpus_init()'s host_cpu-1 guess. ncpus= is the
+        // __uml_setup in arch/um/kernel/smp.c.
+        if (cpus > 0) a.add("ncpus=" + cpus);
         // One port channel: the UML serial console is served over TCP 127.0.0.1:1050 —
-        // the exact port GuestExec/GuestConsole already talk to.
+        // the exact port GuestExec/GuestConsole already talk to. strykerapp 6.5
+        // drops this and reaches the guest over an SSH port forward instead; we
+        // keep it because our GuestExec speaks the serial port directly.
         a.add("port=1050");
         if (netd) {
             // vec0 = vector-net device. The BESS transport makes the KERNEL a

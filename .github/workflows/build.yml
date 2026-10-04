@@ -1,4 +1,22 @@
 name: Build & Update Release
+# v1.3.7 build round — port of strykerapp 6.5's UML boot fixes.
+# (1) Kernel command line now matches what strykerapp 6.5 boots UML with:
+# con=null + con0=fd:0,fd:1 pins the kernel console to the process's own
+# stdin/stdout and switches every other console channel off, so console output
+# cannot escape to a /dev/pts node the app never reads; panic=-1 stops a
+# panicking guest from re-exec'ing itself and orphaning its console; the CPU
+# count became ncpus=<N> (a bare number is not a kernel option, so it was
+# silently dropped and the guest used the host's core count).
+# (2) NativeExec pre-flight: every engine binary is checked for presence,
+# size and the execute bit before spawn, and exec failures are reported in
+# plain language instead of Android's error=13/error=8.
+# (3) Stray UML processes left behind by a previous app session are reaped
+# via /proc/<pid>/cmdline before a boot starts and after teardown.
+# (4) UmlProbe: a bounded 64 MB no-rootfs kernel start that reports
+# KERNEL_STARTS/UNPROVEN/BLOCKED, so a failed UML boot says whether this
+# phone can run the kernel at all rather than "see the boot log".
+# (5) $TMPDIR now honours an existing TMPDIR/TMP/TEMP and /dev/shm or /tmp
+# when the device has them, matching 6.5's fallbackTempDir. Chain signed APK publish.
 # v1.3.6 build round — v1.3.4 engine fixes plus OTA fallback pin resync
 # (initrd/rootfs sha256+size were still pinned to the pre-rebuild core files, so
 # an offline-manifest install failed verification and re-downloaded forever).
