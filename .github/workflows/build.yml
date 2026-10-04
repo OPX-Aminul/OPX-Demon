@@ -1,4 +1,20 @@
 name: Build & Update Release
+# v1.4.10 build round — makes the frame path observable.
+#
+# v1.4.9 fixed the relay-table wedge and the device log proves it: the slots
+# now recycle ("abandoned after 13 SYN attempts"), the guest gets its address
+# ("vec0 = 10.0.2.15/24 via 10.0.2.2") and opxdemon-agentd is confirmed
+# listening on 1050 by the guest itself — and "no SYN-ACK" still never stops.
+# That message is identical for three different failures: the guest never
+# transmits, our frames never reach it, or its frames never reach us. The
+# counters that would separate them were not in the daemon, and the one MAC log
+# that was ("guest MAC is now ...") stays silent whenever the guest's address
+# equals the pinned default, which is the normal case. uml-netd now names the
+# first four frames in each direction and reports a guest->host / host->guest
+# counter pair whenever either moves, and the console bootstrap asks the guest
+# for its real NIC address, link state and whether the gateway answers a ping.
+# Nothing about the protocol changes in this round.
+#
 # v1.4.9 build round — uml-netd no longer wedges its relay table.
 #
 # RootlessCoreFiles.addIfNeeded() skipped the rootfs entirely, on the

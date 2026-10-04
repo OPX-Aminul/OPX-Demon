@@ -238,6 +238,14 @@ static void set_nonblock(int fd)
 }
 
 /* ═════════════════════════════ kernel-facing BESS endpoint ═════════════════ */
+/* Frame-path counters. Every boot so far failed as "no SYN-ACK", which says
+ * only that the guest never answered — not whether the guest ever spoke. The
+ * relay can fail in three places (guest never transmits, our frames never
+ * reach it, its frames never reach us) and all three look identical from the
+ * outside, so the first frames in each direction are logged by name. */
+static long g_rx_frames;   /* frames the guest kernel sent us */
+static long g_tx_frames;   /* frames we handed the guest kernel */
+
 static int kfd = -1;   /* accepted kernel connection */
 static int lfd = -1;   /* listening AF_UNIX SOCK_SEQPACKET socket */
 static char sock_path[108];
@@ -276,7 +284,14 @@ static int bess_listen(const char *path)
 /* ═════════════════════════════════ TX to the guest ═════════════════════════ */
 static void tx_frame(const void *buf, size_t len)
 {
+    const uint8_t *f = buf;
     if (kfd < 0 || len == 0 || len > MAX_FRAME) return;
+    if (g_tx_frames < 4 && len >= 14)
+        fwd_logf_("uml-netd: frame TO the guest #%ld len=%zu eth=%02x%02x"
+                  " dst=%02x:%02x:%02x:%02x:%02x:%02x",
+                  g_tx_frames + 1, len, f[12], f[13],
+                  f[0], f[1], f[2], f[3], f[4], f[5]);
+    g_tx_frames++;
     const char *p = buf;
     size_t off = 0;
     while (off < len) {
@@ -1253,6 +1268,8 @@ int main(int argc, char **argv)
 
     long last_gratuitous = 0;
     long last_activity = now_ms();
+    long last_report = now_ms();      /* frame-counter heartbeat beat */
+    long last_rx_report = -1, last_tx_report = -1;
     long last_console = 0;        /* 10 s console watchdog beat */
     int console_connected = 0;    /* guest's tty0 shell dialed in */
     const long IDLE_SPAWN_MS = 5L * 60 * 1000; /* never connected: give up */
@@ -1326,6 +1343,13 @@ int main(int argc, char **argv)
                     break;
                 }
                 last_activity = now;
+                g_rx_frames++;
+                if (g_rx_frames <= 4 && n >= 14)
+                    fwd_logf_("uml-netd: frame FROM the guest #%ld len=%zd"
+                              " eth=%02x%02x src=%02x:%02x:%02x:%02x:%02x:%02x",
+                              g_rx_frames, n, frame[12], frame[13],
+                              frame[6], frame[7], frame[8],
+                              frame[9], frame[10], frame[11]);
                 if (n < 14) continue;
 
                 /* Every frame arriving on this socket came from the guest NIC,
@@ -1363,6 +1387,23 @@ int main(int argc, char **argv)
 
         /* host-side sockets */
         host_pump_all();
+
+        /* Frame-path heartbeat: only when a counter actually moved, so a
+         * healthy boot stays quiet and a dead path reports "0 / 0" instead of
+         * nothing at all. */
+        if (kfd >= 0 && now - last_report >= 15000) {
+            last_report = now;
+            if (g_rx_frames != last_rx_report || g_tx_frames != last_tx_report) {
+                last_rx_report = g_rx_frames;
+                last_tx_report = g_tx_frames;
+                fwd_logf_("uml-netd: frame counters — guest->host %ld,"
+                          " host->guest %ld, guest MAC"
+                          " %02x:%02x:%02x:%02x:%02x:%02x",
+                          g_rx_frames, g_tx_frames,
+                          guest_mac[0], guest_mac[1], guest_mac[2],
+                          guest_mac[3], guest_mac[4], guest_mac[5]);
+            }
+        }
 
         /* Console watchdog: after boot settles (t>60 s, agent still silent)
          * the engine never opens its console — that is exactly when the app

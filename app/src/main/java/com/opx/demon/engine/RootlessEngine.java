@@ -1049,6 +1049,24 @@ public final class RootlessEngine {
                 GuestExec.logToStore("console bootstrap failed — guest reports " + l.trim());
             }
         }
+        // And what the guest's own NIC looks like. "no SYN-ACK" is the same
+        // message whether the guest never transmits, its frames die on the way
+        // to us, or ours die on the way to it; the guest can answer that from
+        // its side in one shot - real hardware address, link state, and
+        // whether the gateway answers an echo at all.
+        for (String l : GuestConsole.run(
+                "printf 'GUEST mac=%s state=%s flags=%s\\n' "
+                + "\"$(cat /sys/class/net/" + netIf + "/address 2>/dev/null)\" "
+                + "\"$(cat /sys/class/net/" + netIf + "/operstate 2>/dev/null)\" "
+                + "\"$(ip -br link show " + netIf + " 2>/dev/null | tr -s ' ' | cut -d' ' -f2)\"; "
+                + "ping -c 2 -W 1 10.0.2.2 2>&1 | tail -2", sock, 30_000)) {
+            if (l == null) continue;
+            String t = l.trim();
+            if (t.startsWith("GUEST ") || t.contains("packets transmitted")
+                    || t.contains("bytes from") || t.contains("not found")) {
+                GuestExec.logToStore("console bootstrap: " + t);
+            }
+        }
         return false;
     }
 
