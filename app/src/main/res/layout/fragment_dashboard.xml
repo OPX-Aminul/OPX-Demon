@@ -697,19 +697,81 @@
                             </ScrollView>
                         </LinearLayout>
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/vm_btn_refresh_log"
-                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
-                            android:text="Refresh"
-                            android:textSize="12sp"
-                            app:cornerRadius="12dp" />
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/vm_btn_refresh_log"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Refresh"
+                                android:textSize="12sp"
+                                app:cornerRadius="12dp" />
+
+                            <!-- Ported from strykerapp 6.5. Reading a boot
+                                 failure out of this log is the single most
+                                 common thing a user does with this card, and
+                                 before this they had to screenshot it. -->
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/vm_btn_copy_log"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                android:text="@string/vm_log_copy"
+                                android:textSize="12sp"
+                                app:cornerRadius="12dp" />
+                        </LinearLayout>
                     </LinearLayout>
                 </net.cachapa.expandablelayout.ExpandableLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
+
+        <!-- ═══ PRIMARY ACTION ═══ -->
+        <!--
+             Ported from strykerapp 6.5. Scanning Wi-Fi is what this app is
+             overwhelmingly opened for, and in our layout it was just another
+             tile in the grid, level with things like Terminal and Metasploit.
+             The upstream design states the primary action once, full width and
+             in the accent colour, before the tool grid begins.
+        -->
+        <LinearLayout
+            android:id="@+id/dash_hero"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/dash_hero_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minHeight="60dp"
+            android:orientation="horizontal"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:contentDescription="@string/dashboard_hero_scan"
+                android:src="@drawable/wifi"
+                app:tint="@android:color/white" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="@string/dashboard_hero_scan"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <!-- ═══ TOOLS GRID ═══ -->
         <LinearLayout

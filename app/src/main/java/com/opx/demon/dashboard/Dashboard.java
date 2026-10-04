@@ -4,6 +4,8 @@ import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -17,6 +19,7 @@ import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -125,6 +128,10 @@ public class Dashboard extends Fragment {
         renderHero(userHello, userSubtitle, savedCount, recentScanCount, recentScanSubtitle);
 
         menuWifi.setOnClickListener(v -> receiver.changeFragment(R.id.wifi_item));
+        // The hero pill and the Wi-Fi tile are the same action, so they share
+        // one handler rather than repeating the destination.
+        View heroScan = view.findViewById(R.id.dash_hero);
+        if (heroScan != null) heroScan.setOnClickListener(v -> receiver.changeFragment(R.id.wifi_item));
         menuLocalNetwork.setOnClickListener(v -> receiver.changeFragment(R.id.lan_item));
         menuHs.setOnClickListener(v -> receiver.changeFragment(R.id.hs_item));
         menuExploits.setOnClickListener(v -> receiver.changeFragment(
@@ -421,6 +428,10 @@ public class Dashboard extends Fragment {
             }, "vm-stop").start();
         });
         view.findViewById(R.id.vm_btn_refresh_log).setOnClickListener(v -> refreshVmLog());
+        // Ported from strykerapp 6.5: putting the boot log on the clipboard
+        // beats asking a user to screenshot a scrolling monospace view when
+        // they are reporting a boot that did not come up.
+        view.findViewById(R.id.vm_btn_copy_log).setOnClickListener(v -> copyVmLog());
 
         vmTick = () -> {
             refreshVmStatus();
@@ -628,6 +639,37 @@ public class Dashboard extends Fragment {
                 com.opx.demon.engine.VmSpecs.diskAllocatedBytes(context));
         boolean kvm = com.opx.demon.engine.VmSpecs.kvmAvailable();
         vmSpecs.setText(cpus + " vCPU · " + ram + " MB · " + disk + " disk · " + (kvm ? "KVM" : "TCG"));
+    }
+
+    /**
+     * Copies the VM console log to the clipboard.
+     *
+     * Reads the same {@code tailLog(400)} the visible log view shows, so what
+     * lands on the clipboard is exactly what the user could see. Done off the
+     * UI thread because tailLog can block on the engine's file, and the
+     * clipboard write has to happen back on the UI thread.
+     */
+    private void copyVmLog() {
+        if (vmEngine == null) return;
+        new Thread(() -> {
+            List<String> lines = vmEngine.tailLog(400);
+            final StringBuilder sb = new StringBuilder();
+            for (String l : lines) sb.append(l).append('\n');
+            final String text = sb.length() == 0 ? "(no console output yet)" : sb.toString();
+            Activity host = activity;
+            if (host == null) return;
+            host.runOnUiThread(() -> {
+                try {
+                    ClipboardManager cm =
+                            (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+                    cm.setPrimaryClip(ClipData.newPlainText("OPX-Demon boot log", text));
+                    Toast.makeText(context, "Boot log copied", Toast.LENGTH_SHORT).show();
+                } catch (Throwable t) {
+                    Toast.makeText(context, "Could not copy the log",
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+        }, "vm-log-copy").start();
     }
 
     private void refreshVmLog() {

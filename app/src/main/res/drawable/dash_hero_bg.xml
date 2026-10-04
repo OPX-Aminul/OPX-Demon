@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Dashboard's primary "scan now" action.
+
+  Ported from strykerapp 6.5, where this is a full-width accent pill at the
+  top of the dashboard. Upstream it fills with @color/stryker_accent; this app
+  has its own golden premium palette, so the token is opxdemon_accent rather
+  than the upstream blue — the shape, radius and role are the same.
+
+  Fully rounded (100dp) rather than a rectangle: it is a primary action, and
+  the pill shape is what separates it from the outlined tool tiles below it.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="100dp" />
+    <solid android:color="@color/opxdemon_accent" />
+</shape>

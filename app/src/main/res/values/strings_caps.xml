@@ -34,4 +34,20 @@
     <string name="engine_uml">UML-ARM64</string>
     <string name="engine_vm">the virtual machine</string>
     <string name="engine_chroot">the root chroot</string>
+
+    <!--
+      Dashboard additions ported from strykerapp 6.5:
+      a primary hero action at the top of the dashboard, the copy-log action on
+      the VM log card, the USB management entry, and the support links card.
+    -->
+    <string name="dashboard_hero_scan">Scan Wi‑Fi</string>
+    <string name="dashboard_section_more">More</string>
+    <string name="vm_log_copy">Copy log</string>
+    <string name="vm_usb_manage">Pass a device to the guest</string>
+    <string name="dashboard_customize_title">Customize</string>
+    <string name="dashboard_report_title">Report a bug</string>
+    <string name="dashboard_social_github">GitHub</string>
+    <string name="dashboard_social_site">Website</string>
+    <string name="dashboard_social_blog">Channel</string>
+    <string name="dashboard_social_chat">Chat</string>
 </resources>

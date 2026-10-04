@@ -1,4 +1,16 @@
 name: Build & Update Release
+# v1.4.3 build round — dashboard UI elements from strykerapp 6.5.
+# diffing the two apps showed our dashboard still lacked three things upstream
+# had, all of them real affordances rather than cosmetics:
+# (1) dash_hero — a full-width accent pill stating the primary action (scan
+#     Wi-Fi) once, before the tool grid. Scanning was only another tile, level
+#     with Terminal and Metasploit. It shares one handler with the wifi tile so
+#     the destination cannot drift.
+# (2) vm_btn_copy_log — the boot log on the clipboard. Reading a failed boot out
+#     of that log is what this card is for, and before this the only option was
+#     screenshotting a scrolling monospace view.
+# (3) dash_hero_bg drawable, using this app's own golden accent rather than the
+#     upstream blue, so the pill matches the existing theme.
 # v1.4.1 build round — UML build-script parity plus the 6.5 handshake-verification fix.
 # uml-build.sh now asserts the original developer's full required-symbol list in
 # one pass (UML_IOMEM_EMULATION / UML_DMA_EMULATION first: without those two Kconfig
