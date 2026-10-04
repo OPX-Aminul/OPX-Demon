@@ -313,6 +313,12 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- Ported from strykerapp 6.5: the wordlist manager sits at the top of
+             the TOOLS section, above GeoMac, matching the upstream drawer. -->
+        <include
+            android:id="@+id/wordlists_item"
+            layout="@layout/drawer_row" />
+
         <include
             android:id="@+id/geomac_item"
             layout="@layout/drawer_row" />

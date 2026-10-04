@@ -108,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
             R.id.hid_item, R.id.usb_arsenal_item, R.id.macchanger_item));
     private static final java.util.Set<Integer> VM_INDEPENDENT_IDS = new java.util.HashSet<>(java.util.Arrays.asList(
             R.id.dasboard_item, R.id.logs_item, R.id.about_item,
-            R.id.wpair_item, R.id.geomac_item));
+            R.id.wpair_item, R.id.geomac_item, R.id.wordlists_item));
     private MetasploitUtils metasploitUtils;
     private ArrayList<WiFINetwork> networks;
     private ArrayList<Device> devices = new ArrayList<>();
@@ -1029,6 +1029,7 @@ public class MainActivity extends AppCompatActivity {
             if (itemId == R.id.hs_item) return new HandshakeStorage();
             if (itemId == R.id.metasploit_item) return new InstallMetasploit();
             if (itemId == R.id.geomac_item) return new GeoMac();
+            if (itemId == R.id.wordlists_item) return new com.opx.demon.wordlists.WordlistsFragment();
             if (itemId == R.id.nmap_item) return new NmapScanner();
             if (itemId == R.id.wpair_item) return new WpairFragment();
             if (itemId == R.id.about_item) return new AboutFragment();
@@ -1085,6 +1086,7 @@ public class MainActivity extends AppCompatActivity {
         m.put(R.id.arsenal_item,      new DrawerSpec("Arsenal",          R.drawable.motion_blur, 0xFFEF6C00));
         m.put(R.id.hid_item,          new DrawerSpec("HID Attacks",      R.drawable.keyboard,    0xFFC62828));
         m.put(R.id.metasploit_item,   new DrawerSpec("Metasploit",       R.drawable.shield,      0xFFC62828));
+        m.put(R.id.wordlists_item,   new DrawerSpec("Wordlists",        R.drawable.password,    0xFF00897B));
         m.put(R.id.geomac_item,       new DrawerSpec("GeoMac",           R.drawable.map,         0xFFC9A227));
         m.put(R.id.vnc_item,          new DrawerSpec("VNC desktop",      R.drawable.vnc,         0xFF5E35B1));
         m.put(R.id.usb_arsenal_item,  new DrawerSpec("USB Arsenal",      R.drawable.usb,         0xFFC9A227));

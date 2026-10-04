@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Wi-Fi guest setup, attack monitor and hash cracker strings, ported from
+  strykerapp 6.5. English values only (upstream also ships values-zh/ for these
+  names; copying from there would import translated text).
+-->
+<resources>
+    <string name="engine_uml_name">UML-ARM64 (Experimental)</string>
+    <string name="engine_vm_name">Virtual machine</string>
+    <string name="hc_copied">Copied</string>
+    <string name="hc_error">Failed: %1$s</string>
+    <string name="hc_found">%1$d of %2$d cracked · %3$s tried · %4$s</string>
+    <string name="hc_loaded">%1$d hashes loaded</string>
+    <string name="hc_need_hashes">Paste at least one hash</string>
+    <string name="hc_need_type">Pick a hash format</string>
+    <string name="hc_need_wordlist">Pick a wordlist</string>
+    <string name="hc_none">Not found · %1$s tried · %2$s</string>
+    <string name="hc_salt_none">None</string>
+    <string name="hc_salt_prefix">Before</string>
+    <string name="hc_salt_suffix">After</string>
+    <string name="hc_stopped">Stopped · %1$s tried · %2$s</string>
+    <string name="hc_unknown_length">No known format is %1$d characters long</string>
+    <string name="wg_boot_failed">Didn\'t start</string>
+    <string name="wg_boot_ok">%1$s is running</string>
+    <string name="wg_booting">Starting · the first time is slow</string>
+    <string name="wg_cancelled">Cancelled</string>
+    <string name="wg_cancelling">Stopping</string>
+    <string name="wg_check_log">Open the log to see why.</string>
+    <string name="wg_checking">Checking</string>
+    <string name="wg_choosing">Picking one</string>
+    <string name="wg_device_ok">arm64 · %1$s free</string>
+    <string name="wg_device_ok_short">arm64</string>
+    <string name="wg_done_body">Wi-Fi now runs in %1$s. Everything else keeps using root.</string>
+    <string name="wg_downloading">Downloading</string>
+    <string name="wg_engine_installed">%1$s · already installed</string>
+    <string name="wg_files_ready">Ready</string>
+    <string name="wg_iface_failed">Linux has no driver either</string>
+    <string name="wg_iface_failed_body">This adapter isn\'t supported by the Linux kernel Stryker ships. Open the log for what it reported.</string>
+    <string name="wg_iface_waiting">Waiting for the driver</string>
+    <string name="wg_install_failed">Install failed</string>
+    <string name="wg_looking">Looking for it</string>
+    <string name="wg_low_space">Only %1$s free</string>
+    <string name="wg_low_space_body">Free up %1$s, then start again.</string>
+    <string name="wg_missing">Missing: %1$s</string>
+    <string name="wg_missing_body">The install finished without everything Linux needs.</string>
+    <string name="wg_no_adapter">Nothing plugged in</string>
+    <string name="wg_no_adapter_body">Plug the adapter in, then start again.</string>
+    <string name="wg_not_arm64">Needs a 64-bit ARM phone</string>
+    <string name="wg_not_arm64_body">Linux can\'t run on this processor.</string>
+    <string name="wg_offline">No internet</string>
+    <string name="wg_offline_body">The download comes from GitHub. Connect, then start again.</string>
+    <string name="wg_probing">Trying the lightweight kernel</string>
+    <string name="wg_unexpected">Something went wrong</string>
+    <string name="wg_unexpected_body">Setup stopped: %1$s</string>
+    <string name="wg_usb_asking">Asking Android for USB access</string>
+    <string name="wg_usb_failed">Android kept the adapter</string>
+    <string name="wg_usb_failed_body">Allow USB access when Android asks, then start again.</string>
+    <string name="wifi_guest_close">Close</string>
+    <string name="wifi_guest_done">Done</string>
+    <string name="wifi_guest_retry">Try again</string>
+    <string name="wifi_guest_running_warning">About 500 MB to download, a few minutes to set up. Keep Stryker open.</string>
+    <string name="wifi_guest_step_adapter">Adapter</string>
+    <string name="wifi_guest_step_boot">Start Linux</string>
+    <string name="wifi_guest_step_device">This phone</string>
+    <string name="wifi_guest_step_engine">Linux engine</string>
+    <string name="wifi_guest_step_files">Download</string>
+    <string name="wifi_guest_step_interface">Wi-Fi interface</string>
+    <string name="wifi_guest_step_passthrough">Adapter handover</string>
+</resources>
