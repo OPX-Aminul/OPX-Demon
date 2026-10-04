@@ -519,6 +519,7 @@ struct trelay {
     long created_ms;
     int fwd;               /* 0 = outbound relay; 1 = inbound, SYN in flight;
                             * 2 = inbound, guest side established */
+    uint16_t fport;        /* forward: host port the client connected to */
     long syn_retx;         /* forward: SYN retransmit counter (diagnostics) */
 };
 static struct trelay relays[RELAY_MAX];
@@ -821,6 +822,19 @@ static struct fwd {
 #define FWD_GPORT_MIN 2000
 #define FWD_GPORT_MAX 5999
 
+/* SYN attempts before an inbound forward is abandoned. The relay table only
+ * holds RELAY_MAX (48) sessions and the app opens a new 127.0.0.1:1050
+ * connection every second or two while the guest is still coming up, so a
+ * forward that never gets its SYN-ACK MUST give its slot back: fwd_finished()
+ * only retires relays the guest actually completed a handshake with, and
+ * r->dead is only set once the guest (or the client) says something. A guest
+ * that is still booting therefore filled all 48 slots within a minute and left
+ * them full forever — the guest could come up healthy minutes later and still
+ * be unreachable, because every later connection found no free slot and was
+ * closed on accept. 12 x RETX_MS(500) = 6s, twice the 3s it takes to print
+ * the "no SYN-ACK" diagnostic, so an ordinary slow handshake is never cut. */
+#define FWD_SYN_MAX 12
+
 /* Port channel the UML kernel serves its console on (RootlessEngine passes
  * port=1050; the app and this daemon share that single TCP host port). */
 static uint16_t fwd_console_port = 1050;
@@ -890,6 +904,7 @@ static void fwd_accept_all(void)
             r->hfd = cfd;
             r->hs = 0;          /* flips once the guest completes the handshake */
             r->connecting = 0;  /* the client fd is usable from the start */
+            r->fport = f->hport;
             r->egress = EGRESS_LOOPBACK;      /* never leaves the device */
             r->our_isn = make_isn(gp);
             r->snd_nxt = r->our_isn;
@@ -1385,7 +1400,17 @@ int main(int argc, char **argv)
             if (r->fwd) {
                 /* A forwarded agent connection lives as long as the session;
                  * free it only when both directions drained and closed (or
-                 * one side gave up while the handshake was in flight). */
+                 * one side gave up while the handshake was in flight).
+                 * A handshake that never completes is the third case: without
+                 * the give-up below its slot is never returned (see
+                 * FWD_SYN_MAX). */
+                if (r->fwd == 1 && r->syn_retx > FWD_SYN_MAX) {
+                    fwd_logf_("uml-netd: forward 127.0.0.1:%u -> 10.0.2.15:%u"
+                              " (gport=%u) abandoned after %ld SYN attempts"
+                              " — the guest never answered, releasing the slot",
+                              r->fport, r->dport, r->gport, r->syn_retx);
+                    r->dead = 1;
+                }
                 if (r->dead || fwd_finished(r)) {
                     relay_free(r);
                     continue;

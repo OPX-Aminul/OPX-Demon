@@ -1,4 +1,30 @@
 name: Build & Update Release
+# v1.4.9 build round — uml-netd no longer wedges its relay table.
+#
+# RootlessCoreFiles.addIfNeeded() skipped the rootfs entirely, on the
+# assumption that build-rootfs.sh could not change what the pin says. That
+# stopped being true when the rootfs itself changed, so every phone kept
+# booting the guest image it already had: v1.4.7's fixed opxdemon-net.service
+# never reached the device, which is why the guest log still printed
+# "Ignoring unknown escape sequences" and "Found ordering cycle" on v1.4.8.
+# The rootfs is now pinned by a sidecar stamp written at extraction time, so a
+# moved pin invalidates the guest image and this costs ONE 366 MB download.
+#
+# The decisive bug this round came out of that log: uml-netd's forward relays
+# were only retired by fwd_finished(), which requires a handshake the guest
+# actually completed. A forward whose SYN never got a SYN-ACK stayed in the
+# table forever, retransmitting every 500ms. The app opens a new 127.0.0.1:1050
+# connection every second or two while the guest boots, so all 48 slots filled
+# inside a minute (the device log shows gport=2000..2047 and then no accepted
+# connection again) and stayed full: from then on every connect() was closed on
+# accept, so a guest that came up healthy one minute later could never be
+# reached again. Stalled forwards now give their slot back after 12 SYN
+# attempts (6s, twice the 3s the "no SYN-ACK" diagnostic takes) and say so in
+# the log. The boot loop's agent-readiness round trip also went from 1500ms to
+# 5000ms: that budget has to cover uml-netd's 500ms SYN retransmit plus socat
+# forking a shell, and expiring inside it reported a healthy slow guest as a
+# silent agent.
+#
 # v1.4.8 build round — chains a signed APK for the vec0 link-up fix (the guest
 # could receive but not transmit: the console bootstrap kept 'ip link set up'
 # inside the branch that runs only when the address is missing, and the

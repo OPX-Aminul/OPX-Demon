@@ -21,6 +21,19 @@ public final class RootlessEngine {
 
     private static final String TAG = "RootlessEngine";
     private static final int BOOT_TIMEOUT_MS = 900_000;
+    /**
+     * Budget for one round trip to the guest agent while booting.
+     *
+     * <p>Not a bare socket connect: uml-netd only logs the app's connection as
+     * "no SYN-ACK after 6 tries", and its SYN retransmit timer is 500ms, so a
+     * guest that needs even one retransmit — plus socat forking a shell for the
+     * connection — can sit past 1.5s on a phone that is also unpacking a
+     * 366MB image. The old 1500ms budget called that a silent agent and sent
+     * the next loop iteration straight back into the console bootstrap.
+     */
+    private static final int AGENT_READY_PING_MS = 5000;
+    /** Shorter budget for the throttled progress notes; they only report state. */
+    private static final int PROBE_PING_MS = 3000;
     /** Minimum spacing between console-bootstrap attempts inside one boot. */
     private static final long CONSOLE_RETRY_MS = 30_000;
     private volatile long lastConsoleBootstrapMs;
@@ -1450,7 +1463,7 @@ public final class RootlessEngine {
                     return "UML exited during boot (code " + safeExit(proc) + "): "
                             + lastLogProblem() + umlProbeNote();
                 }
-                if (GuestExec.ping(1500) && guestShellReady()) {
+                if (GuestExec.ping(AGENT_READY_PING_MS) && guestShellReady()) {
                     markBooted();
                     // vec0 addressing: set by ip= on kernels with CONFIG_IP_PNP,
                     // re-applied here for the already-released kernels that ignore it.
@@ -1469,7 +1482,7 @@ public final class RootlessEngine {
                     GuestExec.logToStore("boot +" + ((nowMs - bootStartMs) / 1000)
                             + "s — stage " + bootStageName(VmBootStage.detect(tailLog(120)))
                             + ", console " + consoleState()
-                            + ", agent " + (GuestExec.ping(1200) ? "answering" : "silent"));
+                            + ", agent " + (GuestExec.ping(PROBE_PING_MS) ? "answering" : "silent"));
                 }
 
                 // Agent bootstrap over the guest console.
@@ -1506,7 +1519,7 @@ public final class RootlessEngine {
                             + RootlessPaths.HOST_EXEC_PORT + " listener "
                             + (listenerUp ? "UP" : "DOWN")
                             + (listenerUp ? "" : " (uml-netd forward missing)")
-                            + ", guest agent " + (GuestExec.ping(1200) ? "answering" : "silent"));
+                            + ", guest agent " + (GuestExec.ping(PROBE_PING_MS) ? "answering" : "silent"));
                 }
                 sleep(1000);
             }
