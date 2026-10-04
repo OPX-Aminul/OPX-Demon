@@ -219,26 +219,76 @@ printf 'nameserver 10.0.2.3\n' > "$ROOTFS/etc/resolv.conf"
 # Belt and braces: a dedicated oneshot unit configures eth0 no matter what the
 # distro ifupdown state is. Only its marker file says it already succeeded.
 mkdir -p "$ROOTFS/etc/systemd/system"
+# The guest's network setup lives in a real script file rather than inline in
+# ExecStart=/bin/sh -c '...'. systemd does not hand that string to the shell
+# untouched: it applies its own escape processing first, so the "\$2" inside the
+# awk program became an unknown escape ("Ignoring unknown escape sequences" in
+# the guest boot log) and every $i/$dev was then expanded as a systemd variable
+# and replaced with nothing - the script could never pick an interface. A file
+# has none of those layers between systemd and /bin/sh.
+cat > "$ROOTFS/usr/local/sbin/opxdemon-net-setup.sh" <<'NETSCRIPT'
+#!/bin/sh
+# Give the guest's first non-loopback interface the slirp-equivalent static
+# addressing: 10.0.2.15/24 via the 10.0.2.2 gateway that uml-netd plays, which
+# is what carries `usbip attach -r 10.0.2.2` back to the app's USB/IP server.
+#
+# Under UML that interface is vec0; under QEMU/slirp it is eth0. Wait briefly
+# first, because the vector NIC is registered by the kernel's late init and can
+# appear a moment after systemd starts.
+#
+# Only write net-ok once the address is really there: the app's diagnostics
+# treat that marker as the truth about whether the guest has a route.
+set -u
+
+dev=
+i=0
+while [ "$i" -lt 15 ]; do
+    dev=$(ip -o link show 2>/dev/null | awk -F': ' '{print $2}' | sed 's/@.*//' | grep -v '^lo$' | head -n1)
+    [ -n "$dev" ] && break
+    i=$((i + 1))
+    sleep 1
+done
+
+if [ -z "$dev" ]; then
+    echo "opxdemon-net: no non-loopback interface found" >&2
+    exit 1
+fi
+
+mkdir -p /run/opxdemon
+ip link set "$dev" up 2>/dev/null
+ip addr flush dev "$dev" 2>/dev/null
+ip addr add 10.0.2.15/24 dev "$dev" 2>/dev/null
+ip route replace default via 10.0.2.2 dev "$dev" 2>/dev/null
+
+if ! ip -4 addr show dev "$dev" 2>/dev/null | grep -q '10.0.2.15'; then
+    echo "opxdemon-net: could not address $dev" >&2
+    exit 1
+fi
+
+printf 'auto lo\niface lo inet loopback\n\nauto %s\niface %s inet static\n    address 10.0.2.15\n    netmask 255.255.255.0\n    gateway 10.0.2.2\n    dns-nameservers 10.0.2.3\n' \
+    "$dev" "$dev" > /etc/network/interfaces
+echo opxdemon > /run/opxdemon/net-if
+: > /run/opxdemon/net-ok
+exit 0
+NETSCRIPT
+chmod 0755 "$ROOTFS/usr/local/sbin/opxdemon-net-setup.sh"
+
 cat > "$ROOTFS/etc/systemd/system/opxdemon-net.service" <<'NETEOF'
 [Unit]
 Description=OpxDemon VM network (static 10.0.2.15/24 via the host gateway)
 DefaultDependencies=no
+# The vector/bridge NIC is registered by the kernel's network init, which runs
+# after modules-load, so wait for that - but stay strictly before
+# network-pre.target. Listing the same target in both Before= and After= is a
+# direct contradiction, and systemd resolved it by dropping the job and
+# printing "Found ordering cycle on network-pre.target/start" on every boot.
 After=systemd-modules-load.service
 Before=network-pre.target
 Wants=network-pre.target
-# The vector/bridge NIC is registered by the kernel's network init, which runs
-# after modules-load. Without this ordering the unit can run before vec0 exists,
-# find no interface, and give up.
-After=systemd-networkd.service network-pre.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-# Wait briefly for the NIC: under UML vec0 appears only once the stub is up.
-# Then take the first non-loopback interface that is not already addressed —
-# vec0 under UML, eth0 under QEMU/slirp — and only report success if the
-# address really landed. No interface, no net-ok: the app's diagnostics depend
-# on this marker telling the truth.
-ExecStart=/bin/sh -c 'i=0; while [ $i -lt 15 ]; do dev=$(ip -o link show 2>/dev/null | awk -F": " "{print \$2}" | sed "s/@.*//" | grep -v "^lo$" | head -n1); [ -n "$dev" ] && break; i=$((i+1)); sleep 1; done; [ -n "$dev" ] || { echo "opxdemon-net: no non-loopback interface found" >&2; exit 1; }; mkdir -p /run/opxdemon; ip link set "$dev" up 2>/dev/null; ip addr flush dev "$dev" 2>/dev/null; ip addr add 10.0.2.15/24 dev "$dev" 2>/dev/null; ip route replace default via 10.0.2.2 dev "$dev" 2>/dev/null; if ip -4 addr show dev "$dev" 2>/dev/null | grep -q "10.0.2.15"; then printf "auto lo\niface lo inet loopback\n\nauto %s\niface %s inet static\n    address 10.0.2.15\n    netmask 255.255.255.0\n    gateway 10.0.2.2\n    dns-nameservers 10.0.2.3\n" "$dev" "$dev" > /etc/network/interfaces; echo opxdemon > /run/opxdemon/net-if; : > /run/opxdemon/net-ok; else echo "opxdemon-net: could not address $dev" >&2; exit 1; fi'
+ExecStart=/usr/local/sbin/opxdemon-net-setup.sh
 [Install]
 WantedBy=multi-user.target
 NETEOF

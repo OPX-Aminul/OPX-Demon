@@ -993,13 +993,19 @@ public final class RootlessEngine {
         // One attempt is often not enough: DHCP-less first-boot races (address applied before
         // slirp finishes wiring the NIC) and slow apt fallbacks both need a second try.
         for (int attempt = 0; attempt < 2 && !up; attempt++) {
+            // Per attempt, not sticky across them: a first attempt that raced the
+            // NIC followed by a second that succeeded used to still log
+            // "vec0 addressing failed" immediately above "vec0 now carries
+            // 10.0.2.15 and the guest listens on 1050", which sent diagnosis
+            // down the addressing path when addressing had in fact succeeded.
+            netFailed = false;
             for (String l : GuestConsole.run(cmd.toString(), sock, 180_000)) {
                 if (l == null) continue;
                 if (l.contains("__AGENT_UP__")) up = true;
                 if (l.contains("__OPX_NET__FAIL")) netFailed = true;
             }
         }
-        if (netFailed) {
+        if (netFailed && !up) {
             GuestExec.logToStore("console bootstrap: the guest could not bring up"
                     + " 10.0.2.15 on " + netIf + " — vec0 addressing failed");
         }
