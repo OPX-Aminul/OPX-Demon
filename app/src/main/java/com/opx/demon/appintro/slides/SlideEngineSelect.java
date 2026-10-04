@@ -55,8 +55,8 @@ public class SlideEngineSelect extends Fragment {
         checkRootless = view.findViewById(R.id.check_rootless);
         checkUml = view.findViewById(R.id.check_uml);
         checkChroot = view.findViewById(R.id.check_chroot);
-        View rootlessNote = view.findViewById(R.id.rootless_note);
-        View umlNote = view.findViewById(R.id.uml_note);
+        android.widget.TextView rootlessNote = view.findViewById(R.id.rootless_note);
+        android.widget.TextView umlNote = view.findViewById(R.id.uml_note);
         MaterialButton continueBtn = view.findViewById(R.id.login);
 
         rootlessSupported = EngineType.rootlessSupported(context);
@@ -87,7 +87,7 @@ public class SlideEngineSelect extends Fragment {
             // Probed and refused: stop offering it rather than letting the user
             // pick an engine this phone has already been shown it cannot run.
             umlNote.setVisibility(View.VISIBLE);
-            ((android.widget.TextView) umlNote).setText(R.string.engine_uml_blocked);
+            umlNote.setText(R.string.engine_uml_blocked);
             cardUml.setAlpha(0.4f);
             cardUml.setOnClickListener(null);
             if (selected == EngineType.ROOTLESS_UML) selected = EngineType.ROOTLESS;
@@ -124,15 +124,15 @@ public class SlideEngineSelect extends Fragment {
     }
 
     /** Marks the probed-recommended engine in the note under its card. */
-    private void showRecommendation(EngineType recommended, View rootlessNote, View umlNote) {
+    private void showRecommendation(EngineType recommended,
+                                     android.widget.TextView rootlessNote,
+                                     android.widget.TextView umlNote) {
         String text = context.getString(R.string.engine_recommended,
                 context.getString(labelFor(recommended)));
-        View target = recommended == EngineType.ROOTLESS_UML ? umlNote : rootlessNote;
-        if (target instanceof android.widget.TextView) {
-            android.widget.TextView tv = (android.widget.TextView) target;
-            tv.setVisibility(View.VISIBLE);
-            tv.setText(text);
-        }
+        android.widget.TextView target =
+                recommended == EngineType.ROOTLESS_UML ? umlNote : rootlessNote;
+        target.setVisibility(View.VISIBLE);
+        target.setText(text);
     }
 
     private static int labelFor(EngineType type) {
