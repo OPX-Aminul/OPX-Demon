@@ -66,8 +66,8 @@
     },
     "uml_netd": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/uml-mode-all-file/uml-netd",
-      "sha256": "55f301b1124b95c11920c3d1aa78d6cf437849acac17c5b2024706a625a8a29b",
-      "size": 2905552,
+      "sha256": "2d1044ab8e586c9b5a48e8ef033f501f3a16915f2cd32e4c6490e618868057c4",
+      "size": 2905808,
       "note": "Rootless UML network gateway (BESS vector transport): ARP/ICMP + TCP relay to 127.0.0.1:<same port> + DNS. CI re-pins sha256/size after each upload."
     }
   },
