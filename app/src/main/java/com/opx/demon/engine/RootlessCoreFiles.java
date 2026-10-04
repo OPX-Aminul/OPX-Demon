@@ -13,6 +13,8 @@ import java.util.Locale;
 public final class RootlessCoreFiles {
 
     private static final long ROOTFS_MIN_BYTES = 50L * 1024 * 1024;
+    /** Sidecar next to rootfs.img recording which rootfs.imgz produced it. */
+    private static final String ROOTFS_PIN_SUFFIX = ".rootfs-pin";
 
     public enum Kind {
         QEMU("qemu-system-aarch64", "QEMU", QemuInstaller.Stage.EXTRACTING_QEMU),
@@ -244,6 +246,7 @@ public final class RootlessCoreFiles {
                 }
                 //noinspection ResultOfMethodCallIgnored
                 archive.delete();
+                stampRootfsPin(context, g.asset);
                 continue;
             }
             if (!QemuInstaller.fetchAsset(g.asset, g.dest, g.kind.label, p)) return false;
@@ -285,10 +288,29 @@ public final class RootlessCoreFiles {
             // exactly what happened to the SECCOMP-patched linux-uml: same
             // 19,763,856 bytes, different code). Small engine binaries are cheap
             // to verify, so stream-hash them whenever the manifest pins a digest
-            // and mark a re-download on mismatch. The rootfs is excluded: it is
-            // hundreds of MB and re-fetching it over mobile data would be worse
-            // than the disease — its pin did not change with the engine rebuild.
-            if (!rootfs && asset != null && asset.sha256 != null
+            // and mark a re-download on mismatch.
+            if (rootfs) {
+                // The rootfs cannot be stream-hashed on every boot — it is
+                // hundreds of MB — so it carries a sidecar stamp written when it
+                // was extracted (stampRootfsPin). The old code skipped the check
+                // outright on the assumption that the pin never moved; when
+                // build-rootfs.sh changed, rootfs.imgz got a new sha and the
+                // device kept booting the previous image, so guest-side fixes
+                // (opxdemon-net.service) never reached the phone while the app
+                // reported "all engine files already match the release manifest".
+                // Comparing the stamp makes a moved pin a Gap without hashing
+                // anything, and an unmoved pin still costs no download.
+                String stamp = rootfsPinStamp(dest);
+                String want = asset != null ? asset.sha256 : null;
+                if (want != null && want.length() == 64 && !want.equalsIgnoreCase(stamp)) {
+                    out.add(new Gap(kind, dest, asset,
+                            "Guest image is from an earlier release (built from a"
+                            + " different rootfs.imgz) — it needs the current one",
+                            true, compressed(asset)));
+                }
+                return;
+            }
+            if (asset != null && asset.sha256 != null
                     && asset.sha256.length() == 64) {
                 String actual = sha256(dest);
                 if (actual != null && !actual.equalsIgnoreCase(asset.sha256)) {
@@ -313,6 +335,41 @@ public final class RootlessCoreFiles {
     /** Streaming SHA-256, or null when the file cannot be read/hashed (fail-open:
      *  keep the local file rather than forcing a re-download loop). */
     static String sha256For(File f) { return sha256(f); }
+
+    /**
+     * Records which rootfs.imgz a rootfs.img was expanded from.
+     *
+     * <p>The image itself cannot be hashed cheaply, so the pin travels beside it.
+     * Write it only right after a successful extraction: a stamp that survives a
+     * failed or partial download would claim an image the device does not have.
+     */
+    private static void stampRootfsPin(Context context, RemoteManifest.Asset asset) {
+        if (asset == null || asset.sha256 == null || asset.sha256.length() != 64) return;
+        try (java.io.OutputStream out = new java.io.FileOutputStream(rootfsPinFile(context))) {
+            out.write(asset.sha256.toLowerCase(java.util.Locale.US).getBytes("UTF-8"));
+        } catch (Exception e) {
+            // Fail-open: without the stamp the next check simply sees a mismatch
+            // and re-extracts once. Losing a stamp must never abort a good image.
+            android.util.Log.w("RootlessCoreFiles",
+                    "could not record the rootfs pin: " + e.getMessage());
+        }
+    }
+
+    /** The pin recorded next to rootfs.img, or null when it has none (or is unreadable). */
+    private static String rootfsPinStamp(File rootfs) {
+        File pin = new File(rootfs.getParentFile(), ROOTFS_PIN_SUFFIX);
+        if (!pin.isFile()) return null;
+        try {
+            String s = new String(java.nio.file.Files.readAllBytes(pin.toPath()), "UTF-8").trim();
+            return s.isEmpty() ? null : s;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static File rootfsPinFile(Context context) {
+        return new File(RootlessPaths.rootfs(context).getParentFile(), ROOTFS_PIN_SUFFIX);
+    }
 
     private static String sha256(File f) {
         try (java.io.InputStream in = new java.io.FileInputStream(f)) {
