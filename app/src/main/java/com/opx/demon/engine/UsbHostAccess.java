@@ -28,6 +28,9 @@ final class UsbHostAccess {
 
     private static final String ACTION_PERMISSION = "com.opx.demon.USB_PERMISSION";
 
+    /** Serialises this class's blocking permission requests. */
+    private static final Object PERMISSION_LOCK = new Object();
+
     private final Context app;
     private final UsbManager manager;
 
@@ -103,7 +106,15 @@ final class UsbHostAccess {
 
     boolean requestPermissionBlocking(UsbDevice device, long waitMs) {
         if (manager == null || device == null) return false;
-        synchronized (UsbPassthroughManager.PERMISSION_LOCK) {
+        // Adapted: upstream shares a package-level PERMISSION_LOCK with
+        // UsbPassthroughManager. This app has no shared manager instance — a
+        // passthrough manager is created per session, while this class runs its
+        // own receiver and latch — so the two flows cannot share a monitor.
+        // This lock serialises this class's own permission requests, which is
+        // what actually needs protecting: two concurrent asks for the same
+        // device race, and the loser's callback never arrives, so its wait
+        // times out for no reason.
+        synchronized (PERMISSION_LOCK) {
             return askLocked(device, waitMs);
         }
     }
