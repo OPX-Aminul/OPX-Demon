@@ -364,6 +364,60 @@ public final class QemuInstaller {
     }
 
     /**
+     * The gateway API level this build of the app needs. A uml-netd that does
+     * not report at least this is deleted and re-fetched before it is booted.
+     * Bump when the engine must not run against an older gateway.
+     */
+    private static final int UML_NETD_MIN_API = 2;
+
+    /**
+     * What the on-disk gateway answers to "uml-netd --version", or -1 when it
+     * cannot be run at all. This is the only check that does not depend on the
+     * manifest: a digest is consulted only when the manifest the app happens to
+     * be holding carries one for this file, and a cached or fallback manifest
+     * does not — which is how a phone booted a stale uml-netd across two
+     * releases while the engine check reported "all engine files already match
+     * the release manifest". Asking the binary itself needs no bookkeeping.
+     */
+    static int umlNetdApi(File dest) {
+        if (dest == null || !dest.isFile() || dest.length() < 64 * 1024) return -1;
+        if (!dest.setExecutable(true, false)) return -1;
+        try {
+            Process p = new ProcessBuilder(dest.getAbsolutePath(), "--version")
+                    .redirectErrorStream(true).start();
+            java.io.BufferedReader br = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(p.getInputStream(),
+                            java.nio.charset.StandardCharsets.UTF_8));
+            String line;
+            while ((line = br.readLine()) != null) {
+                int at = line.indexOf("api ");
+                if (at < 0) continue;
+                // Take the first run of digits after the marker and nothing
+                // else: the banner and the --version line are different
+                // strings, and a parse failure here must not be mistaken for
+                // "this binary cannot answer" (that would delete and re-fetch
+                // a perfectly good gateway on every single boot).
+                StringBuilder digits = new StringBuilder();
+                for (int i = at + 4; i < line.length(); i++) {
+                    char c = line.charAt(i);
+                    if (c < '0' || c > '9') break;
+                    digits.append(c);
+                }
+                if (digits.length() == 0) continue;
+                try {
+                    return Integer.parseInt(digits.toString());
+                } catch (RuntimeException ignored) {
+                    // keep looking on the next line
+                }
+            }
+            p.waitFor();
+        } catch (Throwable t) {
+            Log.i(TAG, "could not ask uml-netd for its API level: " + t);
+        }
+        return -1;
+    }
+
+    /**
      * Fetches the BESS network gateway on its own (2.9 MB). Devices that ran the
      * UML installer before the gateway existed have a complete-looking engine
      * without it, and the USB passthrough path silently degrades to "no
@@ -373,6 +427,29 @@ public final class QemuInstaller {
     public static boolean ensureUmlNetd(Context context) {
         File dest = RootlessPaths.umlNetd(context);
         if (dest.isFile() && dest.length() > 64 * 1024) {
+            // Ask the binary what it is before trusting it. This runs even when
+            // the manifest check below cannot: the manifest digest is only
+            // compared when the manifest carries one, and a cached or fallback
+            // manifest carries none, so the digest branch silently passed a
+            // gateway that was two releases old — which is why v1.5.0's frame
+            // logging never showed up in the device log even though the app was
+            // v1.5.0. Cheap (one fork of a 2.9 MB binary) and unconditional.
+            int api = umlNetdApi(dest);
+            if (api >= UML_NETD_MIN_API) {
+                // New enough. Deliberately returns before the manifest branch:
+                // the API level is a stronger statement than a digest (we bump
+                // it exactly when the engine must not run against an older
+                // gateway) and it costs no network round trip on every boot.
+                //noinspection ResultOfMethodCallIgnored
+                dest.setExecutable(true, false);
+                return true;
+            }
+            if (api >= 0) {
+                Log.i(TAG, "uml-netd reports API " + api + ", this app needs "
+                        + UML_NETD_MIN_API + " — re-downloading");
+                //noinspection ResultOfMethodCallIgnored
+                dest.delete();
+            }
             // A rebuild can ship a new uml-netd with the SAME size — and the
             // boot path adds new command-line flags to it (v1.2.8 added
             // --forward). Size alone would then boot with a stale daemon
@@ -383,7 +460,7 @@ public final class QemuInstaller {
             try {
                 a0 = QemuDownloader.resolve(context).umlNetd;
             } catch (Throwable ignored) {}
-            if (a0 != null && a0.sha256 != null && a0.sha256.length() == 64) {
+            if (dest.isFile() && a0 != null && a0.sha256 != null && a0.sha256.length() == 64) {
                 String actual = RootlessCoreFiles.sha256For(dest);
                 if (actual != null && !actual.equalsIgnoreCase(a0.sha256)) {
                     Log.i(TAG, "uml-netd is stale (sha256 mismatch) — re-downloading");
@@ -395,7 +472,7 @@ public final class QemuInstaller {
                     dest.setExecutable(true, false);
                     return true;
                 }
-            } else {
+            } else if (dest.isFile()) {
                 //noinspection ResultOfMethodCallIgnored
                 dest.setExecutable(true, false);
                 return true;

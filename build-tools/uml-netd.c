@@ -238,6 +238,19 @@ static void set_nonblock(int fd)
 }
 
 /* ═════════════════════════════ kernel-facing BESS endpoint ═════════════════ */
+/* Identity, printed by --version and in the startup banner.
+ *
+ * UML_NETD_API is the contract the app checks before it trusts the daemon on
+ * disk: a binary that does not answer --version, or answers with a lower api,
+ * is deleted and re-fetched. Manifest digests cannot do this job on their own
+ * — they are only consulted when the manifest the app happens to hold carries
+ * a digest for this file, and a cached or fallback manifest does not — which
+ * is how a phone ended up booting a stale uml-netd for two releases while the
+ * app reported "all engine files already match the release manifest".
+ * Bump API whenever the app must refuse to boot with an older daemon. */
+#define UML_NETD_BUILD "2026-10-05.framecounters"
+#define UML_NETD_API   "2"
+
 /* Frame-path counters. Every boot so far failed as "no SYN-ACK", which says
  * only that the guest never answered — not whether the guest ever spoke. The
  * relay can fail in three places (guest never transmits, our frames never
@@ -1163,6 +1176,18 @@ int main(int argc, char **argv)
 {
     signal(SIGPIPE, SIG_IGN);
     /*
+     * Build banner, always first, always on the forward log path.
+     *
+     * A device log that only proves WHICH binary was running is worth more than
+     * any amount of guessing: the v1.5.0 log carried v1.4.9's relay messages
+     * but none of v1.5.0's, which is what exposed that a stale uml-netd was
+     * still on disk. The app never noticed, because the manifest digest is
+     * only consulted when the manifest actually carries one, and a cached or
+     * fallback manifest does not. Say so on every start.
+     */
+    fwd_logf_("uml-netd: build %s (gateway level %s, frame-logging on)",
+              UML_NETD_BUILD, UML_NETD_API);
+    /*
      * Lifecycle: the daemon lives exactly as long as the kernel connection.
      * - UML dies        -> kfd EOF -> the daemon exits and unlinks its socket.
      * - The app dies    -> the kernel dies too -> same EOF -> same cleanup.
@@ -1175,6 +1200,10 @@ int main(int argc, char **argv)
 
     const char *path = NULL;
     for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--version")) {
+            printf("uml-netd build %s api %s\n", UML_NETD_BUILD, UML_NETD_API);
+            return 0;
+        }
         if (!strcmp(argv[i], "--socket") && i + 1 < argc) {
             path = argv[++i];
         } else if (!strcmp(argv[i], "--dns") && i + 1 < argc) {

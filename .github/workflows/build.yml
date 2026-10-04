@@ -1,4 +1,28 @@
 name: Build & Update Release
+# v1.5.1 build round — the phone was booting a two-releases-old uml-netd.
+#
+# The v1.5.0 device log carried v1.4.9's "abandoned after 13 SYN attempts"
+# and none of v1.5.0's frame logging, while the app itself reported versionCode
+# 150 and "all engine files already match the release manifest". startUmlNetd()
+# called ensureUmlNetd() only when the file was ABSENT, and ensureUmlNetd() only
+# compares a digest when the manifest it resolves actually carries one for
+# uml-netd — a cached or fallback manifest carries none, so the digest branch
+# never ran and a rebuilt gateway stayed on disk indefinitely. Every diagnosis
+# written from that log was therefore read off a binary two releases old.
+#
+# uml-netd now answers "--version" with its build and gateway level and prints
+# the same banner as its first log line, so a device log always proves which
+# binary ran. The app asks the file on disk for that level on every boot and
+# re-fetches it when it is older than the engine needs, which needs no manifest
+# and no bookkeeping; ensureUmlNetd() returns on that check before touching the
+# network so the happy path stays offline.
+#
+# Deliberately NOT in this round: the two guest-console FAILED lines (the 9p
+# sdcard share, which UML cannot mount at all, and ifupdown's networking.service)
+# and the x-systemd.device-timeout warning on the 9p fstab entry. They are
+# cosmetic, and fixing them means a new 366 MB rootfs.imgz that every phone would
+# have to download while the actual boot blocker is still open.
+#
 # v1.4.10 build round — makes the frame path observable.
 #
 # v1.4.9 fixed the relay-table wedge and the device log proves it: the slots

@@ -1836,12 +1836,14 @@ public final class RootlessEngine {
     private boolean startUmlNetd() {
         try {
             File netd = RootlessPaths.umlNetd(app);
-            if (!netd.isFile()) {
-                // Engines installed before the BESS gateway existed look complete but
-                // have no uml-netd, which silently costs USB passthrough. Pull the
-                // one 2.9 MB file instead of sending the user back to the installer.
-                QemuInstaller.ensureUmlNetd(app);
-            }
+            // Every boot, not only when the file is absent. ensureUmlNetd()
+            // re-fetches a gateway that reports an older API level than this
+            // build needs, which is the only way a phone picks up a rebuilt
+            // uml-netd without reinstalling the app — the manifest digest can
+            // only do it when the manifest the app happens to hold carries one,
+            // and a cached or fallback manifest does not. Engines installed
+            // before the BESS gateway existed are covered by the same call.
+            QemuInstaller.ensureUmlNetd(app);
             if (!netd.isFile()) return false;
             netd.setExecutable(true, false);
             File sock = RootlessPaths.umlNetdSock(app);
