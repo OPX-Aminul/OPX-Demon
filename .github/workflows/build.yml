@@ -1,4 +1,34 @@
 name: Build & Update Release
+# v1.6.0 build round — v1.5.1 ran on the phone and STILL booted the old gateway.
+#
+# The device log is unambiguous this time: "engine check: verifying every engine
+# file against the release manifest (app versionCode 151)" is followed by "all
+# engine files already match the release manifest", and the running uml-netd
+# still prints none of v1.5.1's lines. The reason is in QemuDownloader's own
+# fallback bundle:
+#
+#     // ... hashes are empty so downloads are accepted
+#     new RemoteManifest.Asset(OpxDemonEndpoints.FALLBACK_UML_NETD, "", 0)
+#
+# When the app cannot use the live manifest it falls back to that bundle, whose
+# uml_netd asset has an EMPTY sha256. Every digest test in the engine is guarded
+# by "sha256.length() == 64", so with the fallback manifest in play the gateway
+# is invisible: RootlessCoreFiles.addIfNeeded() reports no gap ("all engine
+# files already match") and ensureUmlNetd() takes its "else if (dest.isFile())"
+# branch and keeps whatever binary is on disk, forever. The v1.5.1 API check
+# could not break that either, because it only deleted the file for a gateway
+# that ANSWERED with a level too low, and the stale one answers nothing at all.
+#
+# So a gateway that does not answer --version is now treated as stale and
+# re-fetched, and both outcomes are written to the log store (a Log.i line never
+# reaches the exported log, which is how this stayed invisible). Cost: one 2.9 MB
+# download, once — a build that can answer always answers.
+#
+# The same round carries the audit's one real code fix: tx_frame() split a
+# partial write into two datagrams on a SOCK_SEQPACKET socket, which the kernel
+# reads as one truncated frame plus one garbage frame; it now retries the whole
+# frame and never splits it.
+#
 # v1.5.1 build round — the phone was booting a two-releases-old uml-netd.
 #
 # The v1.5.0 device log carried v1.4.9's "abandoned after 13 SYN attempts"

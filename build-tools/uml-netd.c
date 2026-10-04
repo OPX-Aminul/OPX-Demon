@@ -305,20 +305,31 @@ static void tx_frame(const void *buf, size_t len)
                   g_tx_frames + 1, len, f[12], f[13],
                   f[0], f[1], f[2], f[3], f[4], f[5]);
     g_tx_frames++;
-    const char *p = buf;
-    size_t off = 0;
-    while (off < len) {
-        ssize_t n = write(kfd, p + off, len - off);
-        if (n > 0) {
-            off += (size_t)n;
-            continue;
-        }
-        if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+    /*
+     * One write() == one datagram on SOCK_SEQPACKET, and the kernel reads it
+     * with a single readv (vector_mmsg_rx -> uml_vector_recvmmsg). A SHORT
+     * write therefore cannot be resumed: the receiver already got a truncated
+     * frame, and writing the remainder as a second write() hands it a bogus
+     * second frame. The old loop advanced by n and wrote the tail as a fresh
+     * datagram, which turns one partial write into one corrupt + one garbage
+     * frame. Retry the whole frame instead, and never split it.
+     */
+    for (int attempt = 0; attempt < 3; attempt++) {
+        ssize_t n = write(kfd, buf, len);
+        if (n == (ssize_t)len) return;
+        if (n < 0 && errno == EINTR) continue;
+        if (n >= 0) {
+            fwd_logf_("uml-netd: short write to the guest (%zd of %zu bytes)"
+                      " — frame dropped whole, never split into two datagrams",
+                      n, len);
+        } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
             struct pollfd pf = { .fd = kfd, .events = POLLOUT, .revents = 0 };
             poll(&pf, 1, 100);
             continue;
+        } else {
+            return; /* kernel socket is gone; the poll loop will reap it */
         }
-        return; /* kernel socket is gone; the poll loop will reap it */
+        return;
     }
 }
 

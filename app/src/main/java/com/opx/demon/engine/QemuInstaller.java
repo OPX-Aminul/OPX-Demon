@@ -444,12 +444,26 @@ public final class QemuInstaller {
                 dest.setExecutable(true, false);
                 return true;
             }
-            if (api >= 0) {
-                Log.i(TAG, "uml-netd reports API " + api + ", this app needs "
-                        + UML_NETD_MIN_API + " — re-downloading");
-                //noinspection ResultOfMethodCallIgnored
-                dest.delete();
-            }
+            // Anything below the level this build needs is re-fetched, AND SO IS
+            // A GATEWAY THAT CANNOT ANSWER --version AT ALL (api < 0). That last
+            // case is not a detail: it is the one that kept a stale daemon on the
+            // phone for release after release. The manifest digest branch below
+            // cannot catch it, because QemuDownloader's fallback bundle hands
+            // uml_netd an EMPTY sha256 ("hashes are empty so downloads are
+            // accepted") — every digest test in the engine is skipped when the
+            // app cannot use the live manifest, so the old binary was reported as
+            // "already matching the release manifest" while it was two releases
+            // old. A build that can answer --version always answers with its
+            // level, so treating silence as stale costs exactly one 2.9 MB
+            // download and can never repeat. This is the same failure shape as
+            // the rootfs pin: a check that quietly does nothing.
+            GuestExec.logToStore("uml-netd verification: " + (api < 0
+                    ? "the gateway on disk does not answer --version (older than "
+                      + "this app's check)"
+                    : "gateway API " + api + ", this app needs " + UML_NETD_MIN_API)
+                    + " — re-downloading");
+            //noinspection ResultOfMethodCallIgnored
+            dest.delete();
             // A rebuild can ship a new uml-netd with the SAME size — and the
             // boot path adds new command-line flags to it (v1.2.8 added
             // --forward). Size alone would then boot with a stale daemon
@@ -486,9 +500,18 @@ public final class QemuInstaller {
             boolean ok = fetch(a, dest, "UML netd", null);
             if (ok) //noinspection ResultOfMethodCallIgnored
                 dest.setExecutable(true, false);
+            // Both outcomes go to the log store, not just logcat: whether the
+            // refresh happened is the first question any boot log has to answer,
+            // and a Log.i line never reaches the exported log at all.
+            GuestExec.logToStore(ok
+                    ? "uml-netd verification: gateway re-fetched (" + dest.length()
+                      + " bytes) — restarting the boot path with the current one"
+                    : "uml-netd verification: re-fetch FAILED — the file was removed,"
+                      + " so this boot has no network gateway");
             return ok;
         } catch (Throwable t) {
             Log.w(TAG, "uml-netd auto-install failed: " + t);
+            GuestExec.logToStore("uml-netd verification: re-fetch failed (" + t + ")");
             return false;
         }
     }
