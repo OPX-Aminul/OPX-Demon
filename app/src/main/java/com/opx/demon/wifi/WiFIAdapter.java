@@ -83,6 +83,9 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
     private static final Pattern MAC_TOKEN = Pattern.compile("(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}");
 
     private String archiveCapture(String captureDir, String filename) {
+        // Set once the capture file is actually on disk, so the caller can tell
+        // "nothing was written" from "written, but no handshake inside".
+        archiveHadFile = false;
         String safe = filename.replaceAll("[^A-Za-z0-9._-]", "_");
         if (safe.length() > 120) safe = safe.substring(safe.length() - 120);
         String dest = captureDir + "/" + safe;
@@ -100,7 +103,18 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
         }
         if (newest != null) {
             core.moveFile(newest.getAbsolutePath(), dest);
-            if (new java.io.File(dest).isFile()) return dest;
+            if (new java.io.File(dest).isFile()) {
+                archiveHadFile = true;
+                // Ported from strykerapp 6.5: airodump creates handshake-<bssid>.cap
+                // as soon as it sees EAPOL traffic, long before a full four-way
+                // handshake lands in it. Accepting the file on sight reported
+                // captures that aircrack then rejected as having no handshake at
+                // all, which is the single most confusing failure in this flow —
+                // the user sees "captured" and nothing crackable. Parse the pcap
+                // on the host and only hand back a capture that really carries
+                // a handshake (or a PMKID).
+                return verifyCapture(dest) ? dest : null;
+            }
         }
         if (core.isRootless()) return null;
 
@@ -111,7 +125,33 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
         core.customMegaCommand("mkdir -p '" + captureDir + "'; "
                 + "src=$(ls -1t '" + hsDir + "'/handshake-*.cap 2>/dev/null | head -n 1); "
                 + "if [ -n \"$src\" ]; then mv -f \"$src\" '" + dest + "'; fi");
-        return new java.io.File(dest).isFile() ? dest : null;
+        if (!new java.io.File(dest).isFile()) return null;
+        archiveHadFile = true;
+        return verifyCapture(dest) ? dest : null;
+    }
+
+    /**
+     * True when the capture really carries something crackable.
+     *
+     * Parses the pcap directly on the host (no guest shell, no aircrack), so it
+     * works identically under both engines and costs a file read instead of a
+     * VM round trip. A file that cannot be parsed at all is accepted rather
+     * than discarded: it may be a capture format this parser does not know,
+     * and silently dropping it would be worse than showing it to the user.
+     */
+    private boolean archiveHadFile = false;
+
+    private boolean verifyCapture(String path) {
+        try {
+            java.io.File f = new java.io.File(path);
+            if (!f.isFile() || f.length() < 24) return false;
+            com.opx.demon.handshakes.CaptureInfo info =
+                    com.opx.demon.handshakes.CaptureInfo.of(f);
+            if (info.kind == com.opx.demon.handshakes.CaptureInfo.Kind.UNREADABLE) return true;
+            return info.usable();
+        } catch (Throwable t) {
+            return true;
+        }
     }
 
 
@@ -859,7 +899,15 @@ public class WiFIAdapter extends RecyclerView.Adapter<WiFIAdapter.ViewHolder> {
                             sendEvent(hsStatus[0] ? "Handshake captured!" : "PMKID captured!");
                             String saved = archiveCapture(captureDir, filename);
                             if (saved == null) {
-                                sendEvent("Capture file not found — nothing was saved.");
+                                // archiveCapture returns null both when the file
+                                // never appeared and when it appeared without a
+                                // usable handshake in it. Saying "not found" for
+                                // the second case is how users end up hunting for
+                                // a file that was written all along.
+                                sendEvent(archiveHadFile
+                                        ? "No usable handshake in the capture — the file was"
+                                        + " written but has no EAPOL handshake, so it cannot be cracked."
+                                        : "Capture file not found — nothing was saved.");
                             } else {
                                 sendEvent((hsStatus[0] ? "Handshake" : "PMKID") + " saved to " + saved);
                                 com.opx.demon.geomac.GeoHooks.recordHandshake(

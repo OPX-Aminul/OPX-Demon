@@ -136,6 +136,33 @@ grep -q '^CONFIG_RTL8XXXU=y'           "${SRC}/.config" || die "RTL8XXXU missing
 grep -q '^CONFIG_ATH9K_HTC=y'          "${SRC}/.config" || die "ATH9K_HTC missing (USB-WiFi parity)"
 grep -q '^CONFIG_BLK_DEV_LOOP=y'       "${SRC}/.config" || die "LOOP missing (.img/.iso mount)"
 
+# The full required-symbol list the original developer's build-uml.sh asserts,
+# collected into one list so a regression names every missing symbol at once
+# instead of one per run. Under ARCH=um the usual cause is a missing
+# UML_IOMEM_EMULATION or UML_DMA_EMULATION: without those two, Kconfig never
+# even OFFERS anything that looks like a device driver, so the fragment looks
+# applied while every driver silently drops out of the build.
+#
+# UML_NET from that upstream list is deliberately absent: it does not exist in
+# this tree (grep -rn '^config UML_NET$' --include=Kconfig finds nothing). It is
+# the pre-vector name for the same feature; here the only symbol is
+# UML_NET_VECTOR, which IS asserted above.
+REQUIRED_SYMBOLS="STATIC_LINK UML_NET_VECTOR HOSTFS BLK_DEV_UBD
+UML_IOMEM_EMULATION UML_DMA_EMULATION USBIP_VHCI_HCD
+PACKET CFG80211 MAC80211 RTL8XXXU RTW88_8812AU RTW88_8821AU ATH9K_HTC
+MT7601U RT2800USB BLK_DEV_LOOP"
+MISSING=""
+for sym in ${REQUIRED_SYMBOLS}; do
+    grep -qx "CONFIG_${sym}=y" "${SRC}/.config" || MISSING="${MISSING} ${sym}"
+done
+if [ -n "${MISSING}" ]; then
+    die "these did not survive olddefconfig:${MISSING}
+  Under ARCH=um the usual cause is a missing UML_IOMEM_EMULATION or
+  UML_DMA_EMULATION -- without those two nothing that looks like a device
+  driver is even offered."
+fi
+log "all required UML symbols are built in"
+
 # ── Build ────────────────────────────────────────────────────────────────────
 # The UML kernel is built as a userspace binary. CC carries the full Android
 # target (--target + NDK sysroot) so the kernel compiles against the NDK
@@ -219,6 +246,17 @@ fi
 
 # ── Sanity checks (fail the build rather than shipping a broken engine) ─────
 [ -s "${OUT}/linux-uml" ] || die "linux-uml is empty"
+# Never wire the UML console straight to a regular file when reproducing a boot
+# by hand. UML drives its console with epoll, and epoll_ctl() rejects a regular
+# file with EPERM: redirected straight to a file the kernel boots as far as the
+# console driver and then stops with
+#     epollctl add err fd 1, Operation not permitted
+# which reads exactly like a broken image. A pipe is pollable, so pipe it into
+# cat. The app is unaffected — RootlessEngine hands the kernel a pipe via
+# ProcessBuilder and only merges stderr — but this bites anyone testing a build
+# from a shell, which is what the original developer's test-uml.sh does.
+#   ( timeout 120 ./linux-uml ubda=... root=/dev/ubda rw mem=512M \
+#       con=null con0=fd:0,fd:1 < /dev/null 2>&1 | cat > /tmp/uml.log ) || true
 SIZE="$(stat -c %s "${OUT}/linux-uml")"
 [ "${SIZE}" -gt 10485760 ] || die "linux-uml suspiciously small (${SIZE} bytes)"
 if command -v readelf >/dev/null 2>&1; then

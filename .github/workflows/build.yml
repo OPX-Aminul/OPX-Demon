@@ -1,4 +1,17 @@
 name: Build & Update Release
+# v1.4.1 build round — UML build-script parity plus the 6.5 handshake-verification fix.
+# uml-build.sh now asserts the original developer's full required-symbol list in
+# one pass (UML_IOMEM_EMULATION / UML_DMA_EMULATION first: without those two Kconfig
+# never offers a device driver, so the fragment looks applied while every driver
+# drops out). UML_NET is left out of that list deliberately — it does not exist in
+# this tree; grep -rn '^config UML_NET$' --include=Kconfig finds nothing, it is the
+# pre-vector name for the same feature and UML_NET_VECTOR is asserted instead.
+# Also documents the epoll trap: UML drives its console with epoll and epoll_ctl()
+# rejects a regular file with EPERM, so a hand-rolled test must pipe into cat.
+# CaptureInfo: a self-contained pcap reader that decides whether a .cap really
+# carries an EAPOL handshake or a PMKID. airodump creates handshake-*.cap as soon
+# as it sees EAPOL traffic, so accepting the file on sight reported captures that
+# aircrack then rejected as having no handshake at all.
 # v1.3.9 build round — port of strykerapp 6.5's engine-selection and Wi-Fi UI fixes.
 # DeviceCapabilities: probes the device (ABI + memory-page size, RAM, storage,
 # network, root) and actually LAUNCHES the UML kernel for up to 12s via UmlProbe,
