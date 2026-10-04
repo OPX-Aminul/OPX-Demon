@@ -1,4 +1,20 @@
 name: Build & Update Release
+# v1.4.4 build round — publishes the four feature packages ported from
+# strykerapp 6.5: wordlists (15 files), wifi/attack (4), wifi/guest (2) and
+# hashcrack (3), 5,622 lines in total, which had no counterpart in this app at
+# all. Android CI is green on the port; this round exists because build.yml
+# does not watch app/**, so an app-only change that needs a shipped APK has to
+# touch this file to chain the release — the convention noted below.
+#
+# Adapted rather than copied verbatim where this app's shape differs: the guest
+# flow goes through the single RootlessEngine instead of upstream's Engines /
+# GuestEngine split; QemuInstaller returns a boolean here, so its three-way
+# Outcome collapses to ok/failed; UsbHostAccess keeps its own permission lock
+# because there is no shared manager instance to share upstream's with.
+# Core gained overrideEngine/engineOverride (force an engine for one instance
+# without repointing the app), guestShare (the path the guest sees) and
+# RootlessEngine.missing (names the absent file).
+#
 # v1.4.3 build round — dashboard UI elements from strykerapp 6.5.
 # diffing the two apps showed our dashboard still lacked three things upstream
 # had, all of them real affordances rather than cosmetics:
