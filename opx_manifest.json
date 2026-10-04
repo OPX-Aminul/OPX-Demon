@@ -46,13 +46,13 @@
     },
     "initrd": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/initrd.img",
-      "sha256": "ff8cbf0158936c8c201d437fb69a16a748bb3648947d85a8a4b4b566fd41b2cf",
-      "size": 39098942
+      "sha256": "c5afd00f19baf71cc372526af3ff73eed7974fa812f0149d9ac0753cd0d31c49",
+      "size": 39097698
     },
     "rootfs": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/rootfs.imgz",
-      "sha256": "905851a1b978f743e1f434527cd3ff6005c95a0f145165b03e5412b5534d557d",
-      "size": 366790810
+      "sha256": "105450d268de492f9a9b2ff291b854089e4953d977cb46ff6ff433ab95ce6b66",
+      "size": 366776071
     },
     "uml_kernel": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/uml-mode-all-file/linux-uml",
@@ -86,8 +86,8 @@
     },
     "initrd": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/initrd.img",
-      "sha256": "ff8cbf0158936c8c201d437fb69a16a748bb3648947d85a8a4b4b566fd41b2cf",
-      "size": 39098942
+      "sha256": "c5afd00f19baf71cc372526af3ff73eed7974fa812f0149d9ac0753cd0d31c49",
+      "size": 39097698
     },
     "libslirp": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/libslirp.so",
@@ -96,8 +96,8 @@
     },
     "rootfs": {
       "url": "https://github.com/OPX-Aminul/OPX-Demon/releases/download/all-core-file/rootfs.imgz",
-      "sha256": "905851a1b978f743e1f434527cd3ff6005c95a0f145165b03e5412b5534d557d",
-      "size": 366790810
+      "sha256": "105450d268de492f9a9b2ff291b854089e4953d977cb46ff6ff433ab95ce6b66",
+      "size": 366776071
     }
   },
   "app": {
