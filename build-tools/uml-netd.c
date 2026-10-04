@@ -81,7 +81,32 @@ static const uint8_t IP_GUEST[4] = { 10, 0, 2, 15 };
 static const uint8_t IP_HOST[4]  = { 10, 0, 2, 2 };
 
 static const uint8_t MAC_GATE[6]  = {0x52, 0x54, 0x00, 0x12, 0x34, 0x02};
-static const uint8_t MAC_GUEST[6] = {0x52, 0x54, 0x00, 0x12, 0x34, 0x15};
+
+static void fwd_logf_(const char *fmt, ...);
+
+/* Destination MAC for every gateway->guest frame.
+ *
+ * The kernel command line pins vec0 to this address (RootlessEngine emits
+ * "mac=" on the vec0 spec), so it starts out correct. It is kept mutable and
+ * refreshed from the source address of each frame the kernel sends us: the
+ * UML vector driver falls back to eth_hw_addr_random() whenever the ifspec has
+ * no mac=, and a frame addressed to a MAC the NIC does not own is dropped
+ * without a word — ARP still succeeded, so the guest believed it had a route
+ * while no TCP packet ever arrived ("no SYN-ACK after 6 tries"). Learning the
+ * real address makes that failure mode impossible even if the two ends drift. */
+static uint8_t guest_mac[6] = {0x52, 0x54, 0x00, 0x12, 0x34, 0x15};
+
+/* Record the guest NIC's address from the frame we just received. Only the
+ * kernel writes into this socket, so its source address is always the guest. */
+static void learn_mac(const uint8_t *smac)
+{
+    if (smac[0] & 0x01) return;          /* multicast/broadcast source: bogus */
+    if (memcmp(smac, guest_mac, 6) == 0) return;
+    memcpy(guest_mac, smac, 6);
+    fwd_logf_("uml-netd: guest MAC is now %02x:%02x:%02x:%02x:%02x:%02x",
+              guest_mac[0], guest_mac[1], guest_mac[2],
+              guest_mac[3], guest_mac[4], guest_mac[5]);
+}
 
 #define MAX_FRAME   65536
 #define MSS         1400
@@ -277,7 +302,7 @@ static void tx_ipv4(uint8_t proto, const void *payload, size_t plen,
     if (plen > 1600) return;
     size_t total = 14 + 20 + plen;
 
-    memcpy(out, MAC_GUEST, 6);      /* dst = guest NIC */
+    memcpy(out, guest_mac, 6);      /* dst = guest NIC */
     memcpy(out + 6, MAC_GATE, 6);   /* src = gateway */
     out[12] = 0x08;
     out[13] = 0x00;
@@ -310,7 +335,7 @@ static void send_gratuitous_arp(void)
 {
     uint8_t a[42];
     memset(a, 0, sizeof a);
-    memcpy(a, MAC_GUEST, 6);
+    memcpy(a, guest_mac, 6);
     memcpy(a + 6, MAC_GATE, 6);
     a[12] = 0x08;
     a[13] = 0x06;
@@ -321,7 +346,7 @@ static void send_gratuitous_arp(void)
     a[20] = 0x00; a[21] = 1;        /* request (gratuitous) */
     memcpy(a + 22, MAC_GATE, 6);
     memcpy(a + 28, IP_HOST, 4);     /* sender IP */
-    memcpy(a + 32, MAC_GUEST, 6);   /* target MAC */
+    memcpy(a + 32, guest_mac, 6);   /* target MAC */
     memcpy(a + 38, IP_HOST, 4);     /* target IP */
     tx_frame(a, sizeof a);
 }
@@ -1287,6 +1312,10 @@ int main(int argc, char **argv)
                 }
                 last_activity = now;
                 if (n < 14) continue;
+
+                /* Every frame arriving on this socket came from the guest NIC,
+                 * so its source address is the one we must address replies to. */
+                learn_mac(frame + 6);
 
                 uint16_t et = (uint16_t)((frame[12] << 8) | frame[13]);
                 if (et == 0x0806) {

@@ -832,6 +832,14 @@ public final class RootlessEngine {
     /** Name the payload carries inside the 9p share, i.e. /sdcard/OPX-Demon/<this> in the guest. */
     private static final String STAGED_CORE = ".opxdemon-guest-core.tar";
 
+    /**
+     * MAC address the guest's vec0 NIC is pinned to on the kernel command line.
+     * Must equal {@code MAC_GUEST} in {@code build-tools/uml-netd.c}: uml-netd
+     * addresses every gateway-&gt;guest frame to that address, and the UML vector
+     * driver otherwise hands vec0 a random one, which vec0 then discards.
+     */
+    private static final String UML_NETD_GUEST_MAC = "52:54:00:12:34:15";
+
     public synchronized boolean ensureGuestCore() {
         if (!isReady() && !startBlocking(null)) return false;
         ArrayList<String> chk = GuestExec.run("[ -f " + CORE_MARKER + " ] && "
@@ -1715,7 +1723,21 @@ public final class RootlessEngine {
             // which carries `usbip attach -r 10.0.2.2` to the USB/IP server.
             // No CAP_NET_ADMIN, no /dev/net/tun, no VpnService — both endpoints
             // are ordinary app processes.
-            a.add("vec0:transport=bess,dst=" + RootlessPaths.umlNetdSock(app).getAbsolutePath());
+            //
+            // mac= is REQUIRED, not cosmetic. vector_eth_configure() in
+            // arch/um/drivers/vector_kern.c calls eth_hw_addr_random() when the
+            // ifspec carries no mac=, so the guest NIC gets a RANDOM address.
+            // uml-netd addresses its IP frames to the MAC_GUEST constant
+            // (52:54:00:12:34:15) in build-tools/uml-netd.c, so without this
+            // every gateway->guest frame is addressed to a MAC vec0 does not
+            // own and the NIC drops it silently. ARP still works — handle_arp()
+            // replies to the address the guest actually asked from — which is
+            // why the guest resolves 10.0.2.2 and believes it has a route while
+            // no TCP packet ever arrives: "no SYN-ACK after 6 tries".
+            //
+            // Keep this in sync with MAC_GUEST in build-tools/uml-netd.c.
+            a.add("vec0:transport=bess,dst=" + RootlessPaths.umlNetdSock(app).getAbsolutePath()
+                    + ",mac=" + UML_NETD_GUEST_MAC);
             // Give vec0 the QEMU/slirp-equivalent addressing. Parsed when CONFIG_IP_PNP
             // is on (do_ipauto in drivers/net/ipv4/devinet.c); on kernels without it
             // the parameter is ignored by the kernel and vec0 is configured from the
