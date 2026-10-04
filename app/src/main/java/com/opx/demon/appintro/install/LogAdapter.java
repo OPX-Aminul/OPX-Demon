@@ -64,6 +64,22 @@ public final class LogAdapter extends RecyclerView.Adapter<LogAdapter.VH> {
         if (size > 0) notifyItemRangeRemoved(0, size);
     }
 
+    /**
+     * The whole log as plain text, for the dialog's copy button.
+     *
+     * Renders the same level prefix the rows show, so what lands on the
+     * clipboard is recognisable as the log the user was looking at rather than
+     * an undifferentiated wall of lines.
+     */
+    public String asText() {
+        StringBuilder sb = new StringBuilder();
+        for (LogLine line : lines) {
+            sb.append('[').append(line.level.name()).append("] ")
+              .append(line.text).append(System.lineSeparator());
+        }
+        return sb.toString();
+    }
+
     public int size() {
         return lines.size();
     }

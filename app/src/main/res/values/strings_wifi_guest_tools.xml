@@ -17,6 +17,7 @@
     <string name="engine_uml_name">UML-ARM64 (Experimental)</string>
     <string name="engine_vm_name">Virtual machine</string>
     <string name="hc_copied">Copied</string>
+    <string name="hc_progress">%1$s tried · %2$s</string>
     <string name="hc_error">Failed: %1$s</string>
     <string name="hc_found">%1$d of %2$d cracked · %3$s tried · %4$s</string>
     <string name="hc_loaded">%1$d hashes loaded</string>

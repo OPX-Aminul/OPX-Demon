@@ -123,8 +123,8 @@ public final class WifiGuestSetup {
             // Adapted: our installer returns a boolean and does not take an
             // engine type (it provisions whichever engine the user has chosen),
             // so the upstream three-way Outcome collapses to ok/failed here.
-            boolean installed = QemuInstaller.install(app, installProgress());
-            if (!installed) {
+            boolean installOk = QemuInstaller.install(app, installProgress());
+            if (!installOk) {
                 WifiEngine.disarm(core);
                 fail(Step.FILES, s(R.string.wg_install_failed), s(R.string.wg_check_log), true);
                 return;

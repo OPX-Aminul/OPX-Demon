@@ -908,6 +908,9 @@ public class Core {
 
     /** True when the last generateSuProcess() could not spawn su at all. See the note there. */
     private volatile boolean suSpawnFailed = false;
+
+    /** Per-instance engine override; null means "follow the app setting". */
+    private volatile EngineType engineOverride = null;
     private volatile boolean suMissingLogged = false;
 
     public boolean suSpawnFailed() { return suSpawnFailed; }
@@ -1140,6 +1143,47 @@ public class Core {
     }
     public boolean isRootless() {
         return EngineType.isRootless(this);
+    }
+
+    /**
+     * Forces every engine decision made through this instance to use one
+     * engine, without changing what the user picked.
+     *
+     * This is how a USB Wi-Fi adapter session boots the engine it was bound to
+     * rather than whatever the app is currently configured for: the guest needs
+     * that engine for the adapter's lifetime, but persisting the switch would
+     * silently repoint the user's whole app. Returns this, so
+     * {@code new Core(ctx).overrideEngine(t)} reads as one expression.
+     *
+     * Null clears the override.
+     */
+    public Core overrideEngine(EngineType type) {
+        this.engineOverride = type;
+        return this;
+    }
+
+    /** The engine forced on this instance, or null when following the app setting. */
+    public EngineType engineOverride() {
+        return engineOverride;
+    }
+
+    /**
+     * The path the guest sees its share directory at.
+     *
+     * Under the rootless engines the share is a 9p/hostfs mount, so it is not
+     * the host path; under the root chroot it is the shared-storage directory.
+     * Callers that write files for the guest must use this, not
+     * {@link #getShareRoot()} — the two differ exactly when the app runs
+     * without root, which is the configuration these callers exist for.
+     */
+    public String guestShare() {
+        if (isRootless()) {
+            RootlessEngine e = rootless();
+            if (e != null && e.resolveShareDir() != null) {
+                return e.resolveShareDir().getAbsolutePath();
+            }
+        }
+        return getStorage() + "OpxDemon";
     }
 
     public RootlessEngine rootless() {
