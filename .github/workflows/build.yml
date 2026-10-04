@@ -1,4 +1,10 @@
 name: Build & Update Release
+# v1.4.5 build round — publishes the 6.5 visuals we could actually place
+# (AuroraView behind the engine card, IntroBackgroundView behind the app
+# intro, the credits screen reachable from About) plus the guest Wi-Fi entry
+# point. build.yml does not watch app/**, so this round exists to chain a
+# signed APK for an app-only change.
+#
 # v1.4.4 build round — publishes the four feature packages ported from
 # strykerapp 6.5: wordlists (15 files), wifi/attack (4), wifi/guest (2) and
 # hashcrack (3), 5,622 lines in total, which had no counterpart in this app at
