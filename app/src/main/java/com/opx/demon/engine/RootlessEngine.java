@@ -966,8 +966,16 @@ public final class RootlessEngine {
            // hostfwd — the 'listening' check below would then lie about being up. Self-heal the
            // network first: static slirp addresses on eth0, and persist them so the next boot
            // does not start from the same broken state (pre-rootfs.imgz guests only).
-           .append("if ! ip -4 addr show dev ").append(netIf).append(" 2>/dev/null | grep -q '10.0.2.15'; then ")
+           // Bring the link up FIRST, unconditionally. It used to sit inside the
+           // "address is missing" branch below, which made it dead code: the
+           // kernel's ip= parameter does hand vec0 its 10.0.2.15 address, so the
+           // branch never ran and vec0 stayed administratively DOWN. A guest can
+           // listen on a down interface - which is why the agent check reported
+           // __AGENT_UP__ and "vec0 = 10.0.2.15/24" while uml-netd never got a
+           // SYN-ACK: the guest could not transmit a single packet. configureGuestNetIf()
+           // has always done it in this order, and that is the order that works.
            .append("ip link set ").append(netIf).append(" up 2>/dev/null; ")
+           .append("if ! ip -4 addr show dev ").append(netIf).append(" 2>/dev/null | grep -q '10.0.2.15'; then ")
            .append("ip addr flush dev ").append(netIf).append(" 2>/dev/null; ")
            .append("ip addr add 10.0.2.15/24 dev ").append(netIf).append(" 2>/dev/null; ")
            .append("ip route add default via 10.0.2.2 dev ").append(netIf).append(" 2>/dev/null; ")
