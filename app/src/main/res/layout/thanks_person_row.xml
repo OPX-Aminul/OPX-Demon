@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/thanks_chip_bg"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingTop="13dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="13dp">
+
+    <View
+        android:id="@+id/thanks_person_dot"
+        android:layout_width="7dp"
+        android:layout_height="7dp"
+        android:background="@drawable/capability_dot_bg" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/thanks_person_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:textColor="@color/thanks_text"
+        android:textSize="15sp" />
+</LinearLayout>

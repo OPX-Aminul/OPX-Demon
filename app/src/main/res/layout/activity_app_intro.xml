@@ -1,12 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/light_contrast"
-    android:orientation="vertical"
     tools:context=".appintro.AppIntroActivity">
+
+    <!-- Ported from strykerapp 6.5: the intro runs on an animated backdrop. -->
+    <com.opx.demon.appintro.IntroBackgroundView
+        android:id="@+id/intro_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -87,4 +97,5 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-</LinearLayout>
+    </LinearLayout>
+</FrameLayout>

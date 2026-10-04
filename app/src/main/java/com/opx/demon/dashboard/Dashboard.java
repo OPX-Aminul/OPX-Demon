@@ -74,6 +74,8 @@ public class Dashboard extends Fragment {
     private TextView vmCpuValue, vmRamValue;
     private SparklineView vmCpuGraph, vmRamGraph;
     private VmRingView vmRing;
+    /** Animated aurora backdrop behind the engine card (ported from strykerapp 6.5). */
+    private com.opx.demon.utils.AuroraView vmAurora;
     private ExpandableLayout vmStatusExpand, vmLogsExpand;
     private final Handler vmHandler = new Handler(Looper.getMainLooper());
     private boolean vmRefreshing = false;
@@ -342,6 +344,7 @@ public class Dashboard extends Fragment {
         vmStatusChevron = view.findViewById(R.id.vm_status_chevron);
         vmStatusExpand = view.findViewById(R.id.vm_status_expand);
         vmRing = view.findViewById(R.id.vm_ring);
+        vmAurora = view.findViewById(R.id.vm_aurora);
 
         if (!core.isRootless()) {
             if (cardTitle != null) cardTitle.setText("Chroot engine");
@@ -780,6 +783,7 @@ public class Dashboard extends Fragment {
         vmLogScroll = null;
         lastVmLog = null;
         vmRing = null;
+        vmAurora = null;
         vmCpuGraph = null;
         vmRamGraph = null;
          vmCpuValue = null;

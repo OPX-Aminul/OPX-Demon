@@ -44,6 +44,8 @@ public class AppIntroActivity extends FragmentActivity {
     private ScreenPagerAdapter pagerAdapter;
     private LinearProgressIndicator progress;
     private MaterialTextView stepLabel;
+    /** Animated intro backdrop (ported from strykerapp 6.5). */
+    private IntroBackgroundView introBackground;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,6 +55,7 @@ public class AppIntroActivity extends FragmentActivity {
         mPager = findViewById(R.id.view_pager);
         progress = findViewById(R.id.intro_progress);
         stepLabel = findViewById(R.id.intro_step);
+        introBackground = findViewById(R.id.intro_bg);
 
         mPager.setUserInputEnabled(false);
         mPager.setPageTransformer(new SlideFadeTransformer());

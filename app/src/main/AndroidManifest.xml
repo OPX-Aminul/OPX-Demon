@@ -90,6 +90,13 @@
             android:name=".utils.LicenseActivity"
             android:exported="false" />
 
+        <!-- Credits screen, ported from strykerapp 6.5. -->
+        <activity
+            android:name=".about.ThanksActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
+            android:exported="false"
+            android:theme="@style/Theme.OpxDemon" />
+
         <activity
             android:name=".hid.ui.HidIdeActivity"
             android:exported="false"

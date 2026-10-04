@@ -62,6 +62,11 @@ public class AboutFragment extends Fragment {
             if (getContext() == null) return;
             startActivity(new Intent(getContext(), LicenseActivity.class));
         });
+        // Credits screen, ported from strykerapp 6.5.
+        view.findViewById(R.id.about_thanks).setOnClickListener(v -> {
+            if (getContext() == null) return;
+            startActivity(new Intent(getContext(), ThanksActivity.class));
+        });
 
         playEntranceAnimation(view);
         startLogoAmbientAnimation(view);

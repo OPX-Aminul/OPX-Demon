@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Credits screen, ported from strykerapp 6.5 (see ThanksActivity). -->
+    <string name="thanks_title">Thank you</string>
+    <string name="thanks_subtitle">OPX-Demon builds on Stryker\'s Linux engines, wordlists and Wi-Fi work. These people made it possible.</string>
+    <string name="thanks_section">SPECIAL THANKS</string>
+    <string name="thanks_community">…and the community</string>
+    <string name="thanks_close">Close</string>
+
+    <color name="thanks_text">#0B2B45</color>
+    <color name="thanks_text_dim">#42708F</color>
+    <color name="thanks_chip_stroke">#22105A8C</color>
+
+    <!-- Upstream contributors whose GPL-licensed work this app builds on. -->
+    <string-array name="thanks_people" translatable="false">
+        <item>zalexdev (Stryker)</item>
+        <item>Nevod</item>
+        <item>Jb314</item>
+        <item>Max</item>
+        <item>Lukas</item>
+        <item>Mirivan</item>
+        <item>The Show Started</item>
+        <item>skilfulwriter (X\u9ed1\u624b)</item>
+    </string-array>
+</resources>

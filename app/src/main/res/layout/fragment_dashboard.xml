@@ -271,6 +271,13 @@
             app:strokeColor="@color/light_lite_contrast"
             app:strokeWidth="1dp">
 
+            <!-- Ported from strykerapp 6.5: an animated aurora sits behind the
+                 engine card so the status panel reads as a live surface. -->
+            <com.opx.demon.utils.AuroraView
+                android:id="@+id/vm_aurora"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
